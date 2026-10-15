@@ -57,6 +57,8 @@ public class FeatureTests
         Assert.Equal(1, models[FixtureLibrary.AyraFogId].ChannelCount);
         Assert.Equal(10, models[FixtureLibrary.GalacticLaserId].ChannelCount);
         Assert.Equal(8, models[FixtureLibrary.ParUvId].ChannelCount);
+        Assert.Equal(7, models[FixtureLibrary.ParUvOnlyId].ChannelCount);
+        Assert.Equal(3, models[FixtureLibrary.ParUvOnlyId].IndicesOf(ChannelType.UV).Length);
 
         var spot = models[FixtureLibrary.Spot260X14Id];
         Assert.Equal(ChannelType.Dimmer, spot.Channels[SpotDimmer].Type);   // canal 11 du guide

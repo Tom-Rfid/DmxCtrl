@@ -27,7 +27,8 @@ public static class FixtureLibrary
     public const string SpiderId = "mindi-mini-spider-15ch";
     public const string AyraFogId = "ayra-wsm02-mkiii";
     public const string GalacticLaserId = "showtec-galactic-rgy140-mkii";
-    public const string ParUvId = "par-led-36-rgb-uv-generic";
+    public const string ParUvId = "par-led-36-rgb-uv-generic";   // RGB + UV (mis de cote : pas le PAR de l'utilisateur)
+    public const string ParUvOnlyId = "par-led-36-uv-generic-7ch"; // UV seul (le PAR de l'utilisateur, table a verifier)
 
     /// <summary>Tous les modeles (copies neuves a chaque appel : on peut les modifier sans risque).</summary>
     public static List<FixtureProfile> All() => new()
@@ -37,6 +38,7 @@ public static class FixtureLibrary
         MiniSpider(),
         AyraWsm02(),
         GalacticRgy140(),
+        ParLed36Uv(),
         ParLed36RgbUv(),
     };
 
@@ -457,6 +459,37 @@ public static class FixtureLibrary
             Ch("UV", ChannelType.UV, 0, verified: false),
             Ch("Strobe (0 = arrêt)", ChannelType.Strobe, 0, verified: false, strobeSlow: 10, strobeFast: 255),
             Ch("Mode / programmes", ChannelType.Macro, 0, verified: false, notes: "Laisser à 0 pour piloter les couleurs en direct."),
+            Ch("Vitesse des programmes", ChannelType.EffectSpeed, 0, verified: false),
+        },
+    };
+
+    // =================================================================================
+    //  PAR LED 36 UV (UV seul, generique)
+    // =================================================================================
+
+    /// <summary>
+    /// PAR 36 LED UV seul (36 x 1 W), marque inconnue. Table la plus courante de ces PAR : la carte
+    /// est celle des modeles RGB, les 3 voies de couleur pilotant chacune un groupe de LED UV.
+    /// </summary>
+    public static FixtureProfile ParLed36Uv() => new()
+    {
+        Id = ParUvOnlyId,
+        Name = "PAR LED 36 UV seul (générique 7 canaux — à vérifier)",
+        Manufacturer = "Générique",
+        DefaultFixtureName = "PAR UV",
+        Revision = 1,
+        Notes = "PAR 36 LED UV (lumière noire), marque inconnue. Table la plus courante de ces PAR (mode « 7CH » / « d001 » " +
+                "dans le menu) : dimmer, 3 groupes de LED UV, strobe, programmes, vitesse. Si le PAR a un autre mode " +
+                "(ex. 1 à 5 canaux), vérifie chaque canal (curseurs ou onglet Debug) et corrige dans Appareils > Éditeur de profils. " +
+                "Le bouton « UV » de l'onglet Soirée allume les 3 groupes.",
+        Channels =
+        {
+            Ch("Dimmer", ChannelType.Dimmer, 0, verified: false),
+            Ch("UV groupe 1", ChannelType.UV, 0, verified: false, notes: "Sur les cartes RGB : la voie « rouge »."),
+            Ch("UV groupe 2", ChannelType.UV, 0, verified: false, notes: "Sur les cartes RGB : la voie « verte »."),
+            Ch("UV groupe 3", ChannelType.UV, 0, verified: false, notes: "Sur les cartes RGB : la voie « bleue »."),
+            Ch("Strobe (0 = arrêt)", ChannelType.Strobe, 0, verified: false, strobeSlow: 10, strobeFast: 255),
+            Ch("Mode / programmes", ChannelType.Macro, 0, verified: false, notes: "Laisser à 0 pour piloter en direct."),
             Ch("Vitesse des programmes", ChannelType.EffectSpeed, 0, verified: false),
         },
     };

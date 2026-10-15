@@ -74,7 +74,7 @@ Commentaires et textes d'IHM en français.
 1. Tester la v2 avec le boîtier (connexion, onglets, scènes, reconnexion auto).
 2. Vérifier les captures d'écran de l'IHM (mise en page des groupes de l'onglet Soirée).
 3. Profil 260X : table officielle Chauvet en place (presets couleurs/gobos/obturateur) → confirmer sur la lyre.
-4. PAR LED 36 RGB+UV : demander la marque / le menu DMX à l'utilisateur et corriger le profil générique.
+4. PAR de l'utilisateur = 36 LED **UV seul** → modèle générique `par-led-36-uv-generic-7ch` (dimmer, 3 groupes UV, strobe, mode, vitesse), À VÉRIFIER : marque inconnue, demander l'étiquette / le menu (ex. 7CH, d001). Le modèle RGB+UV est mis de côté.
 4b. Fumée : confirmer le débit (0-255 = 0-100 %) et le temps de chauffe ; laser : confirmer que le canal 1 en 240-255 = DMX.
 5. Spider VALIDÉ (2026-10-16) : moteur 1 = aile gauche, moteur 2 = aile droite ; LED 1-4 gauche, LED 5-8 droite (rouge, vert, bleu, blanc). Le décalage d'un canal vu au début venait probablement d'un seul appareil branché en DMX.
    Le décalage d'un canal observé au début a disparu (2026-10-16) : profil revenu à 15 canaux (révision 2,
