@@ -162,23 +162,23 @@ public class FeatureTests
     [Fact]
     public void Suggested_address_fits_in_a_gap_or_goes_after_the_last_fixture()
     {
-        // Patch par defaut : Spider 1-15, lyres 16-29 et 30-43.
+        // Patch par defaut : lyres 1-14 et 15-28, Spider 29-43.
         var profiles = _show.Profiles.ToList();
         FixtureLibrary.EnsureProfile(profiles, FixtureLibrary.AyraFogId);
         var fixtures = _show.Fixtures.ToList();
         Assert.Equal(44, PatchValidator.NextFreeAddress(fixtures, profiles, 1));
 
-        // On libere 16-29 (lyre 1 desactivee) : la fumee (1 canal) va dans le trou.
+        // On libere 1-14 (lyre 1 desactivee) : la fumee (1 canal) va dans le trou.
         fixtures.First(f => f.Id == "lyre-1").Enabled = false;
-        Assert.Equal(16, PatchValidator.NextFreeAddress(fixtures, profiles, 1));
-        // 16 canaux ne rentrent pas dans 16-29 (14 libres) : apres la derniere lyre.
+        Assert.Equal(1, PatchValidator.NextFreeAddress(fixtures, profiles, 1));
+        // 16 canaux ne rentrent pas dans 1-14 (14 libres) : apres le Spider.
         Assert.Equal(44, PatchValidator.NextFreeAddress(fixtures, profiles, 16));
 
         // Changement de modele : l'adresse actuelle est gardee si elle tient encore.
         var spider = fixtures.First(f => f.Id == "spider-1");
-        Assert.Equal(1, PatchValidator.SuggestAddress(fixtures, profiles, 14, spider.Address, spider.Id));
-        Assert.Equal(44, PatchValidator.SuggestAddress(fixtures, profiles, 40, spider.Address, spider.Id));
-        Assert.Contains(PatchValidator.FreeRanges(fixtures, profiles), r => r.Start == 16 && r.End == 29);
+        Assert.Equal(29, PatchValidator.SuggestAddress(fixtures, profiles, 14, spider.Address, spider.Id));
+        Assert.Equal(-1, PatchValidator.SuggestAddress(fixtures, profiles, 600, 1, null)); // ne rentre nulle part
+        Assert.Contains(PatchValidator.FreeRanges(fixtures, profiles), r => r.Start == 1 && r.End == 14);
     }
 
     // =================================================================================
@@ -259,12 +259,12 @@ public class FeatureTests
         _engine.SetFixtureStrobe("lyre-1", true);
 
         var universe = Render();
-        Assert.Equal(255, universe[16 + SpotDimmer]);
-        Assert.Equal(76, universe[16 + SpotShutter]);     // strobe le plus rapide de l'obturateur
-        Assert.Equal(0, universe[30 + SpotDimmer]);       // lyre 2 : toujours en blackout
+        Assert.Equal(255, universe[1 + SpotDimmer]);
+        Assert.Equal(76, universe[1 + SpotShutter]);      // strobe le plus rapide de l'obturateur
+        Assert.Equal(0, universe[15 + SpotDimmer]);       // lyre 2 : toujours en blackout
 
         _engine.StrobeSpeed = 0;
-        Assert.Equal(8, Render()[16 + SpotShutter]);      // strobe le plus lent
+        Assert.Equal(8, Render()[1 + SpotShutter]);      // strobe le plus lent
     }
 
     [Fact]
@@ -272,7 +272,7 @@ public class FeatureTests
     {
         _engine.EditShow(s => s.Fixtures.First(f => f.Id == "spider-1").NoStrobe = true);
         _engine.SetFixtureStrobe("spider-1", true);
-        Assert.Equal(0, Render()[1 + 3]); // canal strobe du Spider
+        Assert.Equal(0, Render()[29 + 3]); // canal strobe du Spider
     }
 
     [Fact]
@@ -281,9 +281,37 @@ public class FeatureTests
         _engine.Master = 0;
         _engine.SetFixtureFlash("lyre-2", true);
         var universe = Render();
-        Assert.Equal(255, universe[30 + SpotDimmer]);
-        Assert.Equal(255, universe[30 + SpotShutter]); // obturateur ouvert
-        Assert.Equal(0, universe[16 + SpotDimmer]);
+        Assert.Equal(255, universe[15 + SpotDimmer]);
+        Assert.Equal(255, universe[15 + SpotShutter]); // obturateur ouvert
+        Assert.Equal(0, universe[1 + SpotDimmer]);
+    }
+
+    // =================================================================================
+    //  Effet gauche <-> droite du Spider
+    // =================================================================================
+
+    [Fact]
+    public void Wing_sweep_goes_left_then_right_with_the_delay_and_follows_the_mirror_box()
+    {
+        const int Motor1 = 29, Motor2 = 30; // Spider en adresse 29 (config par defaut)
+        var spider = _show.Fixtures.First(f => f.Id == "spider-1");
+        _engine.EditShow(_ => spider.WingSweepDelaySeconds = 3);
+
+        _engine.SetWingSweep("spider-1", true);
+        var universe = Render();
+        Assert.Equal(0, universe[Motor1]);    // gauche
+        Assert.Equal(255, universe[Motor2]);  // miroir : aile 2 du cote oppose
+
+        _now = 3.1;
+        universe = Render();
+        Assert.Equal(255, universe[Motor1]);  // droite apres le delai
+        Assert.Equal(0, universe[Motor2]);
+
+        _engine.EditShow(_ => spider.MirrorMotors = false);
+        Assert.Equal(255, Render()[Motor2]);  // sans "Inverser" : les 2 ailes ensemble
+
+        _engine.SetWingSweep("spider-1", false);
+        Assert.Equal(0, Render()[Motor1]);    // retour a la position reglee (programmeur)
     }
 
     // =================================================================================

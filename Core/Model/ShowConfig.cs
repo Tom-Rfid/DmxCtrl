@@ -52,6 +52,22 @@ public sealed class FixtureInstance
     public bool NoStrobe { get; set; }
 
     /// <summary>
+    /// Effet "gauche <-> droite" des appareils a 2 moteurs (ailes du Spider) : les ailes vont a
+    /// gauche, attendent WingSweepDelaySeconds, vont a droite, attendent, etc. En miroir
+    /// (MirrorMotors), l'aile 2 fait le mouvement oppose.
+    /// </summary>
+    public double WingSweepDelaySeconds { get; set; } = 2;
+
+    /// <summary>Amplitude de l'effet gauche/droite autour du milieu (100 % = toute la course 0-135°).</summary>
+    public int WingSweepAmplitudePercent { get; set; } = 100;
+
+    /// <summary>Effet gauche/droite cale sur le tempo (BPM, eventuellement detecte au micro).</summary>
+    public bool WingSweepSyncToBpm { get; set; }
+
+    /// <summary>Nombre de temps pour un aller quand l'effet est cale sur le tempo.</summary>
+    public double WingSweepBeats { get; set; } = 2;
+
+    /// <summary>
     /// Case "Flash / strobe" du patch : l'appareil a ses interrupteurs FLASH et STROBE dans
     /// l'onglet Soiree.
     /// </summary>
@@ -97,6 +113,12 @@ public sealed class ShowSettings
     public int SendIntervalMs { get; set; } = 100;
 
     public bool OpenDimmerOnColor { get; set; } = true;
+
+    /// <summary>Micro choisi (nom du peripherique Windows), null = micro par defaut.</summary>
+    public string? MicrophoneName { get; set; }
+
+    /// <summary>Dimmer suivant le volume : duree de remontee quand la musique revient (s).</summary>
+    public double SoundDimmerRecoverySeconds { get; set; } = 2;
 }
 
 /// <summary>Contenu complet d'un fichier de configuration.</summary>

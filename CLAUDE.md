@@ -6,6 +6,17 @@ Intimidator Spot 260X (adresses 16 et 30, mode 14 canaux) et un Mindi Mini Spide
 8x3W RGBW (adresse 1 : canaux 1-15). Protocole obtenu par rétro-ingénierie de l'APK :
 voir `PROTOCOLE.md`.
 
+## Statut (2026-10-16, suite)
+
+- Config de référence de l'utilisateur : `%APPDATA%\DmxController\Configurations\Soirée par défaut.dmxshow_3.dmxshow.json`
+  (lyres en 1 et 15, Spider en 29, ailes en miroir) ; `DefaultShow` reprend ce patch.
+- Spider : effet gauche ↔ droite (onglet Spider) avec délai, amplitude, ou calé sur le tempo (N temps par aller) ;
+  suit la case « Inverser ». Moteur : `SetWingSweep`, recalage sans saut quand le BPM change.
+- Micro (onglet Soirée, groupe « Micro ») : `Core/Audio/BeatDetector` (autocorrélation des attaques → BPM 80-160,
+  niveau en dB, dimmer qui baisse quand le volume chute puis remonte en N s) + `App/Audio/MicInput` (NAudio.WinMM).
+  Cases « Caler le BPM sur le micro » et « Dimmer suit le volume ». Testé sur signaux synthétiques seulement :
+  **à régler en vrai** (DeadZoneDb 8, DimmerRangeDb 18, lissage 0,5 s).
+
 ## Statut (2026-10-16)
 
 - **Bibliothèque de modèles** (`Core/Model/FixtureLibrary.cs`) : 260X 14 et 8 canaux (table officielle

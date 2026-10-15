@@ -88,6 +88,17 @@ internal sealed class LivePanel : UserControl
     private readonly List<(string FixtureId, CheckBox Toggle)> _strobeToggles = new();
     private readonly ToolTip _tips = new();
 
+    // --- Micro : tempo detecte et dimmer qui suit le volume ---
+    private readonly Audio.MicInput _mic = new();
+    private readonly ComboBox _micDevice = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 205, DropDownWidth = 320, Margin = new Padding(3, 4, 3, 3) };
+    private readonly CheckBox _micOn = new() { Text = "Écouter le micro", Appearance = Appearance.Button, TextAlign = ContentAlignment.MiddleCenter, Size = new Size(205, 30), Font = Ui.BoldFont };
+    private readonly ProgressBar _micLevel = new() { Width = 205, Height = 12, Maximum = 100, Margin = new Padding(3, 4, 3, 2) };
+    private readonly Label _micTempo = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 4, 3, 3) };
+    private readonly CheckBox _micFollow = new() { Text = "Caler le BPM sur le micro", AutoSize = true };
+    private readonly CheckBox _soundDimmer = new() { Text = "Dimmer suit le volume", AutoSize = true };
+    private readonly NumericUpDown _soundRecovery = new() { Minimum = 0.2m, Maximum = 30, DecimalPlaces = 1, Increment = 0.5m, Value = 2, Width = 56, Margin = new Padding(3, 4, 3, 3) };
+    private readonly Label _soundInfo = new() { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(3, 2, 3, 3) };
+
     // --- Master / blackout / flash / tempo ---
     private readonly TrackBar _master = Ui.Slider(0, 255, 160);
     private readonly Label _masterValue = Ui.ValueLabel(46);
@@ -132,7 +143,11 @@ internal sealed class LivePanel : UserControl
         WireEvents();
 
         _ctx.LiveStateChanged += RefreshFromEngine;
-        _autoTimer.Tick += (_, _) => OnAutoTick();
+        _autoTimer.Tick += (_, _) =>
+        {
+            OnAutoTick();
+            OnMicTick();
+        };
         _autoTimer.Start();
 
         ReloadAll();
@@ -405,6 +420,7 @@ internal sealed class LivePanel : UserControl
         tempo.SetColumnSpan(_tap, 2);
         Ui.Row(tempo, "Fondu scènes (s)", _fade);
         panel.Controls.Add(Ui.Group("Tempo", tempo));
+        panel.Controls.Add(BuildMicGroup());
 
         panel.Controls.Add(new Label
         {
@@ -414,6 +430,131 @@ internal sealed class LivePanel : UserControl
             Margin = new Padding(8, 8, 3, 3),
         });
         return panel;
+    }
+
+    /// <summary>
+    /// Micro : choix de l'entree son, tempo detecte (affiche, et recopie dans le BPM si
+    /// « Caler le BPM sur le micro »), et dimmer qui baisse avec le volume puis remonte.
+    /// </summary>
+    private Control BuildMicGroup()
+    {
+        try
+        {
+            _micDevice.Items.AddRange(Audio.MicInput.DeviceNames().Cast<object>().ToArray());
+        }
+        catch (Exception ex)
+        {
+            _ctx.Status($"Entrées son indisponibles : {ex.Message}");
+        }
+        string? wanted = _ctx.Show.Settings.MicrophoneName;
+        _micDevice.SelectedIndex = _micDevice.Items.Count == 0 ? -1
+            : Math.Max(0, _micDevice.Items.IndexOf(wanted ?? ""));
+        _micOn.Enabled = _micDevice.Items.Count > 0;
+
+        _micOn.CheckedChanged += (_, _) => ToggleMic();
+        _micDevice.SelectionChangeCommitted += (_, _) =>
+        {
+            _ctx.Show.Settings.MicrophoneName = _micDevice.SelectedItem as string;
+            if (_micOn.Checked)
+            {
+                ToggleMic(); // relance sur la nouvelle entree
+            }
+        };
+        _soundDimmer.CheckedChanged += (_, _) =>
+        {
+            _ctx.Engine.SoundDimmerEnabled = _soundDimmer.Checked;
+            if (!_soundDimmer.Checked)
+            {
+                _ctx.Engine.SoundDimmerFactor = 1;
+            }
+        };
+        _soundRecovery.ValueChanged += (_, _) => _ctx.Show.Settings.SoundDimmerRecoverySeconds = (double)_soundRecovery.Value;
+        Ui.SetValue(_soundRecovery, _ctx.Show.Settings.SoundDimmerRecoverySeconds);
+        _mic.Error += message => BeginInvoke(new Action(() =>
+        {
+            _micOn.Checked = false;
+            _ctx.Status($"Micro coupé : {message}");
+        }));
+
+        _tips.SetToolTip(_micFollow, "Le tempo détecté remplace le BPM (mouvements, chenillard, effet gauche/droite du Spider calé sur le tempo).");
+        _tips.SetToolTip(_soundDimmer, "Quand le volume baisse (break, pont), le dimmer baisse ; il remonte progressivement quand la musique revient.");
+
+        var table = Ui.Table(1);
+        table.Controls.Add(_micDevice);
+        table.Controls.Add(_micOn);
+        table.Controls.Add(_micLevel);
+        table.Controls.Add(_micTempo);
+        table.Controls.Add(_micFollow);
+        table.Controls.Add(_soundDimmer);
+        table.Controls.Add(Ui.Flow(0, Ui.Text("Remontée"), _soundRecovery, Ui.Text("s")));
+        table.Controls.Add(_soundInfo);
+        UpdateMicLabels();
+        return Ui.Group("Micro (tempo / volume)", table);
+    }
+
+    private void ToggleMic()
+    {
+        _mic.Stop();
+        _ctx.Engine.SoundDimmerFactor = 1;
+        if (_micOn.Checked && _micDevice.SelectedIndex >= 0)
+        {
+            try
+            {
+                _mic.Start(_micDevice.SelectedIndex);
+                _ctx.Show.Settings.MicrophoneName = _micDevice.SelectedItem as string;
+                _ctx.Status($"Micro « {_micDevice.SelectedItem} » : écoute en cours (le tempo apparaît après quelques secondes de musique).");
+            }
+            catch (Exception ex)
+            {
+                _micOn.Checked = false;
+                _ctx.Status($"Impossible d'ouvrir le micro : {ex.Message}");
+            }
+        }
+        _micOn.BackColor = _micOn.Checked ? Color.FromArgb(120, 200, 120) : SystemColors.Control;
+        _micOn.UseVisualStyleBackColor = !_micOn.Checked;
+        UpdateMicLabels();
+    }
+
+    /// <summary>Appele 10 fois/s : affiche le niveau et le tempo, pousse BPM et dimmer au moteur.</summary>
+    private void OnMicTick()
+    {
+        var detector = _mic.Detector;
+        if (detector is null)
+        {
+            return;
+        }
+
+        detector.RecoverySeconds = (double)_soundRecovery.Value;
+        _micLevel.Value = (int)Math.Clamp((detector.LevelDb + 60) * 100 / 60, 0, 100);
+
+        double bpm = detector.Bpm;
+        if (_micFollow.Checked && bpm > 0 && Math.Abs(bpm - (double)_bpm.Value) >= 0.5)
+        {
+            Ui.SetValue(_bpm, Math.Round(bpm, 1)); // -> ValueChanged -> moteur
+        }
+        if (_soundDimmer.Checked)
+        {
+            _ctx.Engine.SoundDimmerFactor = detector.DimmerFactor;
+        }
+        UpdateMicLabels();
+    }
+
+    private void UpdateMicLabels()
+    {
+        var detector = _mic.Detector;
+        if (detector is null)
+        {
+            _micTempo.Text = _micDevice.Items.Count == 0 ? "Aucune entrée son trouvée" : "Micro coupé";
+            _micTempo.ForeColor = Color.DimGray;
+            _micLevel.Value = 0;
+            _soundInfo.Text = "";
+            return;
+        }
+
+        double bpm = detector.Bpm;
+        _micTempo.Text = bpm > 0 ? $"Tempo détecté : {bpm:0.0} BPM" : "Tempo : écoute… (musique ?)";
+        _micTempo.ForeColor = bpm > 0 ? Ui.OkColor : Ui.WarningColor;
+        _soundInfo.Text = _soundDimmer.Checked ? $"Dimmer son : {detector.DimmerFactor * 100:0} %" : $"Volume : {detector.LevelDb:0} dB";
     }
 
     private Control BuildScenePanel()
@@ -535,6 +676,7 @@ internal sealed class LivePanel : UserControl
             Ui.SetValue(_autoBeats, s.AutoIntervalBeats);
             _autoSync.Checked = s.AutoSyncToBpm;
             _openDimmer.Checked = s.OpenDimmerOnColor;
+            Ui.SetValue(_soundRecovery, s.SoundDimmerRecoverySeconds);
             _autoOn.Checked = false; // jamais d'enchainement automatique a l'ouverture
         }
         finally
@@ -1005,6 +1147,7 @@ internal sealed class LivePanel : UserControl
         {
             _ctx.LiveStateChanged -= RefreshFromEngine;
             _autoTimer.Dispose();
+            _mic.Dispose();
             _tips.Dispose();
         }
         base.Dispose(disposing);

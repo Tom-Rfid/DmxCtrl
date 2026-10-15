@@ -12,7 +12,7 @@ public class EngineTests
     private const int SpotPan = 0, SpotPanFine = 1, SpotColorWheel = 5, SpotDimmer = 10;
 
     // Adresses du patch par defaut (installation reelle : Spider en 1, lyres apres).
-    private const int Lyre1 = 16, Lyre2 = 30, Spider = 1;
+    private const int Lyre1 = 1, Lyre2 = 15, Spider = 29;
     // Spider : 15 canaux a partir de son adresse (moteur 1 = canal 0 du profil).
     private const int SpiderDimmer = 2, SpiderLed1 = 4, SpiderLed2 = 5, SpiderLed4 = 7, SpiderLed5 = 8;
 

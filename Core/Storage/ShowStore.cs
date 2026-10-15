@@ -149,6 +149,9 @@ public static class ShowStore
             fixture.Id = string.IsNullOrWhiteSpace(fixture.Id) ? FixtureProfile.NewId() : fixture.Id;
             fixture.Name = string.IsNullOrWhiteSpace(fixture.Name) ? "Appareil" : fixture.Name;
             fixture.ProfileId ??= "";
+            fixture.WingSweepDelaySeconds = Math.Clamp(fixture.WingSweepDelaySeconds, 0.2, 60);
+            fixture.WingSweepAmplitudePercent = Math.Clamp(fixture.WingSweepAmplitudePercent, 0, 100);
+            fixture.WingSweepBeats = Math.Clamp(fixture.WingSweepBeats, 0.25, 64);
             fixture.Fog ??= new FogSettings();
             fixture.Fog.LevelPercent = Math.Clamp(fixture.Fog.LevelPercent, 0, 100);
             fixture.Fog.DurationSeconds = Math.Clamp(fixture.Fog.DurationSeconds, 0.5, 600);
@@ -171,6 +174,7 @@ public static class ShowStore
         s.Bpm = Math.Clamp(s.Bpm, 30, 300);
         s.Master = Math.Clamp(s.Master, 0, 255);
         s.FadeSeconds = Math.Clamp(s.FadeSeconds, 0, 20);
+        s.SoundDimmerRecoverySeconds = Math.Clamp(s.SoundDimmerRecoverySeconds, 0.2, 30);
     }
 
     private static void NormalizeProfile(FixtureProfile profile)

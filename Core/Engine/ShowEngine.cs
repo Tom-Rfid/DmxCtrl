@@ -87,6 +87,20 @@ public sealed class ShowEngine : IFrameSource
 
     private readonly Dictionary<string, FogState> _fog = new();
 
+    // Effet gauche <-> droite des ailes (Spider) : nombre d'allers compte depuis Epoch.
+    private sealed class WingSweepState
+    {
+        public double Epoch;
+        public double StepsAtEpoch;
+        public double LastDelay;
+    }
+
+    private readonly Dictionary<string, WingSweepState> _wingSweep = new();
+
+    // Dimmer qui suit le volume du micro.
+    private bool _soundDimmerEnabled;
+    private double _soundDimmerFactor = 1;
+
     private bool _debugActive;
     private readonly byte[] _debugUniverse = DmxFrame.NewUniverse();
     private readonly byte[] _lastOutput = DmxFrame.NewUniverse();
@@ -150,6 +164,7 @@ public sealed class ShowEngine : IFrameSource
             _fixtureFlash.Clear();
             _fixtureStrobe.Clear();
             _fog.Clear();
+            _wingSweep.Clear();
             _effects = ShowJson.Clone(show.LiveState.Effects);
             _moveEpoch = _chaseEpoch = _clock();
             _movePhaseAtEpoch = _chaseStepAtEpoch = 0;
@@ -202,6 +217,10 @@ public sealed class ShowEngine : IFrameSource
         foreach (string stale in _fog.Keys.Where(k => !ids.Contains(k)).ToList())
         {
             _fog.Remove(stale);
+        }
+        foreach (string stale in _wingSweep.Keys.Where(k => !ids.Contains(k)).ToList())
+        {
+            _wingSweep.Remove(stale);
         }
         _fadeFrom = null;
     }
@@ -574,6 +593,98 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
+    //  Effet gauche <-> droite des ailes (Spider)
+    // =================================================================================
+
+    /// <summary>Demarre / arrete l'effet gauche-droite (commence par la gauche).</summary>
+    public void SetWingSweep(string fixtureId, bool on)
+    {
+        lock (_lock)
+        {
+            if (on)
+            {
+                _wingSweep.TryAdd(fixtureId, new WingSweepState { Epoch = _clock() });
+            }
+            else
+            {
+                _wingSweep.Remove(fixtureId);
+            }
+        }
+    }
+
+    public bool IsWingSweeping(string fixtureId)
+    {
+        lock (_lock)
+        {
+            return _wingSweep.ContainsKey(fixtureId);
+        }
+    }
+
+    /// <summary>Duree d'un aller (gauche -> droite) : delai fixe, ou N temps au BPM si cale sur le tempo.</summary>
+    private double WingSweepDelayLocked(FixtureInstance fixture) => fixture.WingSweepSyncToBpm
+        ? Math.Max(0.25, fixture.WingSweepBeats) * 60.0 / _bpm
+        : Math.Max(0.2, fixture.WingSweepDelaySeconds);
+
+    /// <summary>Position (0..255) du 1er moteur : gauche pour un nombre d'allers pair, droite sinon.</summary>
+    public static byte WingSweepPosition(FixtureInstance fixture, double steps)
+    {
+        double half = 127.5 * Math.Clamp(fixture.WingSweepAmplitudePercent, 0, 100) / 100.0;
+        bool right = (long)Math.Floor(Math.Max(0, steps)) % 2 == 1;
+        return (byte)Math.Round(127.5 + (right ? half : -half));
+    }
+
+    /// <summary>
+    /// Ecrit la position de l'effet sur les moteurs (un sur deux en miroir si "Inverser"). Le compte
+    /// des allers est recale quand leur duree change (BPM du micro qui bouge) : pas de saut d'aile.
+    /// </summary>
+    private void ApplyWingSweepLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, double t)
+    {
+        if (!_wingSweep.TryGetValue(fixture.Id, out var state))
+        {
+            return;
+        }
+        double delay = WingSweepDelayLocked(fixture);
+        if (state.LastDelay <= 0)
+        {
+            state.LastDelay = delay;
+        }
+        else if (Math.Abs(delay - state.LastDelay) > 1e-9)
+        {
+            state.StepsAtEpoch += (t - state.Epoch) / state.LastDelay;
+            state.Epoch = t;
+            state.LastDelay = delay;
+        }
+        byte position = WingSweepPosition(fixture, state.StepsAtEpoch + (t - state.Epoch) / delay);
+        int motor = 0;
+        foreach (int i in profile.IndicesOf(ChannelType.Motor))
+        {
+            if (i < values.Length)
+            {
+                values[i] = fixture.MirrorMotors && motor % 2 == 1 ? (byte)(255 - position) : position;
+            }
+            motor++;
+        }
+    }
+
+    // =================================================================================
+    //  Dimmer qui suit le volume (micro)
+    // =================================================================================
+
+    /// <summary>Case "le dimmer suit le volume" : l'intensite est multipliee par SoundDimmerFactor.</summary>
+    public bool SoundDimmerEnabled
+    {
+        get { lock (_lock) { return _soundDimmerEnabled; } }
+        set { lock (_lock) { _soundDimmerEnabled = value; } }
+    }
+
+    /// <summary>Facteur 0..1 venant du micro (BeatDetector.DimmerFactor), pousse par l'IHM.</summary>
+    public double SoundDimmerFactor
+    {
+        get { lock (_lock) { return _soundDimmerFactor; } }
+        set { lock (_lock) { _soundDimmerFactor = Math.Clamp(value, 0, 1); } }
+    }
+
+    // =================================================================================
     //  Machines a fumee
     // =================================================================================
 
@@ -802,6 +913,9 @@ public sealed class ShowEngine : IFrameSource
 
                 // 1 + 2 : programmeur, avec le fondu de scene eventuel
                 var values = BlendLocked(fixture.Id, profile, target, fadeK);
+
+                // 2 bis : effet gauche <-> droite des ailes (remplace la position des moteurs)
+                ApplyWingSweepLocked(fixture, profile, values, t);
                 bool selected = _selection.Contains(fixture.Id);
 
                 if (selected)
@@ -1025,6 +1139,10 @@ public sealed class ShowEngine : IFrameSource
 
             int v = strobeDark ? 0 : values[i];
             v = v * _master / 255;
+            if (_soundDimmerEnabled)
+            {
+                v = (int)Math.Round(v * _soundDimmerFactor);
+            }
             if (_blackout)
             {
                 v = 0;

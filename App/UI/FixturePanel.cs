@@ -55,6 +55,13 @@ internal sealed class FixturePanel : UserControl
     private readonly double[]?[] _groupRatios = new double[]?[2];
 
     private readonly CheckBox? _noStrobe; // "Pas de strobe" (si le profil a un canal Strobe)
+
+    // Effet gauche <-> droite des ailes (appareils a 2 moteurs)
+    private readonly CheckBox? _sweep;
+    private readonly NumericUpDown? _sweepDelay;
+    private readonly NumericUpDown? _sweepAmplitude;
+    private readonly CheckBox? _sweepSync;
+    private readonly NumericUpDown? _sweepBeats;
     private readonly Label _warning = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 6, 3, 3) };
     private readonly ToolTip _tips = new();
     private bool _updating;
@@ -139,7 +146,7 @@ internal sealed class FixturePanel : UserControl
         {
             // Appareil a 2 moteurs (ailes du Spider) : X = position des ailes, Y = dimmer (haut = 100 %),
             // et a droite du pad, un fader vertical par aile pour ses LED.
-            left = new Panel { Dock = DockStyle.Left, Width = 400, Padding = new Padding(10) };
+            left = new Panel { Dock = DockStyle.Left, Width = 400, Padding = new Padding(10), AutoScroll = true };
 
             (_groupLeft, _groupRight) = LedGroups.Split(profile);
             if (_groupLeft.Length > 0 && _groupRight.Length > 0)
@@ -185,13 +192,54 @@ internal sealed class FixturePanel : UserControl
             _wingsInfo = new Label { Location = new Point(12, 334), Size = new Size(260, 20), Font = Ui.BoldFont };
             var hint = new Label
             {
-                Text = "Gauche / droite : les 2 ailes ensemble. Avec « Inverser », elles partent " +
-                       "chacune de leur côté et reviennent ensemble au milieu.\nHaut / bas : dimmer.",
+                Text = "Gauche / droite : les 2 ailes (opposées avec « Inverser »). " +
+                       "Haut / bas : dimmer.",
                 Location = new Point(12, 358),
-                Size = new Size(260, 80),
+                Size = new Size(260, 36),
                 ForeColor = Color.DimGray,
             };
             left.Controls.AddRange(new Control[] { _wings, _mirrorWings, center, reset, _wingsInfo, hint });
+
+            // Effet automatique gauche <-> droite avec un delai (suit la case "Inverser").
+            _sweep = new CheckBox
+            {
+                Text = "Effet gauche ↔ droite",
+                Appearance = Appearance.Button,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = Ui.BoldFont,
+                Location = new Point(12, 398),
+                Size = new Size(260, 32),
+                Checked = ctx.Engine.IsWingSweeping(fixture.Id),
+            };
+            _sweep.CheckedChanged += (_, _) => OnSweepToggled();
+            _sweepDelay = new NumericUpDown { Minimum = 0.2m, Maximum = 60, DecimalPlaces = 1, Increment = 0.1m, Width = 70, Location = new Point(130, 436) };
+            _sweepAmplitude = new NumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Width = 70, Location = new Point(130, 466) };
+            Ui.SetValue(_sweepDelay, fixture.WingSweepDelaySeconds);
+            Ui.SetValue(_sweepAmplitude, fixture.WingSweepAmplitudePercent);
+            _sweepDelay.ValueChanged += (_, _) => SaveSweepSettings();
+            _sweepAmplitude.ValueChanged += (_, _) => SaveSweepSettings();
+            _tips.SetToolTip(_sweep, "Les ailes vont à gauche, attendent le délai, vont à droite, attendent… " +
+                                     "Avec « Inverser », l'aile 2 fait le mouvement opposé.");
+            _sweepSync = new CheckBox { Text = "Caler sur le tempo : 1 aller =", AutoSize = true, Checked = fixture.WingSweepSyncToBpm, Location = new Point(12, 498) };
+            _sweepBeats = new NumericUpDown { Minimum = 0.25m, Maximum = 64, DecimalPlaces = 2, Increment = 0.25m, Width = 60, Location = new Point(212, 496) };
+            Ui.SetValue(_sweepBeats, fixture.WingSweepBeats);
+            _sweepSync.CheckedChanged += (_, _) => SaveSweepSettings();
+            _sweepBeats.ValueChanged += (_, _) => SaveSweepSettings();
+            _tips.SetToolTip(_sweepSync, "Le délai suit le BPM de l'onglet Soirée (tap tempo ou micro) : 1 aller = ce nombre de temps.");
+            _sweepDelay.Enabled = !fixture.WingSweepSyncToBpm;
+            left.Controls.AddRange(new Control[]
+            {
+                _sweepSync,
+                _sweepBeats,
+                new Label { Text = "temps", Location = new Point(276, 500), AutoSize = true },
+                _sweep,
+                new Label { Text = "Délai gauche/droite", Location = new Point(12, 439), AutoSize = true },
+                _sweepDelay,
+                new Label { Text = "s", Location = new Point(204, 439), AutoSize = true },
+                new Label { Text = "Amplitude", Location = new Point(12, 469), AutoSize = true },
+                _sweepAmplitude,
+                new Label { Text = "%", Location = new Point(204, 469), AutoSize = true },
+            });
         }
         else
         {
@@ -524,6 +572,43 @@ internal sealed class FixturePanel : UserControl
             _ctx.Engine.SetMotors(_fixture.Id, values[_motors[0]], mirror);
         }
         RefreshFromEngine();
+    }
+
+    private void OnSweepToggled()
+    {
+        if (_sweep is null)
+        {
+            return;
+        }
+        _ctx.Engine.SetWingSweep(_fixture.Id, _sweep.Checked);
+        _sweep.BackColor = _sweep.Checked ? Color.FromArgb(255, 210, 60) : SystemColors.Control;
+        _sweep.UseVisualStyleBackColor = !_sweep.Checked;
+        _ctx.Status(_sweep.Checked
+            ? $"{_fixture.Name} : effet gauche ↔ droite toutes les {_fixture.WingSweepDelaySeconds:0.#} s" +
+              (_fixture.MirrorMotors ? " (ailes en miroir)." : ".")
+            : $"{_fixture.Name} : effet gauche ↔ droite arrêté.");
+    }
+
+    /// <summary>Delai et amplitude de l'effet : enregistres avec la configuration.</summary>
+    private void SaveSweepSettings()
+    {
+        if (_sweepDelay is null || _sweepAmplitude is null || _sweepSync is null || _sweepBeats is null)
+        {
+            return;
+        }
+        double delay = (double)_sweepDelay.Value;
+        int amplitude = (int)_sweepAmplitude.Value;
+        bool sync = _sweepSync.Checked;
+        double beats = (double)_sweepBeats.Value;
+        _ctx.Engine.EditShow(_ =>
+        {
+            _fixture.WingSweepDelaySeconds = delay;
+            _fixture.WingSweepAmplitudePercent = amplitude;
+            _fixture.WingSweepSyncToBpm = sync;
+            _fixture.WingSweepBeats = beats;
+        });
+        _sweepDelay.Enabled = !sync;
+        _ctx.MarkDirty();
     }
 
     private void OnXyChanged(object? sender, EventArgs e)
