@@ -116,8 +116,27 @@ public static class FixtureLibrary
         a.ChannelCount == b.ChannelCount &&
         a.Channels.Select(c => c.Type).SequenceEqual(b.Channels.Select(c => c.Type));
 
+    /// <summary>
+    /// Presets retires d'un modele (bouton qui pose probleme sur l'appareil) : supprimes aussi des
+    /// profils deja copies dans les configurations, a leur mise a jour.
+    /// </summary>
+    private static readonly Dictionary<string, string[]> RetiredPresets = new()
+    {
+        // Laser Galactic : « Son rouge » (180-209) met l'appareil en mode « tst » (test) dont il ne
+        // sort plus ; « Couleurs d'origine » retire a la demande de l'utilisateur.
+        [GalacticLaserId] = new[] { "Son rouge", "Couleurs d'origine" },
+        [GalacticLaserRgId] = new[] { "Son rouge", "Couleurs d'origine" },
+    };
+
     private static void MergeDetails(FixtureProfile target, FixtureProfile model)
     {
+        if (RetiredPresets.TryGetValue(model.Id, out var retired))
+        {
+            foreach (var channel in target.Channels)
+            {
+                channel.Presets.RemoveAll(p => retired.Any(name => TextKey.Same(name, p.Name)));
+            }
+        }
         target.Revision = model.Revision;
         if (string.IsNullOrWhiteSpace(target.DefaultFixtureName))
         {
@@ -382,7 +401,7 @@ public static class FixtureLibrary
         Name = "Galactic RGY-140 MKII Value Line (laser, 10 canaux)",
         Manufacturer = "Showtec",
         DefaultFixtureName = "Laser",
-        Revision = 1,
+        Revision = 2, // 2 : boutons « Son rouge » et « Couleurs d'origine » retires (voir RetiredPresets)
         Notes = "Table DMX du manuel Highlite (code 51335). Le canal 1 doit être en « DMX » (240-255) pour piloter " +
                 "motifs, couleurs et mouvements ; sinon le laser joue ses programmes internes. Couleur 0-24 = laser éteint. " +
                 "SÉCURITÉ : connecteur d'interlock obligatoire ; ne jamais viser le public à hauteur des yeux.",
@@ -392,7 +411,7 @@ public static class FixtureLibrary
                 presets: new ChannelPreset[]
                 {
                     new("Auto rouge/vert/jaune", 15), new("Auto vert", 45), new("Auto rouge", 75), new("Auto jaune", 105),
-                    new("Son rouge/vert/jaune", 135), new("Son vert", 165), new("Son rouge", 195), new("Son jaune", 225),
+                    new("Son rouge/vert/jaune", 135), new("Son vert", 165), new("Son jaune", 225),
                     new("DMX (manuel)", 250),
                 },
                 ranges: new ChannelRange[]
@@ -408,7 +427,7 @@ public static class FixtureLibrary
             Ch("Couleur", ChannelType.LaserColor, 0, notes: "0-24 = laser éteint (blackout).",
                 presets: new ChannelPreset[]
                 {
-                    new("Éteint", 0), new("Couleurs d'origine", 37), new("Rouge", 62), new("Vert", 87), new("Jaune", 112),
+                    new("Éteint", 0), new("Rouge", 62), new("Vert", 87), new("Jaune", 112),
                     new("Rouge ↔ vert", 137), new("Vert ↔ jaune", 162), new("Rouge ↔ jaune", 187),
                     new("Rouge / vert / jaune", 212), new("Changement continu", 240),
                 },
@@ -453,7 +472,7 @@ public static class FixtureLibrary
         var color = profile.Channels[profile.IndexOf(ChannelType.LaserColor)];
         color.Presets = new List<ChannelPreset>
         {
-            new("Éteint", 0), new("Couleurs d'origine", 37), new("Rouge", 62), new("Vert", 87),
+            new("Éteint", 0), new("Rouge", 62), new("Vert", 87),
             new("Rouge + vert", 112), new("Alternance rouge ↔ vert", 137), new("Vert ↔ rouge + vert", 162),
             new("Rouge ↔ rouge + vert", 187), new("Rouge / vert / les deux", 212), new("Changement continu", 240),
         };

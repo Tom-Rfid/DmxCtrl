@@ -133,6 +133,24 @@ public class FeatureTests
     }
 
     [Fact]
+    public void Laser_buttons_red_sound_and_original_colors_are_removed_from_old_configs()
+    {
+        var show = DefaultShow.Create();
+        var old = FixtureLibrary.GalacticRgy140();
+        old.Revision = 1;
+        old.Channels[0].Presets.Add(new ChannelPreset("Son rouge", 195));
+        old.Channels[2].Presets.Add(new ChannelPreset("Couleurs d'origine", 37));
+        show.Profiles.Add(old);
+
+        Assert.Empty(FixtureLibrary.UpgradeProfiles(show));
+        var names = old.Channels.SelectMany(c => c.Presets).Select(p => p.Name).ToList();
+        Assert.DoesNotContain("Son rouge", names);
+        Assert.DoesNotContain("Couleurs d'origine", names);
+        Assert.Contains("Son vert", names);
+        Assert.Equal(2, old.Revision);
+    }
+
+    [Fact]
     public void Same_layout_profile_keeps_the_user_changes_and_gets_the_new_details()
     {
         var show = DefaultShow.Create();
