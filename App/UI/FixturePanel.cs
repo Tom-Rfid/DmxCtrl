@@ -35,7 +35,7 @@ internal sealed class FixturePanel : UserControl
     private readonly FixtureInstance _fixture;
     private readonly FixtureProfile _profile;
     private readonly TrackBar[] _sliders;
-    private readonly Label[] _values;
+    private readonly NumericUpDown[] _values; // valeur saisissable (et boutons + / -) a cote de chaque barre
     private readonly Label[] _names;
     private readonly ComboBox[] _presets;
     private readonly CheckBox[] _verified;
@@ -78,6 +78,8 @@ internal sealed class FixturePanel : UserControl
     private readonly Label _warning = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 6, 3, 3) };
     private readonly ToolTip _tips = new();
     private bool _updating;
+    private bool _numberUpdating; // case numerique mise a jour par le code (pas par l'utilisateur)
+    private readonly BeatEffectBlock? _beatBlock; // effet au tempo (projecteurs sans moteur)
 
     public FixturePanel(ShowContext ctx, FixtureInstance fixture, FixtureProfile profile)
     {
@@ -89,7 +91,7 @@ internal sealed class FixturePanel : UserControl
 
         int count = profile.ChannelCount;
         _sliders = new TrackBar[count];
-        _values = new Label[count];
+        _values = new NumericUpDown[count];
         _names = new Label[count];
         _presets = new ComboBox[count];
         _verified = new CheckBox[count];
@@ -338,6 +340,14 @@ internal sealed class FixturePanel : UserControl
             var reset = new Button { Text = "Valeurs par défaut", AutoSize = true };
             reset.Click += (_, _) => ResetDefaults();
             header.Controls.Add(reset);
+
+            // Projecteur a plusieurs groupes de LED (PAR UV, PAR RGB...) : effet au tempo a gauche.
+            if (profile.Channels.Count(c => ChannelTypeInfo.IsColorMix(c.Type)) >= 2)
+            {
+                left = new Panel { Dock = DockStyle.Left, Width = 330, Padding = new Padding(10), AutoScroll = true };
+                _beatBlock = new BeatEffectBlock(ctx, fixture, profile) { Location = new Point(9, 6) };
+                left.Controls.Add(_beatBlock);
+            }
         }
 
         // ---------------- Une ligne par canal ----------------
@@ -367,7 +377,7 @@ internal sealed class FixturePanel : UserControl
             _sliders[i] = Ui.Slider(0, 255, left is null ? 330 : 230); // plus etroit si un pad occupe la gauche
             _sliders[i].ValueChanged += (_, _) => OnSlider(index);
 
-            _values[i] = Ui.ValueLabel(36);
+            _values[i] = new NumericUpDown { Minimum = 0, Maximum = 255, Width = 58, Margin = new Padding(3, 4, 3, 3) }; _values[i].ValueChanged += (_, _) => OnNumberTyped(index);
 
             _presets[i] = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 170, DropDownWidth = 260, Margin = new Padding(3, 4, 3, 3) };
             _presets[i].SelectionChangeCommitted += (_, _) => OnPresetChosen(index);
@@ -439,7 +449,7 @@ internal sealed class FixturePanel : UserControl
             for (int i = 0; i < _sliders.Length && i < values.Length; i++)
             {
                 _sliders[i].Value = values[i];
-                _values[i].Text = values[i].ToString();
+                ShowNumber(i, values[i]);
                 SyncPresetCombo(i, values[i]);
             }
             SyncPads(values);
@@ -449,6 +459,7 @@ internal sealed class FixturePanel : UserControl
             _updating = false;
         }
         UpdateMicUi(); // BPM de l'effet (tap tempo de l'onglet Soiree...)
+        _beatBlock?.UpdateUi();
     }
 
     /// <summary>Met a jour presets, cases "OK", libelles "(?)" et avertissement.</summary>
@@ -493,6 +504,30 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
+    /// <summary>Affiche une valeur dans la case numerique sans relancer d'evenement.</summary>
+    private void ShowNumber(int index, byte value)
+    {
+        _numberUpdating = true;
+        try
+        {
+            _values[index].Value = value;
+        }
+        finally
+        {
+            _numberUpdating = false;
+        }
+    }
+
+    /// <summary>Valeur tapee (ou + / -) : la barre suit, et c'est elle qui envoie au moteur.</summary>
+    private void OnNumberTyped(int index)
+    {
+        if (_numberUpdating || _updating)
+        {
+            return;
+        }
+        _sliders[index].Value = (int)_values[index].Value; // -> OnSlider
+    }
+
     private void OnSlider(int index)
     {
         if (_updating)
@@ -501,7 +536,7 @@ internal sealed class FixturePanel : UserControl
         }
 
         byte value = (byte)_sliders[index].Value;
-        _values[index].Text = value.ToString();
+        ShowNumber(index, value);
         _ctx.Engine.SetValue(_fixture.Id, index, value);
         SyncPresetCombo(index, value);
 
@@ -575,7 +610,7 @@ internal sealed class FixturePanel : UserControl
             foreach (int i in group)
             {
                 _sliders[i].Value = values[i];
-                _values[i].Text = values[i].ToString();
+                ShowNumber(i, values[i]);
             }
         }
         finally

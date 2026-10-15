@@ -152,6 +152,8 @@ public static class ShowStore
             fixture.WingSweepDelaySeconds = Math.Clamp(fixture.WingSweepDelaySeconds, 0.2, 60);
             fixture.WingSweepAmplitudePercent = Math.Clamp(fixture.WingSweepAmplitudePercent, 0, 100);
             fixture.WingSweepBeats = Math.Clamp(fixture.WingSweepBeats, 0.25, 64);
+            fixture.BeatDelaySeconds = Math.Clamp(fixture.BeatDelaySeconds, 0.05, 60);
+            fixture.BeatBeats = Math.Clamp(fixture.BeatBeats, 0.25, 64);
             fixture.Fog ??= new FogSettings();
             fixture.MutedColors ??= new();
             fixture.Fog.LevelPercent = Math.Clamp(fixture.Fog.LevelPercent, 0, 100);

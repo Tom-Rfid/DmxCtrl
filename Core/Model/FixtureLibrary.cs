@@ -475,7 +475,7 @@ public static class FixtureLibrary
     public static FixtureProfile ParLed36Uv() => new()
     {
         Id = ParUvOnlyId,
-        Name = "PAR LED 36 UV (U'King ZQ01087 et clones, 7 canaux)",
+        Name = "PAR LED 36 UV ZQ01087 et clones (7 canaux)",
         Manufacturer = "U'King",
         DefaultFixtureName = "PAR UV",
         Revision = 2,

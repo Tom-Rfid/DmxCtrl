@@ -97,6 +97,9 @@ public sealed class ShowEngine : IFrameSource
 
     private readonly Dictionary<string, WingSweepState> _wingSweep = new();
 
+    // Effet au tempo des projecteurs (chenillard / pulsation) : meme compteur de pas.
+    private readonly Dictionary<string, WingSweepState> _beatEffect = new();
+
     // Dimmer qui suit le volume du micro.
     private bool _soundDimmerEnabled;
     private double _soundDimmerFactor = 1;
@@ -165,6 +168,7 @@ public sealed class ShowEngine : IFrameSource
             _fixtureStrobe.Clear();
             _fog.Clear();
             _wingSweep.Clear();
+            _beatEffect.Clear();
             _effects = ShowJson.Clone(show.LiveState.Effects);
             _moveEpoch = _chaseEpoch = _clock();
             _movePhaseAtEpoch = _chaseStepAtEpoch = 0;
@@ -221,6 +225,10 @@ public sealed class ShowEngine : IFrameSource
         foreach (string stale in _wingSweep.Keys.Where(k => !ids.Contains(k)).ToList())
         {
             _wingSweep.Remove(stale);
+        }
+        foreach (string stale in _beatEffect.Keys.Where(k => !ids.Contains(k)).ToList())
+        {
+            _beatEffect.Remove(stale);
         }
         _fadeFrom = null;
     }
@@ -643,7 +651,24 @@ public sealed class ShowEngine : IFrameSource
         {
             return;
         }
-        double delay = WingSweepDelayLocked(fixture);
+        byte position = WingSweepPosition(fixture, StepsLocked(state, WingSweepDelayLocked(fixture), t));
+        int motor = 0;
+        foreach (int i in profile.IndicesOf(ChannelType.Motor))
+        {
+            if (i < values.Length)
+            {
+                values[i] = fixture.MirrorMotors && motor % 2 == 1 ? (byte)(255 - position) : position;
+            }
+            motor++;
+        }
+    }
+
+    /// <summary>
+    /// Nombre de pas ecoules (fractionnaire) pour un pas de duree "delay". Quand la duree change
+    /// (tempo du micro qui bouge), le compte est recale : l'effet continue sans sauter.
+    /// </summary>
+    private static double StepsLocked(WingSweepState state, double delay, double t)
+    {
         if (state.LastDelay <= 0)
         {
             state.LastDelay = delay;
@@ -654,15 +679,73 @@ public sealed class ShowEngine : IFrameSource
             state.Epoch = t;
             state.LastDelay = delay;
         }
-        byte position = WingSweepPosition(fixture, state.StepsAtEpoch + (t - state.Epoch) / delay);
-        int motor = 0;
-        foreach (int i in profile.IndicesOf(ChannelType.Motor))
+        return state.StepsAtEpoch + (t - state.Epoch) / delay;
+    }
+
+    // =================================================================================
+    //  Effet au tempo des projecteurs (PAR) : chenillard des groupes de LED / pulsation
+    // =================================================================================
+
+    public void SetBeatEffect(string fixtureId, bool on)
+    {
+        lock (_lock)
         {
-            if (i < values.Length)
+            if (on)
             {
-                values[i] = fixture.MirrorMotors && motor % 2 == 1 ? (byte)(255 - position) : position;
+                _beatEffect.TryAdd(fixtureId, new WingSweepState { Epoch = _clock() });
             }
-            motor++;
+            else
+            {
+                _beatEffect.Remove(fixtureId);
+            }
+        }
+    }
+
+    public bool IsBeatEffectRunning(string fixtureId)
+    {
+        lock (_lock)
+        {
+            return _beatEffect.ContainsKey(fixtureId);
+        }
+    }
+
+    /// <summary>Duree d'un pas : delai fixe, ou N temps au BPM (saisi ou micro).</summary>
+    private double BeatStepLocked(FixtureInstance fixture) => fixture.BeatSyncToBpm
+        ? Math.Max(0.25, fixture.BeatBeats) * 60.0 / _bpm
+        : Math.Max(0.05, fixture.BeatDelaySeconds);
+
+    /// <summary>
+    /// Chenillard : un groupe de LED (canal de couleur) allume a la fois, chacun son tour.
+    /// Pulsation : tout allume un pas, eteint le suivant. Un groupe ou un dimmer a 0 est allume a
+    /// fond pour que l'effet se voie ; master et blackout s'appliquent ensuite normalement.
+    /// </summary>
+    private void ApplyBeatEffectLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, double t)
+    {
+        if (!_beatEffect.TryGetValue(fixture.Id, out var state))
+        {
+            return;
+        }
+        int[] groups = Enumerable.Range(0, Math.Min(values.Length, profile.ChannelCount))
+            .Where(i => ChannelTypeInfo.IsColorMix(profile.Channels[i].Type))
+            .ToArray();
+        if (groups.Length == 0)
+        {
+            return;
+        }
+
+        long step = (long)Math.Floor(StepsLocked(state, BeatStepLocked(fixture), t));
+        foreach (int i in profile.IndicesOf(ChannelType.Dimmer).Where(i => i < values.Length && values[i] == 0))
+        {
+            values[i] = 255;
+        }
+
+        for (int k = 0; k < groups.Length; k++)
+        {
+            int i = groups[k];
+            bool on = fixture.BeatEffect == BeatEffectKind.Chase
+                ? k == (int)(step % groups.Length)
+                : step % 2 == 0;
+            values[i] = on ? (values[i] == 0 ? (byte)255 : values[i]) : (byte)0;
         }
     }
 
@@ -916,6 +999,9 @@ public sealed class ShowEngine : IFrameSource
 
                 // 2 bis : effet gauche <-> droite des ailes (remplace la position des moteurs)
                 ApplyWingSweepLocked(fixture, profile, values, t);
+
+                // 2 ter : effet au tempo des projecteurs (chenillard / pulsation)
+                ApplyBeatEffectLocked(fixture, profile, values, t);
                 bool selected = _selection.Contains(fixture.Id);
 
                 if (selected)

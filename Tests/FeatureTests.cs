@@ -317,6 +317,35 @@ public class FeatureTests
     }
 
     [Fact]
+    public void Beat_effect_chases_the_uv_groups_then_pulses()
+    {
+        var par = Add(FixtureLibrary.ParUvOnlyId, "par", 60); // dimmer 60, UV 61-63
+        _engine.EditShow(_ =>
+        {
+            par.BeatDelaySeconds = 1;
+            par.BeatEffect = BeatEffectKind.Chase;
+        });
+        _engine.SetBeatEffect("par", true);
+
+        var u = Render();
+        Assert.Equal(255, u[60]);                                   // dimmer ouvert pour que l'effet se voie
+        Assert.Equal(new byte[] { 255, 0, 0 }, u[61..64]);          // groupe 1
+        _now = 1.1;
+        Assert.Equal(new byte[] { 0, 255, 0 }, Render()[61..64]);   // groupe 2
+        _now = 2.1;
+        Assert.Equal(new byte[] { 0, 0, 255 }, Render()[61..64]);   // groupe 3
+
+        _engine.EditShow(_ => par.BeatEffect = BeatEffectKind.Pulse);
+        _now = 4.1;                                                 // pas pair : allume
+        Assert.Equal(new byte[] { 255, 255, 255 }, Render()[61..64]);
+        _now = 5.1;                                                 // pas impair : eteint
+        Assert.Equal(new byte[] { 0, 0, 0 }, Render()[61..64]);
+
+        _engine.SetBeatEffect("par", false);
+        Assert.Equal(0, Render()[60]);                              // retour aux valeurs reglees
+    }
+
+    [Fact]
     public void Muted_colors_are_forced_to_zero_even_during_a_flash()
     {
         // Spider en 29 : LED 1 rouge gauche = canal 29 + 4, LED 2 vert gauche = 29 + 5.

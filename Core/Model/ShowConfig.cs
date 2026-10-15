@@ -73,6 +73,18 @@ public sealed class FixtureInstance
     /// <summary>Nombre de temps pour un aller quand l'effet est cale sur le tempo.</summary>
     public double WingSweepBeats { get; set; } = 2;
 
+    /// <summary>Effet au tempo des projecteurs (PAR...) : chenillard des groupes de LED ou pulsation.</summary>
+    public BeatEffectKind BeatEffect { get; set; } = BeatEffectKind.Chase;
+
+    /// <summary>Duree d'un pas de l'effet en mode "delai" (s).</summary>
+    public double BeatDelaySeconds { get; set; } = 0.5;
+
+    /// <summary>Effet cale sur le tempo (BPM saisi ou micro) plutot que sur un delai fixe.</summary>
+    public bool BeatSyncToBpm { get; set; }
+
+    /// <summary>Nombre de temps par pas quand l'effet est cale sur le tempo.</summary>
+    public double BeatBeats { get; set; } = 1;
+
     /// <summary>
     /// Case "Flash / strobe" du patch : l'appareil a ses interrupteurs FLASH et STROBE dans
     /// l'onglet Soiree.
@@ -84,6 +96,16 @@ public sealed class FixtureInstance
 
     /// <summary>Dernier canal DMX occupe par cet appareil.</summary>
     public int EndAddress(FixtureProfile? profile) => Address + Math.Max(1, profile?.ChannelCount ?? 1) - 1;
+}
+
+/// <summary>Effet au tempo d'un projecteur sans moteur.</summary>
+public enum BeatEffectKind
+{
+    /// <summary>Les groupes de LED (UV 1, 2, 3 ou R, V, B...) s'allument chacun leur tour.</summary>
+    Chase,
+
+    /// <summary>Tout s'allume puis s'eteint, un pas sur deux.</summary>
+    Pulse,
 }
 
 /// <summary>
