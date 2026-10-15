@@ -89,7 +89,6 @@ internal sealed class LivePanel : UserControl
     private readonly ToolTip _tips = new();
 
     // --- Micro : tempo detecte et dimmer qui suit le volume ---
-    private readonly Audio.MicInput _mic = new();
     private readonly ComboBox _micDevice = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 205, DropDownWidth = 320, Margin = new Padding(3, 4, 3, 3) };
     private readonly CheckBox _micOn = new() { Text = "Écouter le micro", Appearance = Appearance.Button, TextAlign = ContentAlignment.MiddleCenter, Size = new Size(205, 30), Font = Ui.BoldFont };
     private readonly ProgressBar _micLevel = new() { Width = 205, Height = 12, Maximum = 100, Margin = new Padding(3, 4, 3, 2) };
@@ -146,7 +145,6 @@ internal sealed class LivePanel : UserControl
         _autoTimer.Tick += (_, _) =>
         {
             OnAutoTick();
-            OnMicTick();
         };
         _autoTimer.Start();
 
@@ -433,48 +431,56 @@ internal sealed class LivePanel : UserControl
     }
 
     /// <summary>
-    /// Micro : choix de l'entree son, tempo detecte (affiche, et recopie dans le BPM si
-    /// « Caler le BPM sur le micro »), et dimmer qui baisse avec le volume puis remonte.
+    /// Micro (partage avec les autres onglets via _ctx.Mic) : choix de l'entree son, tempo detecte,
+    /// « Caler le BPM sur le micro », et dimmer qui baisse avec le volume puis remonte.
     /// </summary>
     private Control BuildMicGroup()
     {
-        try
+        _micDevice.Items.AddRange(Audio.MicController.DeviceNames().Cast<object>().ToArray());
+        int preferred = _ctx.Mic.PreferredDevice();
+        if (preferred >= 0)
         {
-            _micDevice.Items.AddRange(Audio.MicInput.DeviceNames().Cast<object>().ToArray());
+            _micDevice.SelectedIndex = preferred;
         }
-        catch (Exception ex)
-        {
-            _ctx.Status($"Entrées son indisponibles : {ex.Message}");
-        }
-        string? wanted = _ctx.Show.Settings.MicrophoneName;
-        _micDevice.SelectedIndex = _micDevice.Items.Count == 0 ? -1
-            : Math.Max(0, _micDevice.Items.IndexOf(wanted ?? ""));
         _micOn.Enabled = _micDevice.Items.Count > 0;
 
-        _micOn.CheckedChanged += (_, _) => ToggleMic();
+        _micOn.CheckedChanged += (_, _) =>
+        {
+            if (!_updating)
+            {
+                ToggleMic(_micOn.Checked);
+            }
+        };
         _micDevice.SelectionChangeCommitted += (_, _) =>
         {
             _ctx.Show.Settings.MicrophoneName = _micDevice.SelectedItem as string;
-            if (_micOn.Checked)
+            if (_ctx.Mic.IsListening)
             {
-                ToggleMic(); // relance sur la nouvelle entree
+                ToggleMic(true); // relance sur la nouvelle entree
+            }
+        };
+        _micFollow.CheckedChanged += (_, _) =>
+        {
+            if (!_updating)
+            {
+                _ctx.Mic.FollowBpm = _micFollow.Checked;
             }
         };
         _soundDimmer.CheckedChanged += (_, _) =>
         {
-            _ctx.Engine.SoundDimmerEnabled = _soundDimmer.Checked;
-            if (!_soundDimmer.Checked)
+            if (!_updating)
             {
-                _ctx.Engine.SoundDimmerFactor = 1;
+                _ctx.Mic.SoundDimmer = _soundDimmer.Checked;
             }
         };
         _soundRecovery.ValueChanged += (_, _) => _ctx.Show.Settings.SoundDimmerRecoverySeconds = (double)_soundRecovery.Value;
         Ui.SetValue(_soundRecovery, _ctx.Show.Settings.SoundDimmerRecoverySeconds);
-        _mic.Error += message => BeginInvoke(new Action(() =>
+        _ctx.Mic.Error += message => BeginInvoke(new Action(() =>
         {
-            _micOn.Checked = false;
+            _ctx.Mic.Stop();
             _ctx.Status($"Micro coupé : {message}");
         }));
+        _ctx.Mic.Changed += UpdateMicUi;
 
         _tips.SetToolTip(_micFollow, "Le tempo détecté remplace le BPM (mouvements, chenillard, effet gauche/droite du Spider calé sur le tempo).");
         _tips.SetToolTip(_soundDimmer, "Quand le volume baisse (break, pont), le dimmer baisse ; il remonte progressivement quand la musique revient.");
@@ -488,61 +494,60 @@ internal sealed class LivePanel : UserControl
         table.Controls.Add(_soundDimmer);
         table.Controls.Add(Ui.Flow(0, Ui.Text("Remontée"), _soundRecovery, Ui.Text("s")));
         table.Controls.Add(_soundInfo);
-        UpdateMicLabels();
+        UpdateMicUi();
         return Ui.Group("Micro (tempo / volume)", table);
     }
 
-    private void ToggleMic()
+    private void ToggleMic(bool on)
     {
-        _mic.Stop();
-        _ctx.Engine.SoundDimmerFactor = 1;
-        if (_micOn.Checked && _micDevice.SelectedIndex >= 0)
+        _ctx.Mic.Stop();
+        if (!on)
         {
-            try
-            {
-                _mic.Start(_micDevice.SelectedIndex);
-                _ctx.Show.Settings.MicrophoneName = _micDevice.SelectedItem as string;
-                _ctx.Status($"Micro « {_micDevice.SelectedItem} » : écoute en cours (le tempo apparaît après quelques secondes de musique).");
-            }
-            catch (Exception ex)
-            {
-                _micOn.Checked = false;
-                _ctx.Status($"Impossible d'ouvrir le micro : {ex.Message}");
-            }
+            return;
         }
-        _micOn.BackColor = _micOn.Checked ? Color.FromArgb(120, 200, 120) : SystemColors.Control;
-        _micOn.UseVisualStyleBackColor = !_micOn.Checked;
-        UpdateMicLabels();
+        try
+        {
+            _ctx.Mic.Start(_micDevice.SelectedIndex);
+            _ctx.Status($"Micro « {_micDevice.SelectedItem} » : écoute en cours (le tempo apparaît après quelques secondes de musique).");
+        }
+        catch (Exception ex)
+        {
+            _ctx.Mic.Stop();
+            _ctx.Status($"Impossible d'ouvrir le micro : {ex.Message}");
+        }
     }
 
-    /// <summary>Appele 10 fois/s : affiche le niveau et le tempo, pousse BPM et dimmer au moteur.</summary>
-    private void OnMicTick()
+    /// <summary>Etat du micro -> controles (appele 10 fois/s par _ctx.Mic, et a chaque changement).</summary>
+    private void UpdateMicUi()
     {
-        var detector = _mic.Detector;
-        if (detector is null)
+        if (IsDisposed)
         {
             return;
         }
 
-        detector.RecoverySeconds = (double)_soundRecovery.Value;
-        _micLevel.Value = (int)Math.Clamp((detector.LevelDb + 60) * 100 / 60, 0, 100);
-
-        double bpm = detector.Bpm;
-        if (_micFollow.Checked && bpm > 0 && Math.Abs(bpm - (double)_bpm.Value) >= 0.5)
+        var mic = _ctx.Mic;
+        _updating = true;
+        try
         {
-            Ui.SetValue(_bpm, Math.Round(bpm, 1)); // -> ValueChanged -> moteur
+            _micOn.Checked = mic.IsListening;
+            _micFollow.Checked = mic.FollowBpm;
+            _soundDimmer.Checked = mic.SoundDimmer;
+            if (mic.FollowBpm && Math.Abs((double)_bpm.Value - _ctx.Engine.Bpm) >= 0.05)
+            {
+                Ui.SetValue(_bpm, _ctx.Engine.Bpm); // BPM pousse par le micro
+                UpdateValueLabels();
+            }
         }
-        if (_soundDimmer.Checked)
+        finally
         {
-            _ctx.Engine.SoundDimmerFactor = detector.DimmerFactor;
+            _updating = false;
         }
-        UpdateMicLabels();
-    }
 
-    private void UpdateMicLabels()
-    {
-        var detector = _mic.Detector;
-        if (detector is null)
+        _micOn.Text = mic.IsListening ? "Micro : ÉCOUTE (couper)" : "Écouter le micro";
+        _micOn.BackColor = mic.IsListening ? Color.FromArgb(120, 200, 120) : SystemColors.Control;
+        _micOn.UseVisualStyleBackColor = !mic.IsListening;
+
+        if (!mic.IsListening)
         {
             _micTempo.Text = _micDevice.Items.Count == 0 ? "Aucune entrée son trouvée" : "Micro coupé";
             _micTempo.ForeColor = Color.DimGray;
@@ -551,10 +556,11 @@ internal sealed class LivePanel : UserControl
             return;
         }
 
-        double bpm = detector.Bpm;
+        _micLevel.Value = (int)Math.Clamp((mic.LevelDb + 60) * 100 / 60, 0, 100);
+        double bpm = mic.Bpm;
         _micTempo.Text = bpm > 0 ? $"Tempo détecté : {bpm:0.0} BPM" : "Tempo : écoute… (musique ?)";
         _micTempo.ForeColor = bpm > 0 ? Ui.OkColor : Ui.WarningColor;
-        _soundInfo.Text = _soundDimmer.Checked ? $"Dimmer son : {detector.DimmerFactor * 100:0} %" : $"Volume : {detector.LevelDb:0} dB";
+        _soundInfo.Text = mic.SoundDimmer ? $"Dimmer son : {mic.DimmerFactor * 100:0} %" : $"Volume : {mic.LevelDb:0} dB";
     }
 
     private Control BuildScenePanel()
@@ -1147,7 +1153,7 @@ internal sealed class LivePanel : UserControl
         {
             _ctx.LiveStateChanged -= RefreshFromEngine;
             _autoTimer.Dispose();
-            _mic.Dispose();
+            _ctx.Mic.Changed -= UpdateMicUi;
             _tips.Dispose();
         }
         base.Dispose(disposing);

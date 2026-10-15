@@ -20,9 +20,13 @@ internal sealed class ShowContext
         Engine = engine;
         Link = link;
         Show = show;
+        Mic = new Audio.MicController(engine, () => Show.Settings);
     }
 
     public ShowEngine Engine { get; }
+
+    /// <summary>Le micro (tempo et volume), partage par tous les onglets.</summary>
+    public Audio.MicController Mic { get; }
     public DmxLink Link { get; }
 
     /// <summary>Configuration ouverte. Toute modification de structure passe par Engine.EditShow().</summary>

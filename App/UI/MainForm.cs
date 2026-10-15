@@ -937,6 +937,7 @@ internal sealed class MainForm : Form
         _uiTimer.Stop();
         _wantConnected = false;
         _link.Dispose();
+        _ctx.Mic.Dispose();
         SaveAppSettings();
         base.OnFormClosing(e);
     }

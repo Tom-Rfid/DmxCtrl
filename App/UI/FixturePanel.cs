@@ -62,6 +62,10 @@ internal sealed class FixturePanel : UserControl
     private readonly NumericUpDown? _sweepAmplitude;
     private readonly CheckBox? _sweepSync;
     private readonly NumericUpDown? _sweepBeats;
+    private readonly CheckBox? _micListen;   // ecouter le micro (partage avec l'onglet Soiree)
+    private readonly Label? _micBpm;
+    private readonly CheckBox? _micFollow;   // BPM = tempo du micro, et effet cale dessus
+    private bool _micUpdating;
     private readonly Label _warning = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 6, 3, 3) };
     private readonly ToolTip _tips = new();
     private bool _updating;
@@ -151,21 +155,21 @@ internal sealed class FixturePanel : UserControl
             (_groupLeft, _groupRight) = LedGroups.Split(profile);
             if (_groupLeft.Length > 0 && _groupRight.Length > 0)
             {
-                _ledLeft = new VerticalFader { Location = new Point(284, 6), Size = new Size(48, 260) };
-                _ledRight = new VerticalFader { Location = new Point(340, 6), Size = new Size(48, 260) };
+                _ledLeft = new VerticalFader { Location = new Point(284, 6), Size = new Size(48, 200) };
+                _ledRight = new VerticalFader { Location = new Point(340, 6), Size = new Size(48, 200) };
                 _ledLeft.ValueChanged += (_, _) => OnLedFader(0);
                 _ledRight.ValueChanged += (_, _) => OnLedFader(1);
                 _tips.SetToolTip(_ledLeft, $"LED de l'aile gauche ({LedNames(_groupLeft)}) : bas = 0 %, haut = 100 %.\nGarde la couleur en cours (les proportions entre LED).");
                 _tips.SetToolTip(_ledRight, $"LED de l'aile droite ({LedNames(_groupRight)}) : bas = 0 %, haut = 100 %.\nGarde la couleur en cours (les proportions entre LED).");
                 left.Controls.Add(_ledLeft);
                 left.Controls.Add(_ledRight);
-                left.Controls.Add(new Label { Text = "LED\ngauche", Location = new Point(276, 270), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
-                left.Controls.Add(new Label { Text = "LED\ndroite", Location = new Point(332, 270), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
+                left.Controls.Add(new Label { Text = "LED\ngauche", Location = new Point(276, 210), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
+                left.Controls.Add(new Label { Text = "LED\ndroite", Location = new Point(332, 210), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
             }
             _wings = new XYPad
             {
                 Location = new Point(12, 6),
-                Size = new Size(260, 260),
+                Size = new Size(260, 200),
                 XLabel = "Ailes ← gauche · droite →",
                 YLabel = _dimmer >= 0 ? "Dimmer : haut = 100 %, bas = 0" : "",
             };
@@ -175,71 +179,109 @@ internal sealed class FixturePanel : UserControl
             {
                 Text = "Inverser (ailes en miroir)",
                 Checked = fixture.MirrorMotors,
-                Location = new Point(12, 272),
+                Location = new Point(12, 212),
                 AutoSize = true,
             };
             _mirrorWings.CheckedChanged += (_, _) => OnMirrorChanged();
 
-            var center = new Button { Text = "Ailes au milieu", Location = new Point(12, 298), Width = 126, Height = 30 };
+            var center = new Button { Text = "Ailes au milieu", Location = new Point(12, 238), Width = 126, Height = 30 };
             center.Click += (_, _) =>
             {
                 _ctx.Engine.SetMotors(_fixture.Id, 128, _mirrorWings.Checked);
                 RefreshFromEngine();
             };
-            var reset = new Button { Text = "Par défaut", Location = new Point(146, 298), Width = 126, Height = 30 };
+            var reset = new Button { Text = "Par défaut", Location = new Point(146, 238), Width = 126, Height = 30 };
             reset.Click += (_, _) => ResetDefaults();
 
-            _wingsInfo = new Label { Location = new Point(12, 334), Size = new Size(260, 20), Font = Ui.BoldFont };
-            var hint = new Label
-            {
-                Text = "Gauche / droite : les 2 ailes (opposées avec « Inverser »). " +
-                       "Haut / bas : dimmer.",
-                Location = new Point(12, 358),
-                Size = new Size(260, 36),
-                ForeColor = Color.DimGray,
-            };
-            left.Controls.AddRange(new Control[] { _wings, _mirrorWings, center, reset, _wingsInfo, hint });
+            _wingsInfo = new Label { Location = new Point(12, 274), Size = new Size(260, 20), Font = Ui.BoldFont };
+            _tips.SetToolTip(_wings, "Gauche / droite : les 2 ailes (opposées avec « Inverser »). Haut / bas : dimmer.");
+            left.Controls.AddRange(new Control[] { _wings, _mirrorWings, center, reset, _wingsInfo });
 
             // Effet automatique gauche <-> droite avec un delai (suit la case "Inverser").
+            // Tableau (et non positions fixes) : les libelles prennent la place qu'il leur faut,
+            // meme avec la mise a l'echelle de Windows (125 %, 150 %...).
             _sweep = new CheckBox
             {
                 Text = "Effet gauche ↔ droite",
                 Appearance = Appearance.Button,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Font = Ui.BoldFont,
-                Location = new Point(12, 398),
                 Size = new Size(260, 32),
                 Checked = ctx.Engine.IsWingSweeping(fixture.Id),
             };
             _sweep.CheckedChanged += (_, _) => OnSweepToggled();
-            _sweepDelay = new NumericUpDown { Minimum = 0.2m, Maximum = 60, DecimalPlaces = 1, Increment = 0.1m, Width = 70, Location = new Point(130, 436) };
-            _sweepAmplitude = new NumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Width = 70, Location = new Point(130, 466) };
+            _sweepDelay = new NumericUpDown { Minimum = 0.2m, Maximum = 60, DecimalPlaces = 1, Increment = 0.1m, Width = 70 };
+            _sweepAmplitude = new NumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Width = 70 };
+            _sweepSync = new CheckBox { Text = "Caler sur le tempo, 1 aller =", AutoSize = true, Checked = fixture.WingSweepSyncToBpm, Margin = new Padding(3, 6, 3, 3) };
+            _sweepBeats = new NumericUpDown { Minimum = 0.25m, Maximum = 64, DecimalPlaces = 2, Increment = 0.25m, Width = 70 };
             Ui.SetValue(_sweepDelay, fixture.WingSweepDelaySeconds);
             Ui.SetValue(_sweepAmplitude, fixture.WingSweepAmplitudePercent);
+            Ui.SetValue(_sweepBeats, fixture.WingSweepBeats);
             _sweepDelay.ValueChanged += (_, _) => SaveSweepSettings();
             _sweepAmplitude.ValueChanged += (_, _) => SaveSweepSettings();
-            _tips.SetToolTip(_sweep, "Les ailes vont à gauche, attendent le délai, vont à droite, attendent… " +
-                                     "Avec « Inverser », l'aile 2 fait le mouvement opposé.");
-            _sweepSync = new CheckBox { Text = "Caler sur le tempo : 1 aller =", AutoSize = true, Checked = fixture.WingSweepSyncToBpm, Location = new Point(12, 498) };
-            _sweepBeats = new NumericUpDown { Minimum = 0.25m, Maximum = 64, DecimalPlaces = 2, Increment = 0.25m, Width = 60, Location = new Point(212, 496) };
-            Ui.SetValue(_sweepBeats, fixture.WingSweepBeats);
             _sweepSync.CheckedChanged += (_, _) => SaveSweepSettings();
             _sweepBeats.ValueChanged += (_, _) => SaveSweepSettings();
-            _tips.SetToolTip(_sweepSync, "Le délai suit le BPM de l'onglet Soirée (tap tempo ou micro) : 1 aller = ce nombre de temps.");
             _sweepDelay.Enabled = !fixture.WingSweepSyncToBpm;
-            left.Controls.AddRange(new Control[]
+
+            // Micro : meme micro que l'onglet Soiree (_ctx.Mic).
+            _micListen = new CheckBox
             {
-                _sweepSync,
-                _sweepBeats,
-                new Label { Text = "temps", Location = new Point(276, 500), AutoSize = true },
-                _sweep,
-                new Label { Text = "Délai gauche/droite", Location = new Point(12, 439), AutoSize = true },
-                _sweepDelay,
-                new Label { Text = "s", Location = new Point(204, 439), AutoSize = true },
-                new Label { Text = "Amplitude", Location = new Point(12, 469), AutoSize = true },
-                _sweepAmplitude,
-                new Label { Text = "%", Location = new Point(204, 469), AutoSize = true },
-            });
+                Text = "Micro",
+                Appearance = Appearance.Button,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(110, 28),
+                Enabled = Audio.MicController.DeviceNames().Count > 0,
+            };
+            _micListen.CheckedChanged += (_, _) => OnMicListenToggled();
+            _micBpm = new Label { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 8, 3, 3) };
+            _micFollow = new CheckBox { Text = "Caler sur le tempo du micro", AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
+            _micFollow.CheckedChanged += (_, _) => OnMicFollowToggled();
+
+            _tips.SetToolTip(_sweep, "Les ailes vont à gauche, attendent le délai, vont à droite, attendent… " +
+                                     "Avec « Inverser », l'aile 2 fait le mouvement opposé.");
+            _tips.SetToolTip(_sweepSync, "Le délai suit le BPM (tap tempo de l'onglet Soirée, ou micro) : 1 aller = ce nombre de temps.");
+            _tips.SetToolTip(_micListen, "Écoute le micro pour détecter le tempo (le même micro que l'onglet Soirée).");
+            _tips.SetToolTip(_micFollow, "Le BPM suit le tempo détecté au micro, et l'effet gauche/droite se cale dessus.");
+
+            var effect = new TableLayoutPanel
+            {
+                Location = new Point(9, 298),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 3,
+                GrowStyle = TableLayoutPanelGrowStyle.AddRows,
+            };
+            for (int c = 0; c < 3; c++)
+            {
+                effect.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            }
+            void Row(Control first, Control? second = null, string unit = "")
+            {
+                int row = effect.RowCount++;
+                effect.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                effect.Controls.Add(first, 0, row);
+                if (second is null)
+                {
+                    effect.SetColumnSpan(first, 3);
+                    return;
+                }
+                effect.Controls.Add(second, 1, row);
+                if (unit.Length > 0)
+                {
+                    effect.Controls.Add(Ui.Text(unit), 2, row);
+                }
+            }
+            Row(_sweep);
+            Row(Ui.Text("Délai gauche/droite"), _sweepDelay, "s");
+            Row(Ui.Text("Amplitude"), _sweepAmplitude, "%");
+            Row(_sweepSync, _sweepBeats, "temps");
+            Row(_micListen, _micBpm);
+            effect.SetColumnSpan(_micBpm, 2);
+            Row(_micFollow);
+            left.Controls.Add(effect);
+
+            _ctx.Mic.Changed += UpdateMicUi;
+            UpdateMicUi();
         }
         else
         {
@@ -589,6 +631,78 @@ internal sealed class FixturePanel : UserControl
             : $"{_fixture.Name} : effet gauche ↔ droite arrêté.");
     }
 
+    private void OnMicListenToggled()
+    {
+        if (_micUpdating || _micListen is null)
+        {
+            return;
+        }
+        if (!_micListen.Checked)
+        {
+            _ctx.Mic.Stop();
+            return;
+        }
+        try
+        {
+            _ctx.Mic.Start();
+            _ctx.Status("Micro : écoute en cours (le tempo apparaît après quelques secondes de musique).");
+        }
+        catch (Exception ex)
+        {
+            _ctx.Mic.Stop();
+            _ctx.Status($"Impossible d'ouvrir le micro : {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// "Caler sur le tempo du micro" : le BPM suit le micro (qui est allume si besoin) et
+    /// l'effet gauche/droite passe en mode "cale sur le tempo".
+    /// </summary>
+    private void OnMicFollowToggled()
+    {
+        if (_micUpdating || _micFollow is null || _sweepSync is null)
+        {
+            return;
+        }
+        bool follow = _micFollow.Checked;
+        if (follow && !_ctx.Mic.IsListening && _micListen is not null)
+        {
+            _micListen.Checked = true; // -> OnMicListenToggled
+        }
+        _ctx.Mic.FollowBpm = follow;
+        if (follow)
+        {
+            _sweepSync.Checked = true; // -> SaveSweepSettings
+        }
+    }
+
+    /// <summary>Etat du micro -> controles de l'onglet (10 fois/s pendant l'ecoute).</summary>
+    private void UpdateMicUi()
+    {
+        if (IsDisposed || _micListen is null || _micBpm is null || _micFollow is null)
+        {
+            return;
+        }
+        var mic = _ctx.Mic;
+        _micUpdating = true;
+        try
+        {
+            _micListen.Checked = mic.IsListening;
+            _micFollow.Checked = mic.FollowBpm;
+        }
+        finally
+        {
+            _micUpdating = false;
+        }
+        _micListen.Text = mic.IsListening ? "Micro : ON" : "Micro";
+        _micListen.BackColor = mic.IsListening ? Color.FromArgb(120, 200, 120) : SystemColors.Control;
+        _micListen.UseVisualStyleBackColor = !mic.IsListening;
+        double bpm = mic.Bpm;
+        _micBpm.Text = !mic.IsListening ? $"BPM : {_ctx.Engine.Bpm:0.0}"
+            : bpm > 0 ? $"Tempo micro : {bpm:0.0} BPM" : "Tempo : écoute…";
+        _micBpm.ForeColor = mic.IsListening && bpm > 0 ? Ui.OkColor : mic.IsListening ? Ui.WarningColor : Color.DimGray;
+    }
+
     /// <summary>Delai et amplitude de l'effet : enregistres avec la configuration.</summary>
     private void SaveSweepSettings()
     {
@@ -696,6 +810,7 @@ internal sealed class FixturePanel : UserControl
             // Indispensable : sinon le contexte garderait une reference vers ce panneau detruit.
             _ctx.LiveStateChanged -= RefreshFromEngine;
             _ctx.ProfileDetailsChanged -= RefreshProfileDetails;
+            _ctx.Mic.Changed -= UpdateMicUi;
             _tips.Dispose();
         }
         base.Dispose(disposing);
