@@ -148,7 +148,8 @@ public class FeatureTests
         Assert.DoesNotContain("Couleurs d'origine", names);
         Assert.Contains("Son vert", names);
         Assert.Contains("Son rouge ⚠ tst", names); // remis, avec avertissement
-        Assert.Equal(4, old.Revision);
+        Assert.Equal(5, old.Revision);
+        Assert.Equal(FixtureLibrary.ZoomDefault, old.Channels[old.IndexOf(ChannelType.LaserZoom)].Default); // zoom 60
         Assert.Contains(old.Channels[^1].Ranges, r => r.From == 192 && r.Name.StartsWith("Rotation horaire")); // manuel V3
     }
 

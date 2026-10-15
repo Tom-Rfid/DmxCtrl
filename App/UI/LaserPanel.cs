@@ -111,10 +111,21 @@ internal sealed class LaserPanel : UserControl
     private readonly Label _state = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(6, 8, 3, 3) };
     private readonly List<Button> _modeButtons = new();
     private readonly List<Button> _patternButtons = new();
-    private readonly List<Button> _colorButtons = new();
+    private readonly List<Button> _riskyButtons = new();
+
+    // ----- Section Couleur : type (eteint / fixe / alternance / defilement) + choix + un curseur -----
+    private enum ColorKind { Off, Fixed, Alternate, Continuous, Other }
+
+    private readonly int _blink; // canal "Clignotement" (strobe en couleur fixe, vitesse de changement sinon)
+    private readonly Dictionary<ColorKind, CheckBox> _kindButtons = new();
+    private readonly FlowLayoutPanel _colorChoices = Ui.Flow(440);
+    private readonly Label _speedLabel = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 8, 3, 3) };
+    private readonly TrackBar _speed = Ui.Slider(0, 100, 220);
+    private readonly Label _speedValue = Ui.ValueLabel(80);
+    private ColorKind _shownKind = (ColorKind)(-1);
     private readonly XYPad _pad = new() { Size = new Size(240, 240), XLabel = "X →", YLabel = "Y ↓" };
     private readonly Dictionary<int, RangeControl> _rangeControls = new();
-    private byte _lastColor = 37; // couleur rendue a l'allumage ("couleurs d'origine")
+    private byte _lastColor = 62; // couleur rendue a l'allumage (rouge) si aucune autre n'a ete choisie
     private bool _updating;
 
     public LaserPanel(ShowContext ctx, FixtureInstance fixture, FixtureProfile profile)
@@ -129,6 +140,7 @@ internal sealed class LaserPanel : UserControl
         _color = profile.IndexOf(ChannelType.LaserColor);
         _x = profile.IndexOf(ChannelType.LaserX);
         _y = profile.IndexOf(ChannelType.LaserY);
+        _blink = profile.IndexOf(ChannelType.Strobe);
 
         // Page = une colonne de sections (TableLayoutPanel) dans une zone qui defile : plus fiable
         // qu'un FlowLayoutPanel avec des sauts de ligne autour de GroupBox a taille automatique.
@@ -168,18 +180,18 @@ internal sealed class LaserPanel : UserControl
             foreach (var preset in profile.Channels[_mode].Presets)
             {
                 var button = new Button { Text = preset.Name, AutoSize = true, Tag = preset.Value, Margin = new Padding(3) };
+                _modeButtons.Add(button);
                 if (preset.Name.Contains('⚠'))
                 {
-                    // Bouton a risque (ex. « Son rouge » qui met ce laser en mode test) : confirmation.
+                    // Bouton a risque (« Son rouge » met ce laser en mode test) : confirmation, et
+                    // range a part, en bas a droite de la page.
                     button.ForeColor = Ui.WarningColor;
                     button.Font = Ui.BoldFont;
                     button.Click += (_, _) => ConfirmRiskyMode(preset);
+                    _riskyButtons.Add(button);
+                    continue;
                 }
-                else
-                {
-                    button.Click += (_, _) => SetChannel(_mode, preset.Value);
-                }
-                _modeButtons.Add(button);
+                button.Click += (_, _) => SetChannel(_mode, preset.Value);
                 modes.Controls.Add(button);
             }
             var group = Ui.Group("Mode (programmes internes ou DMX manuel)", modes);
@@ -211,21 +223,7 @@ internal sealed class LaserPanel : UserControl
         var right = Ui.Table(1);
         if (_color >= 0)
         {
-            var colors = Ui.Flow(420);
-            foreach (var preset in profile.Channels[_color].Presets)
-            {
-                var button = new Button { Text = preset.Name, Size = new Size(130, 36), Tag = preset.Value, Margin = new Padding(3), FlatStyle = FlatStyle.Flat };
-                button.BackColor = LaserColorFor(preset.Name);
-                button.ForeColor = button.BackColor.GetBrightness() < 0.45f ? Color.White : Color.Black;
-                button.Click += (_, _) =>
-                {
-                    EnsureDmxMode();
-                    SetChannel(_color, preset.Value);
-                };
-                _colorButtons.Add(button);
-                colors.Controls.Add(button);
-            }
-            right.Controls.Add(Ui.Group("Couleur", colors));
+            right.Controls.Add(Ui.Group("Couleur", BuildColorSection()));
         }
         if (_x >= 0 && _y >= 0)
         {
@@ -254,19 +252,27 @@ internal sealed class LaserPanel : UserControl
         page.Controls.Add(middle);
 
         // ---------------- Autres canaux : plage + curseur ----------------
-        var others = Ui.Table(2);
+        var others = Ui.Table(3);
         for (int i = 0; i < profile.ChannelCount; i++)
         {
             var channel = profile.Channels[i];
-            if (i == _mode || i == _pattern || i == _color || channel.Ranges.Count == 0)
+            if (i == _mode || i == _pattern || i == _color || i == _blink || channel.Ranges.Count == 0)
             {
-                continue;
+                continue; // le clignotement est dans la section Couleur
             }
             int index = i;
             var control = new RangeControl(channel);
             control.ValueChanged += value => SetChannel(index, value);
             _rangeControls[i] = control;
-            Ui.Row(others, $"{channel.Name}  [DMX {fixture.Address + i}]", control);
+            Control? extra = null;
+            if (channel.Type == ChannelType.LaserZoom)
+            {
+                // Sous 60 le motif se deforme sur ce laser : bouton de retour a 60.
+                var zoomReset = new Button { Text = $"{FixtureLibrary.ZoomDefault}", AutoSize = true, Margin = new Padding(3, 4, 3, 3) };
+                zoomReset.Click += (_, _) => SetChannel(index, FixtureLibrary.ZoomDefault);
+                extra = zoomReset;
+            }
+            Ui.Row(others, $"{channel.Name}  [DMX {fixture.Address + i}]", control, extra);
         }
         var reset = new Button { Text = "Tout remettre par défaut (laser éteint, mode DMX)", AutoSize = true };
         reset.Click += (_, _) =>
@@ -283,10 +289,198 @@ internal sealed class LaserPanel : UserControl
             page.Controls.Add(notes);
         }
 
+        // Boutons a risque (mode test) : en bas a droite, a l'ecart.
+        if (_riskyButtons.Count > 0)
+        {
+            var risky = Ui.Flow(0, _riskyButtons.Cast<Control>().Prepend(Ui.Text("Coupe le DMX du laser (mode test) :", color: Ui.WarningColor)).ToArray());
+            risky.Anchor = AnchorStyles.Right;
+            page.Controls.Add(risky);
+        }
+
         Controls.Add(scroll);
 
         _ctx.LiveStateChanged += RefreshFromEngine;
         RefreshFromEngine();
+    }
+
+    // =================================================================================
+    //  Section Couleur
+    //  Notice, canal 3 : 0-24 eteint, 25-49 couleurs d'origine, 50-124 couleur FIXE,
+    //  125-224 ALTERNANCES, 225-255 DEFILEMENT continu. Le canal 4 depend du canal 3 :
+    //  couleur fixe -> vitesse du CLIGNOTEMENT ; alternance / defilement -> VITESSE DU
+    //  CHANGEMENT de couleur (0-24 = arret : sans lui, une alternance reste figee).
+    // =================================================================================
+
+    private static ColorKind KindOf(byte color) => color switch
+    {
+        <= 24 => ColorKind.Off,
+        <= 49 => ColorKind.Other,
+        <= 124 => ColorKind.Fixed,
+        <= 224 => ColorKind.Alternate,
+        _ => ColorKind.Continuous,
+    };
+
+    private Control BuildColorSection()
+    {
+        var kinds = Ui.Flow(0);
+        foreach (var (kind, text) in new[]
+                 {
+                     (ColorKind.Off, "Éteint"), (ColorKind.Fixed, "Fixe"),
+                     (ColorKind.Alternate, "Alternance"), (ColorKind.Continuous, "Défilement continu"),
+                 })
+        {
+            var box = new CheckBox
+            {
+                Text = text,
+                Appearance = Appearance.Button,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(104, 32),
+                Font = Ui.BoldFont,
+                Margin = new Padding(3),
+            };
+            box.Click += (_, _) => SelectKind(kind);
+            _kindButtons[kind] = box;
+            kinds.Controls.Add(box);
+        }
+
+        _speed.ValueChanged += (_, _) => OnSpeedMoved();
+        var table = Ui.Table(1);
+        table.Controls.Add(kinds);
+        table.Controls.Add(_colorChoices);
+        table.Controls.Add(Ui.Flow(0, _speedLabel, _speed, _speedValue));
+        table.Controls.Add(new Label
+        {
+            Text = "Fixe : le curseur règle le clignotement. Alternance / défilement : il règle la vitesse de changement " +
+                   "(à 0 l'alternance reste figée).",
+            AutoSize = true,
+            MaximumSize = new Size(440, 0),
+            ForeColor = Color.DimGray,
+            Margin = new Padding(3, 4, 3, 3),
+        });
+        return table;
+    }
+
+    /// <summary>
+    /// Choix du type : premiere couleur du type ; en alternance / defilement, le canal 4 est mis a
+    /// une vitesse moyenne s'il etait a l'arret ; en fixe, le clignotement est coupe.
+    /// </summary>
+    private void SelectKind(ColorKind kind)
+    {
+        EnsureDmxMode();
+        byte[] values = _ctx.Engine.GetValues(_fixture.Id);
+        byte current = values.ElementAtOrDefault(_color);
+        if (kind == ColorKind.Off)
+        {
+            if (current >= 25)
+            {
+                _lastColor = current;
+            }
+            SetChannel(_color, 0);
+            return;
+        }
+
+        if (KindOf(current) != kind)
+        {
+            var first = RangesOf(kind).FirstOrDefault();
+            _ctx.Engine.SetValue(_fixture.Id, _color, first?.At(0.5) ?? (byte)240);
+        }
+        if (_blink >= 0)
+        {
+            byte blink = values.ElementAtOrDefault(_blink);
+            if (kind == ColorKind.Fixed && KindOf(current) != ColorKind.Fixed)
+            {
+                _ctx.Engine.SetValue(_fixture.Id, _blink, 0);   // pas de clignotement
+            }
+            else if (kind != ColorKind.Fixed && blink < 25)
+            {
+                _ctx.Engine.SetValue(_fixture.Id, _blink, 140); // sinon l'alternance reste figee
+            }
+        }
+        RefreshFromEngine();
+    }
+
+    /// <summary>Plages de la notice pour un type de couleur (noms du profil : « Rouge + vert ensemble »...).</summary>
+    private IEnumerable<ChannelRange> RangesOf(ColorKind kind) =>
+        _profile.Channels[_color].Ranges.Where(r => KindOf(r.From) == kind && kind is ColorKind.Fixed or ColorKind.Alternate);
+
+    /// <summary>Boutons des couleurs du type affiche (recrees seulement quand le type change).</summary>
+    private void RebuildColorChoices(ColorKind kind)
+    {
+        _shownKind = kind;
+        _colorChoices.SuspendLayout();
+        foreach (Control old in _colorChoices.Controls.Cast<Control>().ToList())
+        {
+            old.Dispose();
+        }
+        _colorChoices.Controls.Clear();
+        foreach (var range in RangesOf(kind))
+        {
+            string name = range.Name.Replace("Alternance ", "");
+            var button = new Button { Text = name, Size = new Size(140, 34), Tag = range, Margin = new Padding(3), FlatStyle = FlatStyle.Flat };
+            button.BackColor = LaserColorFor(range.Name);
+            button.ForeColor = button.BackColor.GetBrightness() < 0.45f ? Color.White : Color.Black;
+            button.Click += (_, _) =>
+            {
+                EnsureDmxMode();
+                SetChannel(_color, range.At(0.5));
+            };
+            _colorChoices.Controls.Add(button);
+        }
+        if (_colorChoices.Controls.Count == 0)
+        {
+            _colorChoices.Controls.Add(Ui.Text(kind switch
+            {
+                ColorKind.Off => "Laser éteint.",
+                ColorKind.Continuous => "Les couleurs défilent toutes seules.",
+                _ => "Couleurs d'origine du motif.",
+            }, color: Color.DimGray));
+        }
+        _colorChoices.ResumeLayout();
+    }
+
+    private void RefreshColorSection(byte color, byte blink)
+    {
+        if (_color < 0)
+        {
+            return;
+        }
+        var kind = KindOf(color);
+        foreach (var (k, box) in _kindButtons)
+        {
+            box.Checked = k == kind;
+            box.BackColor = k == kind ? Color.LightSkyBlue : SystemColors.Control;
+            box.UseVisualStyleBackColor = k != kind;
+        }
+        if (kind != _shownKind)
+        {
+            RebuildColorChoices(kind);
+        }
+        foreach (Control control in _colorChoices.Controls)
+        {
+            if (control is Button { Tag: ChannelRange range } button)
+            {
+                bool active = range.Contains(color);
+                button.FlatAppearance.BorderSize = active ? 4 : 1;
+                button.FlatAppearance.BorderColor = active ? Color.DeepSkyBlue : Color.Gray;
+            }
+        }
+
+        // Un seul curseur pour le canal 4, nomme selon le type de couleur.
+        _speedLabel.Text = kind == ColorKind.Fixed ? "Clignotement" : "Vitesse de changement";
+        _speed.Enabled = _blink >= 0 && kind != ColorKind.Off;
+        _speed.Value = blink < 25 ? 0 : Math.Clamp((int)Math.Round((blink - 25) * 99.0 / 230) + 1, 1, 100);
+        _speedValue.Text = blink < 25 ? (kind == ColorKind.Fixed ? "aucun" : "arrêt") : $"{_speed.Value} %";
+    }
+
+    /// <summary>Curseur 0..100 % -> canal 4 : 0 = arret (0), 1..100 % = 25..255 (lent -> rapide).</summary>
+    private void OnSpeedMoved()
+    {
+        if (_updating || _blink < 0)
+        {
+            return;
+        }
+        int v = _speed.Value;
+        SetChannel(_blink, v == 0 ? (byte)0 : (byte)Math.Round(25 + (v - 1) * 230.0 / 99));
     }
 
     /// <summary>Couleur d'affichage d'un bouton de couleur laser, d'apres son nom.</summary>
@@ -431,12 +625,7 @@ internal sealed class LaserPanel : UserControl
 
             Highlight(_modeButtons, b => _mode >= 0 && Equals(b.Tag, Value(_mode)));
             Highlight(_patternButtons, b => b.Tag is ChannelRange r && r.Contains(Value(_pattern)));
-            foreach (var button in _colorButtons)
-            {
-                bool active = Equals(button.Tag, Value(_color));
-                button.FlatAppearance.BorderSize = active ? 4 : 1;
-                button.FlatAppearance.BorderColor = active ? Color.DeepSkyBlue : Color.Gray;
-            }
+            RefreshColorSection(Value(_color), Value(_blink));
 
             if (_x >= 0 && _y >= 0)
             {

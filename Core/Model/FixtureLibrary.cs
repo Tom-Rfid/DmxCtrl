@@ -128,6 +128,16 @@ public static class FixtureLibrary
         [GalacticLaserRgId] = new[] { "Son rouge", "Couleurs d'origine" },
     };
 
+    /// <summary>Zoom par defaut du laser Galactic : en dessous de 60 le motif se deforme (constate sur l'appareil).</summary>
+    public const byte ZoomDefault = 60;
+
+    /// <summary>Valeurs par defaut corrigees dans un modele (type de canal -> valeur), appliquees aux configurations.</summary>
+    private static readonly Dictionary<string, (ChannelType Type, byte Default)[]> UpdatedDefaults = new()
+    {
+        [GalacticLaserId] = new[] { (ChannelType.LaserZoom, ZoomDefault) },
+        [GalacticLaserRgId] = new[] { (ChannelType.LaserZoom, ZoomDefault) },
+    };
+
     /// <summary>Canaux renommes dans un modele (ancien nom -> nouveau), appliques aux configurations.</summary>
     private static readonly Dictionary<string, (string Old, string New)[]> RenamedChannels = new()
     {
@@ -142,6 +152,16 @@ public static class FixtureLibrary
             foreach (var channel in target.Channels)
             {
                 channel.Presets.RemoveAll(p => retired.Any(name => TextKey.Same(name, p.Name)));
+            }
+        }
+        if (UpdatedDefaults.TryGetValue(model.Id, out var defaults))
+        {
+            foreach (var (type, value) in defaults)
+            {
+                foreach (var channel in target.Channels.Where(c => c.Type == type))
+                {
+                    channel.Default = value;
+                }
             }
         }
         if (RenamedChannels.TryGetValue(model.Id, out var renames))
@@ -430,7 +450,7 @@ public static class FixtureLibrary
         Name = "Galactic RGY-140 MKII Value Line (laser, 10 canaux)",
         Manufacturer = "Showtec",
         DefaultFixtureName = "Laser",
-        Revision = 4, // 2 : « Son rouge » et « Couleurs d'origine » retires ; 3 : rotations (manuel V3) ; 4 : « Son rouge ⚠ tst » de retour, Clignotement
+        Revision = 5, // 2 : « Son rouge » / « Couleurs d'origine » retires ; 3 : rotations V3 ; 4 : « Son rouge ⚠ tst », Clignotement ; 5 : zoom 60 par defaut
         Notes = "Table DMX des manuels Highlite (code 51335, V1 et V3 : un seul mode DMX de 10 canaux, pas de réglage d'intensité). Le canal 1 doit être en « DMX » (240-255) pour piloter " +
                 "motifs, couleurs et mouvements ; sinon le laser joue ses programmes internes. Couleur 0-24 = laser éteint. " +
                 "SÉCURITÉ : connecteur d'interlock obligatoire ; ne jamais viser le public à hauteur des yeux.",
@@ -471,7 +491,7 @@ public static class FixtureLibrary
                 notes: "Couleur fixe (25-124) : vitesse du clignotement. Couleur alternée (125-255) : vitesse du changement de couleur. 0-24 = arrêt.",
                 ranges: new ChannelRange[] { new("Pas de clignotement", 0, 24), new("Clignotement (lent → rapide)", 25, 255) },
                 strobeSlow: 25, strobeFast: 255),
-            Ch("Zoom", ChannelType.LaserZoom, 0, notes: "Mode DMX (canal 1 à 240-255) et laser allumé (couleur ≥ 25) : 0-127 = taille fixe 100 % → 5 %, 128-255 = zoom animé.",
+            Ch("Zoom", ChannelType.LaserZoom, ZoomDefault, notes: "Mode DMX (canal 1 à 240-255) et laser allumé (couleur ≥ 25) : 0-127 = taille fixe 100 % → 5 %, 128-255 = zoom animé. Sous 60 le motif se déforme : 60 par défaut (bouton « 60 »).",
                 ranges: new ChannelRange[]
                 {
                     new("Taille fixe (100 % → 5 %)", 0, 127), new("Zoom avant animé (lent → rapide)", 128, 169),
