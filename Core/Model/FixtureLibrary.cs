@@ -464,33 +464,46 @@ public static class FixtureLibrary
     };
 
     // =================================================================================
-    //  PAR LED 36 UV (UV seul, generique)
+    //  PAR LED 36 UV (UV seul) : U'King ZQ01087 et clones, mode 7CH
     // =================================================================================
 
     /// <summary>
-    /// PAR 36 LED UV seul (36 x 1 W), marque inconnue. Table la plus courante de ces PAR : la carte
-    /// est celle des modeles RGB, les 3 voies de couleur pilotant chacune un groupe de LED UV.
+    /// PAR 36 LED UV avec telecommande (U'King ZQ01087 et ses clones). Table du manuel U'King
+    /// des PAR 36 LED (modele P36-5, meme carte) : les voies "rouge / vert / bleu" pilotent les
+    /// 3 groupes de 12 LED UV. Adresse au menu : D001..D512.
     /// </summary>
     public static FixtureProfile ParLed36Uv() => new()
     {
         Id = ParUvOnlyId,
-        Name = "PAR LED 36 UV seul (générique 7 canaux — à vérifier)",
-        Manufacturer = "Générique",
+        Name = "PAR LED 36 UV (U'King ZQ01087 et clones, 7 canaux)",
+        Manufacturer = "U'King",
         DefaultFixtureName = "PAR UV",
-        Revision = 1,
-        Notes = "PAR 36 LED UV (lumière noire), marque inconnue. Table la plus courante de ces PAR (mode « 7CH » / « d001 » " +
-                "dans le menu) : dimmer, 3 groupes de LED UV, strobe, programmes, vitesse. Si le PAR a un autre mode " +
-                "(ex. 1 à 5 canaux), vérifie chaque canal (curseurs ou onglet Debug) et corrige dans Appareils > Éditeur de profils. " +
-                "Le bouton « UV » de l'onglet Soirée allume les 3 groupes.",
+        Revision = 2,
+        Notes = "PAR 36 LED UV avec télécommande. Mode DMX : menu D001..D512 = adresse (7 canaux). Table du manuel U'King " +
+                "des PAR 36 LED (même carte) : le dimmer agit avec les 3 groupes de 12 LED UV (voies R, V, B). " +
+                "Sur la télécommande, « DMX » doit être actif. Le bouton « UV » de l'onglet Soirée allume les 3 groupes.",
         Channels =
         {
-            Ch("Dimmer", ChannelType.Dimmer, 0, verified: false),
-            Ch("UV groupe 1", ChannelType.UV, 0, verified: false, notes: "Sur les cartes RGB : la voie « rouge »."),
-            Ch("UV groupe 2", ChannelType.UV, 0, verified: false, notes: "Sur les cartes RGB : la voie « verte »."),
-            Ch("UV groupe 3", ChannelType.UV, 0, verified: false, notes: "Sur les cartes RGB : la voie « bleue »."),
-            Ch("Strobe (0 = arrêt)", ChannelType.Strobe, 0, verified: false, strobeSlow: 10, strobeFast: 255),
-            Ch("Mode / programmes", ChannelType.Macro, 0, verified: false, notes: "Laisser à 0 pour piloter en direct."),
-            Ch("Vitesse des programmes", ChannelType.EffectSpeed, 0, verified: false),
+            Ch("Dimmer (avec les groupes UV)", ChannelType.Dimmer, 0, notes: "Luminosité, agit avec les canaux 2 à 4."),
+            Ch("UV groupe 1 (voie R)", ChannelType.UV, 0, notes: "0 = éteint, 1-255 de sombre à lumineux."),
+            Ch("UV groupe 2 (voie V)", ChannelType.UV, 0, notes: "0 = éteint, 1-255 de sombre à lumineux."),
+            Ch("UV groupe 3 (voie B)", ChannelType.UV, 0, notes: "0 = éteint, 1-255 de sombre à lumineux."),
+            Ch("Strobe", ChannelType.Strobe, 0, notes: "0-7 = pas de strobe, 8-255 = strobe lent → rapide.",
+                ranges: new ChannelRange[] { new("Pas de strobe", 0, 7), new("Strobe (lent → rapide)", 8, 255) },
+                strobeSlow: 8, strobeFast: 255),
+            Ch("Mode", ChannelType.Macro, 0, notes: "0-10 = manuel (canaux 1 à 5) : laisser à 0 pour piloter en direct.",
+                presets: new ChannelPreset[]
+                {
+                    new("Manuel (DMX direct)", 0), new("Couleurs fixes", 35), new("Dégradé", 85),
+                    new("Pulsation", 135), new("Transition", 185), new("Au son", 233),
+                },
+                ranges: new ChannelRange[]
+                {
+                    new("Manuel (canaux 1 à 5)", 0, 10), new("Sélection de couleur (canal 7)", 11, 60),
+                    new("Dégradé (vitesse canal 7)", 61, 110), new("Pulsation (vitesse canal 7)", 111, 160),
+                    new("Transition (vitesse canal 7)", 161, 210), new("Au son", 211, 255),
+                }),
+            Ch("Vitesse / couleur des programmes", ChannelType.EffectSpeed, 0, notes: "Utilisé par les modes du canal 6."),
         },
     };
 

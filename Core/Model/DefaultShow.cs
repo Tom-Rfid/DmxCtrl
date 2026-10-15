@@ -28,8 +28,8 @@ public static class DefaultShow
             Profiles = { spot, spider },
             Fixtures =
             {
-                // Installation reelle : lyres en 1-14 et 15-28, Spider en 29-43,
-                // lyres juste apres. Les adresses doivent correspondre au menu de chaque appareil.
+                // Installation reelle : lyres en 1-14 et 15-28, Spider en 29-43 (PAR UV en 44, a ajouter
+                // dans le patch). Les adresses doivent correspondre au menu de chaque appareil.
                 new FixtureInstance { Id = "lyre-1", Name = "Lyre 1", ProfileId = spot.Id, Address = 1 },
                 new FixtureInstance { Id = "lyre-2", Name = "Lyre 2", ProfileId = spot.Id, Address = 15 },
                 new FixtureInstance { Id = "spider-1", Name = "Spider", ProfileId = spider.Id, Address = 29, MirrorMotors = true },
