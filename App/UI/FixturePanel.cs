@@ -70,6 +70,11 @@ internal sealed class FixturePanel : UserControl
     private bool _micUpdating;
 
     private enum SweepMode { Delay, Bpm, Mic }
+
+    // Masque de couleurs (All, R, G, B, White) : cases cochees = couleurs autorisees en sortie.
+    private readonly CheckBox? _maskAll;
+    private readonly List<CheckBox> _maskBoxes = new();
+    private bool _maskUpdating;
     private readonly Label _warning = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 6, 3, 3) };
     private readonly ToolTip _tips = new();
     private bool _updating;
@@ -183,23 +188,57 @@ internal sealed class FixturePanel : UserControl
             {
                 Text = "Inverser (ailes en miroir)",
                 Checked = fixture.MirrorMotors,
-                Location = new Point(12, 212),
+                Location = new Point(12, 240),
                 AutoSize = true,
             };
             _mirrorWings.CheckedChanged += (_, _) => OnMirrorChanged();
 
-            var center = new Button { Text = "Ailes au milieu", Location = new Point(12, 238), Width = 126, Height = 30 };
+            var center = new Button { Text = "Ailes au milieu", Location = new Point(12, 266), Width = 126, Height = 30 };
             center.Click += (_, _) =>
             {
                 _ctx.Engine.SetMotors(_fixture.Id, 128, _mirrorWings.Checked);
                 RefreshFromEngine();
             };
-            var reset = new Button { Text = "Par défaut", Location = new Point(146, 238), Width = 126, Height = 30 };
+            var reset = new Button { Text = "Par défaut", Location = new Point(146, 266), Width = 126, Height = 30 };
             reset.Click += (_, _) => ResetDefaults();
 
-            _wingsInfo = new Label { Location = new Point(12, 274), Size = new Size(260, 20), Font = Ui.BoldFont };
+            _wingsInfo = new Label { Location = new Point(12, 302), Size = new Size(260, 20), Font = Ui.BoldFont };
             _tips.SetToolTip(_wings, "Gauche / droite : les 2 ailes (opposées avec « Inverser »). Haut / bas : dimmer.");
             left.Controls.AddRange(new Control[] { _wings, _mirrorWings, center, reset, _wingsInfo });
+
+            // Masque de couleurs : une couleur decochee est forcee a 0 en sortie DMX, quoi qu'il arrive.
+            var maskRow = new FlowLayoutPanel
+            {
+                Location = new Point(9, 210),
+                Size = new Size(265, 26),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, // sinon il garde 100 px de haut et cache la suite
+                WrapContents = false,
+                Margin = new Padding(0),
+            };
+            _maskAll = new CheckBox { Text = "All", AutoSize = true, Font = Ui.BoldFont };
+            maskRow.Controls.Add(_maskAll);
+            var colors = new (ChannelType Type, string Label, Color Color)[]
+            {
+                (ChannelType.Red, "R", Color.Red), (ChannelType.Green, "G", Color.Green),
+                (ChannelType.Blue, "B", Color.Blue), (ChannelType.White, "White", SystemColors.ControlText),
+            };
+            foreach (var (type, label, color) in colors)
+            {
+                if (!profile.Has(type))
+                {
+                    continue;
+                }
+                var box = new CheckBox { Text = label, AutoSize = true, Tag = type, ForeColor = color, Font = Ui.BoldFont, Checked = !fixture.MutedColors.Contains(type) };
+                box.CheckedChanged += (_, _) => OnMaskChanged();
+                _tips.SetToolTip(box, $"Décoché : toutes les LED {label} sont coupées (0) en sortie, même pendant un flash ou un chenillard.");
+                _maskBoxes.Add(box);
+                maskRow.Controls.Add(box);
+            }
+            _maskAll.Checked = _maskBoxes.All(b => b.Checked);
+            _maskAll.CheckedChanged += (_, _) => OnMaskAllChanged();
+            _tips.SetToolTip(_maskAll, "Coche / décoche toutes les couleurs.");
+            left.Controls.Add(maskRow);
 
             // Effet automatique gauche <-> droite avec un delai (suit la case "Inverser").
             // Tableau (et non positions fixes) : les libelles prennent la place qu'il leur faut,
@@ -255,7 +294,7 @@ internal sealed class FixturePanel : UserControl
 
             var effect = new TableLayoutPanel
             {
-                Location = new Point(9, 298),
+                Location = new Point(9, 326),
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 ColumnCount = 3,
@@ -664,6 +703,48 @@ internal sealed class FixturePanel : UserControl
             _ctx.Mic.Stop();
             _ctx.Status($"Impossible d'ouvrir le micro : {ex.Message}");
         }
+    }
+
+    /// <summary>"All" : coche ou decoche toutes les couleurs d'un coup.</summary>
+    private void OnMaskAllChanged()
+    {
+        if (_maskUpdating || _maskAll is null)
+        {
+            return;
+        }
+        _maskUpdating = true;
+        foreach (var box in _maskBoxes)
+        {
+            box.Checked = _maskAll.Checked;
+        }
+        _maskUpdating = false;
+        ApplyMask();
+    }
+
+    private void OnMaskChanged()
+    {
+        if (_maskUpdating || _maskAll is null)
+        {
+            return;
+        }
+        _maskUpdating = true;
+        _maskAll.Checked = _maskBoxes.All(b => b.Checked);
+        _maskUpdating = false;
+        ApplyMask();
+    }
+
+    /// <summary>
+    /// Couleurs decochees -> masque du moteur : des la trame suivante elles sortent a 0. Les valeurs
+    /// des curseurs sont gardees : en recochant, la couleur revient comme avant.
+    /// </summary>
+    private void ApplyMask()
+    {
+        var muted = _maskBoxes.Where(b => !b.Checked).Select(b => (ChannelType)b.Tag!).ToList();
+        _ctx.Engine.EditShow(_ => _fixture.MutedColors = muted);
+        _ctx.MarkDirty();
+        _ctx.Status(muted.Count == 0
+            ? $"{_fixture.Name} : toutes les couleurs actives."
+            : $"{_fixture.Name} : coupé en sortie → {string.Join(", ", _maskBoxes.Where(b => !b.Checked).Select(b => b.Text))}.");
     }
 
     /// <summary>Mode actuel, d'apres l'appareil (cale ou non sur le tempo) et le micro (le BPM le suit ou non).</summary>

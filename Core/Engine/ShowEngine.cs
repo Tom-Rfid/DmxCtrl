@@ -952,6 +952,18 @@ public sealed class ShowEngine : IFrameSource
                 ApplyFogLocked(fixture, profile, values, t);
                 ApplyLaserSafetyLocked(profile, values);
 
+                // 5 ter : masque de couleurs (en dernier : rien ne passe par-dessus)
+                if (fixture.MutedColors.Count > 0)
+                {
+                    for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
+                    {
+                        if (fixture.MutedColors.Contains(profile.Channels[i].Type))
+                        {
+                            values[i] = 0;
+                        }
+                    }
+                }
+
                 // 6 : ecriture aux adresses du patch
                 for (int i = 0; i < values.Length; i++)
                 {

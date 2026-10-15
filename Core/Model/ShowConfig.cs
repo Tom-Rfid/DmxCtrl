@@ -52,6 +52,12 @@ public sealed class FixtureInstance
     public bool NoStrobe { get; set; }
 
     /// <summary>
+    /// Masque de couleurs : les canaux de ces types (Red, Green, Blue, White...) sont forces a 0
+    /// en sortie, a chaque trame, quoi que demandent scenes, chenillard ou flash.
+    /// </summary>
+    public List<ChannelType> MutedColors { get; set; } = new();
+
+    /// <summary>
     /// Effet "gauche <-> droite" des appareils a 2 moteurs (ailes du Spider) : les ailes vont a
     /// gauche, attendent WingSweepDelaySeconds, vont a droite, attendent, etc. En miroir
     /// (MirrorMotors), l'aile 2 fait le mouvement oppose.

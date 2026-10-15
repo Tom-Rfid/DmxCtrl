@@ -314,6 +314,21 @@ public class FeatureTests
         Assert.Equal(0, Render()[Motor1]);    // retour a la position reglee (programmeur)
     }
 
+    [Fact]
+    public void Muted_colors_are_forced_to_zero_even_during_a_flash()
+    {
+        // Spider en 29 : LED 1 rouge gauche = canal 29 + 4, LED 2 vert gauche = 29 + 5.
+        _engine.SetValue("spider-1", 4, 200);
+        _engine.SetValue("spider-1", 5, 150);
+        _engine.EditShow(s => s.Fixtures.First(f => f.Id == "spider-1").MutedColors.Add(ChannelType.Red));
+        _engine.Flash = true;
+
+        var universe = Render();
+        Assert.Equal(0, universe[29 + 4]);   // rouge masque
+        Assert.Equal(150, universe[29 + 5]); // vert intact
+        Assert.Equal(200, _engine.GetValues("spider-1")[4]); // la valeur reste memorisee : on la retrouve en demasquant
+    }
+
     // =================================================================================
     //  Laser et UV
     // =================================================================================
