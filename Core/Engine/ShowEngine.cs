@@ -721,9 +721,9 @@ public sealed class ShowEngine : IFrameSource
     /// </summary>
     private void ApplyBeatEffectLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, double t)
     {
-        if (!_beatEffect.TryGetValue(fixture.Id, out var state))
+        if (!_beatEffect.TryGetValue(fixture.Id, out var state) || !profile.IsInManualMode(values))
         {
-            return;
+            return; // pas d'effet si l'appareil joue un de ses programmes internes
         }
         int[] groups = Enumerable.Range(0, Math.Min(values.Length, profile.ChannelCount))
             .Where(i => ChannelTypeInfo.IsColorMix(profile.Channels[i].Type))
@@ -1205,7 +1205,8 @@ public sealed class ShowEngine : IFrameSource
     private void ApplyIntensityLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, bool strobeDark, double t)
     {
         bool flash = _flash || _fixtureFlash.Contains(fixture.Id);
-        bool fixtureStrobe = _fixtureStrobe.Contains(fixture.Id) && !fixture.NoStrobe;
+        // Strobe de l'appareil : seulement en mode manuel (sinon il joue ses propres programmes).
+        bool fixtureStrobe = _fixtureStrobe.Contains(fixture.Id) && !fixture.NoStrobe && profile.IsInManualMode(values);
 
         if (flash || fixtureStrobe)
         {

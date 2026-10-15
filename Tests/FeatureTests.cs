@@ -346,6 +346,24 @@ public class FeatureTests
     }
 
     [Fact]
+    public void Beat_effect_and_strobe_only_work_in_manual_mode()
+    {
+        var par = Add(FixtureLibrary.ParUvOnlyId, "par", 60); // strobe 64, mode 65
+        _engine.SetBeatEffect("par", true);
+        _engine.SetFixtureStrobe("par", true);
+        _engine.StrobeSpeed = 255;
+        Assert.Equal(255, Render()[64]);                    // manuel : strobe materiel actif
+
+        _engine.SetValue("par", 5, 135);                    // mode "Pulsation" (programme interne)
+        var u = Render();
+        Assert.Equal(0, u[64]);                             // plus de strobe
+        Assert.Equal(new byte[] { 0, 0, 0 }, u[61..64]);    // plus d'effet au tempo : valeurs reglees (0)
+        Assert.Equal(135, u[65]);
+        Assert.False(FixtureLibrary.ParLed36Uv().IsInManualMode(new byte[] { 0, 0, 0, 0, 0, 135, 0 }));
+        Assert.True(FixtureLibrary.ParLed36Uv().IsInManualMode(new byte[] { 0, 0, 0, 0, 0, 5, 0 }));
+    }
+
+    [Fact]
     public void Muted_colors_are_forced_to_zero_even_during_a_flash()
     {
         // Spider en 29 : LED 1 rouge gauche = canal 29 + 4, LED 2 vert gauche = 29 + 5.

@@ -81,6 +81,19 @@ internal sealed class FixturePanel : UserControl
     private bool _numberUpdating; // case numerique mise a jour par le code (pas par l'utilisateur)
     private readonly BeatEffectBlock? _beatBlock; // effet au tempo (projecteurs sans moteur)
     private readonly GroupLevelPad? _groupPad;    // graphique des groupes A, B, C, Tous
+
+    // Bandeau affiche quand l'appareil joue un programme interne (canal Mode hors "Manuel").
+    private readonly Label _modeLock = new()
+    {
+        Text = "Mode programme interne : dimmer, groupes, strobe et effet au tempo sont inactifs. " +
+               "Choisis « Manuel (DMX direct) » dans le canal Mode pour les retrouver.",
+        AutoSize = true,
+        MaximumSize = new Size(1000, 0),
+        Font = Ui.BoldFont,
+        ForeColor = Ui.WarningColor,
+        Visible = false,
+        Margin = new Padding(3, 4, 3, 4),
+    };
     private readonly VerticalFader? _groupsFader; // les 3 groupes ensemble
     private readonly int[] _groups = Array.Empty<int>(); // index des canaux de groupes de LED
     private double[]? _groupsRatios;
@@ -344,6 +357,7 @@ internal sealed class FixturePanel : UserControl
             var reset = new Button { Text = "Valeurs par défaut", AutoSize = true };
             reset.Click += (_, _) => ResetDefaults();
             header.Controls.Add(reset);
+            header.Controls.Add(_modeLock);
 
             // Projecteur a plusieurs groupes de LED (PAR UV, PAR RGB...) : effet au tempo a gauche.
             if (profile.Channels.Count(c => ChannelTypeInfo.IsColorMix(c.Type)) >= 2)
@@ -576,11 +590,58 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
-    /// <summary>TOUT COUPER : effet au tempo arrete, dimmer, groupes et strobe a 0.</summary>
+    /// <summary>
+    /// Mode de l'appareil (canal Mode) : hors « Manuel », il joue ses programmes internes et ignore
+    /// dimmer, groupes et strobe -> ces reglages, le graphique et l'effet au tempo sont grises
+    /// (et l'effet arrete). Le canal Mode (avec ses presets) et la vitesse restent utilisables.
+    /// </summary>
+    private void UpdateManualLock(byte[] values)
+    {
+        if (_profile.ManualModeRange() is null)
+        {
+            return;
+        }
+        bool manual = _profile.IsInManualMode(values);
+        for (int i = 0; i < _profile.ChannelCount && i < _sliders.Length; i++)
+        {
+            var type = _profile.Channels[i].Type;
+            if (type is ChannelType.Dimmer or ChannelType.Strobe || ChannelTypeInfo.IsColorMix(type))
+            {
+                bool strobeLocked = type == ChannelType.Strobe && _noStrobe?.Checked == true;
+                _sliders[i].Enabled = manual && !strobeLocked;
+                _values[i].Enabled = manual && !strobeLocked;
+                _presets[i].Enabled = manual && _profile.Channels[i].Presets.Count > 0;
+            }
+        }
+        if (_noStrobe is not null)
+        {
+            _noStrobe.Enabled = manual;
+        }
+        if (_groupPad is not null && _groupsFader is not null)
+        {
+            _groupPad.Enabled = manual;
+            _groupsFader.Enabled = manual;
+        }
+        if (_beatBlock is not null)
+        {
+            if (!manual && _beatBlock.Enabled)
+            {
+                _beatBlock.Stop(); // un programme interne remplace l'effet
+            }
+            _beatBlock.Enabled = manual;
+        }
+        _modeLock.Visible = !manual;
+    }
+
+    /// <summary>TOUT COUPER : effet au tempo arrete, mode manuel, dimmer, groupes et strobe a 0.</summary>
     private void CutAll()
     {
         _beatBlock?.Stop();
         _ctx.Engine.SetFixtureStrobe(_fixture.Id, false);
+        if (_profile.ManualModeRange() is { } mode)
+        {
+            _ctx.Engine.SetValue(_fixture.Id, mode.Index, mode.Manual.From); // arrete les programmes internes
+        }
         for (int i = 0; i < _profile.ChannelCount; i++)
         {
             var type = _profile.Channels[i].Type;
@@ -646,9 +707,9 @@ internal sealed class FixturePanel : UserControl
 
         var type = _profile.Channels[index].Type;
         if (type is ChannelType.Pan or ChannelType.PanFine or ChannelType.Tilt or ChannelType.TiltFine
-            or ChannelType.Motor or ChannelType.Dimmer || ChannelTypeInfo.IsColorMix(type))
+            or ChannelType.Motor or ChannelType.Dimmer or ChannelType.Macro || ChannelTypeInfo.IsColorMix(type))
         {
-            SyncPads(_ctx.Engine.GetValues(_fixture.Id));
+            SyncPads(_ctx.Engine.GetValues(_fixture.Id)); // Macro : mode manuel / programme -> grise ou non
         }
     }
 
@@ -656,6 +717,7 @@ internal sealed class FixturePanel : UserControl
     private void SyncPads(byte[] values)
     {
         SyncGroups(values);
+        UpdateManualLock(values);
         if (_xy is not null)
         {
             _xy.ValueX = ShowEngine.GetAxis16(_profile, values, ChannelType.Pan, ChannelType.PanFine);

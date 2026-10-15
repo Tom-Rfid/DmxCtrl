@@ -177,6 +177,34 @@ public sealed class FixtureProfile
         : IsLaser ? "Laser"
         : "Appareil";
 
+    /// <summary>
+    /// Canal "Mode" a plage manuelle (ex. PAR UV, canal 6 : « Manuel » 0-10) : index du canal et plage,
+    /// ou null si l'appareil n'a pas ce genre de mode.
+    /// </summary>
+    public (int Index, ChannelRange Manual)? ManualModeRange()
+    {
+        for (int i = 0; i < Channels.Count; i++)
+        {
+            if (Channels[i].Type != ChannelType.Macro)
+            {
+                continue;
+            }
+            var manual = Channels[i].Ranges.FirstOrDefault(r => TextKey.Normalize(r.Name).StartsWith("manuel"));
+            if (manual is not null)
+            {
+                return (i, manual);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// false si l'appareil joue un programme interne (canal Mode hors de la plage « Manuel ») :
+    /// il ignore alors dimmer, couleurs et strobe envoyes en DMX. true sinon (ou sans canal Mode).
+    /// </summary>
+    public bool IsInManualMode(byte[] values) =>
+        ManualModeRange() is not { } mode || mode.Index >= values.Length || mode.Manual.Contains(values[mode.Index]);
+
     /// <summary>Indices des canaux d'un type, dans l'ordre du profil.</summary>
     public int[] IndicesOf(ChannelType type) =>
         Enumerable.Range(0, Channels.Count).Where(i => Channels[i].Type == type).ToArray();
