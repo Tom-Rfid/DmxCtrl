@@ -54,7 +54,8 @@ internal sealed class FixturePanel : UserControl
     private readonly int[] _groupRight = Array.Empty<int>();
     private readonly double[]?[] _groupRatios = new double[]?[2];
 
-    private readonly CheckBox? _noStrobe; // "Pas de strobe" (si le profil a un canal Strobe)
+    private readonly CheckBox? _strobeOn; // case « Strobe » (actif / desactive), si un canal sait strober
+    private readonly int _strobeIndex = -1;
 
     // Effet gauche <-> droite des ailes (appareils a 2 moteurs)
     private readonly CheckBox? _sweep;
@@ -444,24 +445,31 @@ internal sealed class FixturePanel : UserControl
             table.Controls.Add(add, 4, i);
             table.Controls.Add(_verified[i], 5, i);
 
-            // Case "Pas de strobe" a cote du (premier) canal Strobe : force ce canal a 0 en sortie.
-            if (channel.Type == ChannelType.Strobe && _noStrobe is null)
+            // A cote du (premier) canal qui sait strober (canal Strobe, obturateur de la 260X...) :
+            // case « Strobe » (actif / desactive avec memoire de la valeur) + bouton « Strobe 0 ».
+            if (channel.IsStrobeCapable && _strobeOn is null)
             {
-                _noStrobe = new CheckBox
+                _strobeIndex = i;
+                _strobeOn = new CheckBox
                 {
-                    Text = "Pas de strobe",
+                    Text = "Strobe",
                     AutoSize = true,
-                    Checked = fixture.NoStrobe,
+                    Checked = !fixture.NoStrobe,
                     Font = Ui.BoldFont,
                     Margin = new Padding(10, 6, 3, 3),
                 };
-                _tips.SetToolTip(_noStrobe, "Coché : le strobe de cet appareil reste coupé, même si une scène ou le curseur en demande un.");
-                _noStrobe.CheckedChanged += (_, _) => OnNoStrobeChanged();
-                table.Controls.Add(_noStrobe, 6, i);
+                _strobeOn.CheckedChanged += (_, _) => OnStrobeToggled();
+                var strobeZero = new Button { Text = "Strobe 0", AutoSize = true, Margin = new Padding(3, 3, 3, 3) };
+                strobeZero.Click += (_, _) => SetStrobeFixed();
+                _tips.SetToolTip(_strobeOn, "Décoché : strobe désactivé (canal fixe, la valeur est mémorisée ; rien ne peut le faire strober). " +
+                                            "Recoché : l'ancienne valeur revient. Bouger la barre dans une valeur de strobe le réactive.");
+                _tips.SetToolTip(strobeZero, channel.Type == ChannelType.Strobe
+                    ? "Met le strobe à 0 (pas de strobe)."
+                    : $"Remet l'obturateur en fixe (ouvert, {channel.NoStrobeValue}) : plus de strobe.");
+                table.Controls.Add(Ui.Flow(0, _strobeOn, strobeZero), 6, i);
             }
         }
         scroll.Controls.Add(table);
-        UpdateStrobeLock();
 
         // Ordre d'ajout : la zone "Fill" en premier, les bords ensuite.
         Controls.Add(scroll);
@@ -607,15 +615,14 @@ internal sealed class FixturePanel : UserControl
             var type = _profile.Channels[i].Type;
             if (type is ChannelType.Dimmer or ChannelType.Strobe || ChannelTypeInfo.IsColorMix(type))
             {
-                bool strobeLocked = type == ChannelType.Strobe && _noStrobe?.Checked == true;
-                _sliders[i].Enabled = manual && !strobeLocked;
-                _values[i].Enabled = manual && !strobeLocked;
+                _sliders[i].Enabled = manual;
+                _values[i].Enabled = manual;
                 _presets[i].Enabled = manual && _profile.Channels[i].Presets.Count > 0;
             }
         }
-        if (_noStrobe is not null)
+        if (_strobeOn?.Parent is Control strobeRow)
         {
-            _noStrobe.Enabled = manual;
+            strobeRow.Enabled = manual; // case « Strobe » + bouton « Strobe 0 »
         }
         if (_groupPad is not null && _groupsFader is not null)
         {
@@ -704,6 +711,7 @@ internal sealed class FixturePanel : UserControl
         ShowNumber(index, value);
         _ctx.Engine.SetValue(_fixture.Id, index, value);
         SyncPresetCombo(index, value);
+        ReactivateStrobeIfNeeded(index, value);
 
         var type = _profile.Channels[index].Type;
         if (type is ChannelType.Pan or ChannelType.PanFine or ChannelType.Tilt or ChannelType.TiltFine
@@ -788,43 +796,70 @@ internal sealed class FixturePanel : UserControl
 
     private string LedNames(int[] group) => string.Join(", ", group.Select(i => _profile.Channels[i].Name));
 
-    private void OnNoStrobeChanged()
+    /// <summary>
+    /// Case « Strobe » : decochee -> la valeur actuelle est memorisee, le canal repasse en fixe et le
+    /// moteur bloque tout strobe (FixtureInstance.NoStrobe) ; cochee -> l'ancienne valeur revient.
+    /// </summary>
+    private void OnStrobeToggled()
     {
-        if (_updating || _noStrobe is null)
+        if (_updating || _strobeOn is null || _strobeIndex < 0)
         {
             return;
         }
 
-        bool noStrobe = _noStrobe.Checked;
-        _ctx.Engine.EditShow(_ => _fixture.NoStrobe = noStrobe);
-        _ctx.MarkDirty();
-        if (noStrobe)
+        var channel = _profile.Channels[_strobeIndex];
+        bool on = _strobeOn.Checked;
+        byte current = _ctx.Engine.GetValues(_fixture.Id).ElementAtOrDefault(_strobeIndex);
+        _ctx.Engine.EditShow(_ =>
         {
-            // On remet aussi le curseur a 0 : sinon il afficherait une valeur qui n'est pas envoyee.
-            for (int i = 0; i < _profile.ChannelCount; i++)
+            _fixture.NoStrobe = !on;
+            if (!on && channel.IsStrobeValue(current))
             {
-                if (_profile.Channels[i].Type == ChannelType.Strobe)
-                {
-                    _ctx.Engine.SetValue(_fixture.Id, i, 0);
-                }
+                _fixture.StrobeMemory = current; // pour le retrouver en recochant
+            }
+        });
+        if (on)
+        {
+            if (channel.IsStrobeValue(_fixture.StrobeMemory))
+            {
+                _ctx.Engine.SetValue(_fixture.Id, _strobeIndex, _fixture.StrobeMemory);
             }
         }
-        UpdateStrobeLock();
-        _ctx.NotifyLiveStateChanged(); // ce panneau + l'onglet Soiree (interrupteur STROBE grise)
-        _ctx.Status(noStrobe ? $"{_fixture.Name} : strobe coupé." : $"{_fixture.Name} : strobe de nouveau autorisé.");
+        else
+        {
+            _ctx.Engine.SetValue(_fixture.Id, _strobeIndex, channel.NoStrobeValue);
+        }
+        _ctx.MarkDirty();
+        _ctx.NotifyLiveStateChanged(); // ce panneau + l'onglet Soiree (interrupteur STROBE)
+        _ctx.Status(on ? $"{_fixture.Name} : strobe réactivé ({_fixture.StrobeMemory})." : $"{_fixture.Name} : strobe désactivé (valeur {current} mémorisée).");
     }
 
-    /// <summary>Grise le(s) curseur(s) Strobe quand "Pas de strobe" est coche.</summary>
-    private void UpdateStrobeLock()
+    /// <summary>Bouton « Strobe 0 » : canal en fixe (0, ou obturateur ouvert), la case reste comme elle est.</summary>
+    private void SetStrobeFixed()
     {
-        bool locked = _noStrobe?.Checked == true;
-        for (int i = 0; i < _profile.ChannelCount; i++)
+        if (_strobeIndex < 0)
         {
-            if (_profile.Channels[i].Type == ChannelType.Strobe)
-            {
-                _sliders[i].Enabled = !locked;
-            }
+            return;
         }
+        _ctx.Engine.SetValue(_fixture.Id, _strobeIndex, _profile.Channels[_strobeIndex].NoStrobeValue);
+        _ctx.NotifyLiveStateChanged();
+        _ctx.Status($"{_fixture.Name} : strobe à 0.");
+    }
+
+    /// <summary>Barre du strobe bougee dans une valeur de strobe alors qu'il est desactive : on le reactive.</summary>
+    private void ReactivateStrobeIfNeeded(int index, byte value)
+    {
+        if (index != _strobeIndex || _strobeOn is null || _strobeOn.Checked || !_profile.Channels[index].IsStrobeValue(value))
+        {
+            return;
+        }
+        _ctx.Engine.EditShow(_ => _fixture.NoStrobe = false);
+        _ctx.MarkDirty();
+        _updating = true;
+        _strobeOn.Checked = true;
+        _updating = false;
+        _ctx.NotifyLiveStateChanged();
+        _ctx.Status($"{_fixture.Name} : strobe réactivé ({value}).");
     }
 
     /// <summary>Moteur du Spider : 0..255 = 0..135° (notice).</summary>

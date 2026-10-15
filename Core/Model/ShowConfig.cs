@@ -51,6 +51,9 @@ public sealed class FixtureInstance
     /// </summary>
     public bool NoStrobe { get; set; }
 
+    /// <summary>Valeur de strobe memorisee quand on desactive le strobe (case « Strobe ») : rendue en le reactivant.</summary>
+    public byte StrobeMemory { get; set; }
+
     /// <summary>
     /// Masque de couleurs : les canaux de ces types (Red, Green, Blue, White...) sont forces a 0
     /// en sortie, a chaque trame, quoi que demandent scenes, chenillard ou flash.

@@ -48,7 +48,19 @@ internal sealed class MainForm : Form
     private readonly ComboBox _portCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 100, Margin = new Padding(3, 7, 3, 3) };
     private readonly Button _btnConnect = new() { Text = "Connecter", AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
     private readonly Button _btnDisconnect = new() { Text = "Déconnecter", AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
-    private readonly Label _lblLink = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(12, 10, 3, 3) };
+    private readonly Label _lblLink = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(6, 10, 3, 3) };
+
+    // Voyant de connexion bien visible : carre vert (connecte), orange clignotant (connexion), rouge (coupe).
+    private readonly Label _linkLed = new()
+    {
+        AutoSize = false,
+        Size = new Size(118, 28),
+        TextAlign = ContentAlignment.MiddleCenter,
+        Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+        ForeColor = Color.White,
+        BorderStyle = BorderStyle.FixedSingle,
+        Margin = new Padding(12, 5, 3, 3),
+    };
     private readonly CheckBox _autoConnect = new() { Text = "Connexion auto au démarrage", AutoSize = true, Margin = new Padding(16, 9, 3, 3) };
 
     // Menu et barre d'etat
@@ -218,7 +230,7 @@ internal sealed class MainForm : Form
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 40, Padding = new Padding(6, 2, 6, 2), BackColor = Color.FromArgb(240, 242, 246) };
         bar.Controls.AddRange(new Control[]
         {
-            Ui.Text("Boîtier Bluetooth (port COM) :", bold: true), _portCombo, refresh, _btnConnect, _btnDisconnect, _lblLink, _autoConnect,
+            Ui.Text("Boîtier Bluetooth (port COM) :", bold: true), _portCombo, refresh, _btnConnect, _btnDisconnect, _linkLed, _lblLink, _autoConnect,
         });
         return bar;
     }
@@ -807,6 +819,25 @@ internal sealed class MainForm : Form
         {
             _lblLink.Text = "Non connecté (aperçu seulement)";
             _lblLink.ForeColor = Color.DarkRed;
+        }
+        UpdateLinkLed();
+    }
+
+    /// <summary>Voyant carre : vert fixe = connecte ; orange clignotant = connexion / liaison perdue ; rouge = coupe.</summary>
+    private void UpdateLinkLed()
+    {
+        bool blinkOn = DateTime.Now.Millisecond < 500; // 1 clignotement par seconde (minuteur de 100 ms)
+        (string text, Color color) = _link.IsSending ? ("● CONNECTÉ", Color.FromArgb(0, 170, 70))
+            : _connecting ? ("● CONNEXION", blinkOn ? Color.FromArgb(240, 150, 0) : Color.FromArgb(120, 80, 20))
+            : _wantConnected ? ("● PERDUE", blinkOn ? Color.FromArgb(240, 150, 0) : Color.FromArgb(200, 40, 40))
+            : ("● OFF", Color.FromArgb(200, 40, 40));
+        if (_linkLed.Text != text)
+        {
+            _linkLed.Text = text;
+        }
+        if (_linkLed.BackColor != color)
+        {
+            _linkLed.BackColor = color;
         }
     }
 

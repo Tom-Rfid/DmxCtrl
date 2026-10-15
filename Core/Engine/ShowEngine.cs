@@ -1025,11 +1025,13 @@ public sealed class ShowEngine : IFrameSource
                 ApplyIntensityLocked(fixture, profile, values, selected && strobeDark, t);
                 if (fixture.NoStrobe)
                 {
+                    // Strobe desactive : tout canal qui strobe repasse en "fixe" (0, ou obturateur ouvert).
                     for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
                     {
-                        if (profile.Channels[i].Type == ChannelType.Strobe)
+                        var channel = profile.Channels[i];
+                        if (channel.IsStrobeCapable && channel.IsStrobeValue(values[i]))
                         {
-                            values[i] = 0;
+                            values[i] = channel.NoStrobeValue;
                         }
                     }
                 }

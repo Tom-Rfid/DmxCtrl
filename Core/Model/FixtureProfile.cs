@@ -123,6 +123,39 @@ public sealed class ChannelDef
     /// <summary>Plages de valeurs de la notice (optionnel, utilise par les onglets speciaux).</summary>
     public List<ChannelRange> Ranges { get; set; } = new();
 
+    /// <summary>Canal qui sait faire un strobe (canal Strobe, ou obturateur avec plage de strobe).</summary>
+    [JsonIgnore]
+    public bool IsStrobeCapable => Type == ChannelType.Strobe || StrobeSlow is not null;
+
+    /// <summary>
+    /// Valeur "fixe" (sans strobe) : 0 pour un canal Strobe ; pour un obturateur, sa valeur par defaut
+    /// (ouvert : 255 sur la 260X) car 0 y voudrait dire "noir complet".
+    /// </summary>
+    [JsonIgnore]
+    public byte NoStrobeValue => Type == ChannelType.Strobe ? (byte)0 : (Default > 0 ? Default : (byte)255);
+
+    /// <summary>
+    /// true si la valeur fait strober : plages de la notice dont le nom contient « strobe » (hors
+    /// « pas de strobe »), sinon StrobeSlow..StrobeFast, sinon (canal Strobe sans plage) toute valeur > 0.
+    /// </summary>
+    public bool IsStrobeValue(byte value)
+    {
+        var strobeRanges = Ranges.Where(r =>
+        {
+            string name = TextKey.Normalize(r.Name);
+            return name.Contains("strobe") && !name.Contains("pas de");
+        }).ToList();
+        if (strobeRanges.Count > 0)
+        {
+            return strobeRanges.Any(r => r.Contains(value));
+        }
+        if (StrobeSlow is byte slow && StrobeFast is byte fast)
+        {
+            return value >= Math.Min(slow, fast) && value <= Math.Max(slow, fast);
+        }
+        return Type == ChannelType.Strobe && value > 0;
+    }
+
     /// <summary>
     /// true une fois que quelqu'un a verifie SUR L'APPAREIL que ce canal fait bien
     /// ce que dit le profil. Les canaux non verifies sont signales "(?)" dans l'IHM.

@@ -364,6 +364,21 @@ public class FeatureTests
     }
 
     [Fact]
+    public void Disabled_strobe_puts_the_260x_shutter_back_to_open_not_to_black()
+    {
+        _engine.SetValue("lyre-1", SpotShutter, 40);                      // strobe sur l'obturateur
+        _engine.EditShow(s => s.Fixtures.First(f => f.Id == "lyre-1").NoStrobe = true);
+        Assert.Equal(255, Render()[1 + SpotShutter]);                     // fixe = ouvert (0 serait le noir)
+        _engine.SetValue("lyre-1", SpotShutter, 0);                       // "fermé" n'est pas un strobe
+        Assert.Equal(0, Render()[1 + SpotShutter]);
+
+        var shutter = FixtureLibrary.Spot260X14().Channels[SpotShutter];
+        Assert.True(shutter.IsStrobeValue(150));                          // strobe aleatoire
+        Assert.False(shutter.IsStrobeValue(255));                         // ouvert
+        Assert.Equal(255, shutter.NoStrobeValue);
+    }
+
+    [Fact]
     public void Muted_colors_are_forced_to_zero_even_during_a_flash()
     {
         // Spider en 29 : LED 1 rouge gauche = canal 29 + 4, LED 2 vert gauche = 29 + 5.
