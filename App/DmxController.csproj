@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Interface Windows Forms. Toute la logique (protocole, moteur, config) est dans Core. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DmxController</RootNamespace>
+    <AssemblyTitle>Contrôleur DMX - boîtier RY-AI Bluetooth</AssemblyTitle>
+    <Version>2.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Core\DmxController.Core.csproj" />
+  </ItemGroup>
+
+</Project>

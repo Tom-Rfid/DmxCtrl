@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/App/">
+    <Project Path="App/DmxController.csproj" />
+  </Folder>
+  <Folder Name="/Core/">
+    <Project Path="Core/DmxController.Core.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/DmxController.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Bibliotheque "coeur" : protocole du boitier, modele de configuration, moteur
+    d'effets, sauvegarde JSON. Elle ne depend PAS de Windows Forms (cible net10.0
+    et non net10.0-windows) : elle pourra etre reutilisee telle quelle par une
+    future interface Mac/Linux (Avalonia, Qt via binding, etc.).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DmxController.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="10.0.13" />
+  </ItemGroup>
+
+</Project>

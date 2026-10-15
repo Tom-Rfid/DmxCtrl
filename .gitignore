@@ -1,0 +1,15 @@
+# Build .NET
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.pyc
+
+# Fichiers temporaires d'ecriture atomique (ShowStore)
+*.tmp
