@@ -123,6 +123,9 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         _ctx.Status(_run.Checked ? $"{_fixture.Name} : effet au tempo lancé." : $"{_fixture.Name} : effet au tempo arrêté.");
     }
 
+    /// <summary>Arrete l'effet (bouton TOUT COUPER de l'onglet).</summary>
+    public void Stop() => _run.Checked = false; // -> OnRunToggled
+
     private void UpdateRunButton()
     {
         _run.BackColor = _run.Checked ? Color.FromArgb(255, 210, 60) : SystemColors.Control;

@@ -80,6 +80,10 @@ internal sealed class FixturePanel : UserControl
     private bool _updating;
     private bool _numberUpdating; // case numerique mise a jour par le code (pas par l'utilisateur)
     private readonly BeatEffectBlock? _beatBlock; // effet au tempo (projecteurs sans moteur)
+    private readonly GroupLevelPad? _groupPad;    // graphique des groupes A, B, C, Tous
+    private readonly VerticalFader? _groupsFader; // les 3 groupes ensemble
+    private readonly int[] _groups = Array.Empty<int>(); // index des canaux de groupes de LED
+    private double[]? _groupsRatios;
 
     public FixturePanel(ShowContext ctx, FixtureInstance fixture, FixtureProfile profile)
     {
@@ -345,8 +349,36 @@ internal sealed class FixturePanel : UserControl
             if (profile.Channels.Count(c => ChannelTypeInfo.IsColorMix(c.Type)) >= 2)
             {
                 left = new Panel { Dock = DockStyle.Left, Width = 330, Padding = new Padding(10), AutoScroll = true };
-                _beatBlock = new BeatEffectBlock(ctx, fixture, profile) { Location = new Point(9, 6) };
-                left.Controls.Add(_beatBlock);
+
+                // Graphique des groupes (A, B, C, Tous) + fader des 3 groupes ensemble + TOUT COUPER.
+                _groups = Enumerable.Range(0, count).Where(i => ChannelTypeInfo.IsColorMix(profile.Channels[i].Type)).ToArray();
+                _groupPad = new GroupLevelPad
+                {
+                    Location = new Point(9, 6),
+                    Size = new Size(240, 180),
+                    GroupNames = _groups.Select((_, k) => ((char)('A' + k)).ToString()).ToArray(),
+                };
+                _groupPad.LevelChanged += OnGroupPad;
+                _tips.SetToolTip(_groupPad, "X : groupe A, B, C ou Tous. Y : niveau (bas = 0 %, haut = 100 %). Clique ou glisse.");
+                _groupsFader = new VerticalFader { Location = new Point(258, 6), Size = new Size(48, 180), FillColor = Color.FromArgb(160, 100, 240) };
+                _groupsFader.ValueChanged += (_, _) => OnGroupsFader();
+                _tips.SetToolTip(_groupsFader, "Les 3 groupes en même temps (garde leurs proportions).");
+                var faderLabel = new Label { Text = "3 groupes", Location = new Point(250, 188), Size = new Size(64, 18), TextAlign = ContentAlignment.TopCenter };
+                var cutAll = new Button
+                {
+                    Text = "TOUT COUPER",
+                    Location = new Point(9, 210),
+                    Size = new Size(297, 34),
+                    Font = Ui.BoldFont,
+                    BackColor = Color.FromArgb(190, 40, 40),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                };
+                cutAll.Click += (_, _) => CutAll();
+                _tips.SetToolTip(cutAll, "Dimmer, groupes et strobe à 0, effet au tempo arrêté.");
+
+                _beatBlock = new BeatEffectBlock(ctx, fixture, profile) { Location = new Point(9, 252) };
+                left.Controls.AddRange(new Control[] { _groupPad, _groupsFader, faderLabel, cutAll, _beatBlock });
             }
         }
 
@@ -504,6 +536,78 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
+    /// <summary>Graphique : colonne d'un groupe -> ce groupe ; derniere colonne -> les 3 au meme niveau.</summary>
+    private void OnGroupPad(int column, byte level)
+    {
+        OpenDimmerIfClosed();
+        if (column >= _groups.Length)
+        {
+            foreach (int i in _groups)
+            {
+                _ctx.Engine.SetValue(_fixture.Id, i, level);
+            }
+        }
+        else if (column >= 0)
+        {
+            _ctx.Engine.SetValue(_fixture.Id, _groups[column], level);
+        }
+        RefreshFromEngine();
+    }
+
+    /// <summary>Fader "3 groupes" : niveau commun en gardant les proportions entre groupes.</summary>
+    private void OnGroupsFader()
+    {
+        if (_updating || _groupsFader is null)
+        {
+            return;
+        }
+        OpenDimmerIfClosed();
+        _ctx.Engine.SetGroupLevel(_fixture.Id, _groups, (byte)_groupsFader.Value, _groupsRatios);
+        RefreshFromEngine();
+    }
+
+    /// <summary>Le dimmer general doit etre ouvert, sinon regler un groupe ne se verrait pas.</summary>
+    private void OpenDimmerIfClosed()
+    {
+        byte[] values = _ctx.Engine.GetValues(_fixture.Id);
+        if (_dimmer >= 0 && _dimmer < values.Length && values[_dimmer] == 0)
+        {
+            _ctx.Engine.SetFixtureDimmer(_fixture.Id, 255);
+        }
+    }
+
+    /// <summary>TOUT COUPER : effet au tempo arrete, dimmer, groupes et strobe a 0.</summary>
+    private void CutAll()
+    {
+        _beatBlock?.Stop();
+        _ctx.Engine.SetFixtureStrobe(_fixture.Id, false);
+        for (int i = 0; i < _profile.ChannelCount; i++)
+        {
+            var type = _profile.Channels[i].Type;
+            if (type is ChannelType.Dimmer or ChannelType.Strobe || ChannelTypeInfo.IsColorMix(type))
+            {
+                _ctx.Engine.SetValue(_fixture.Id, i, 0);
+            }
+        }
+        _ctx.NotifyLiveStateChanged();
+        _ctx.Status($"{_fixture.Name} : tout coupé.");
+    }
+
+    /// <summary>Graphique et fader des groupes recales sur les valeurs actuelles.</summary>
+    private void SyncGroups(byte[] values)
+    {
+        if (_groupPad is null || _groupsFader is null || !_groups.All(i => i < values.Length))
+        {
+            return;
+        }
+        _groupPad.SetLevels(_groups.Select(i => values[i]).ToArray());
+        _groupsFader.Value = LedGroups.Level(values, _groups);
+        if (LedGroups.Level(values, _groups) >= 32)
+        {
+            _groupsRatios = LedGroups.Ratios(values, _groups); // proportions memorisees (voir RememberRatios)
+        }
+    }
+
     /// <summary>Affiche une valeur dans la case numerique sans relancer d'evenement.</summary>
     private void ShowNumber(int index, byte value)
     {
@@ -551,6 +655,7 @@ internal sealed class FixturePanel : UserControl
     /// <summary>Recale les pads (lyre et ailes) sur les valeurs actuelles des canaux.</summary>
     private void SyncPads(byte[] values)
     {
+        SyncGroups(values);
         if (_xy is not null)
         {
             _xy.ValueX = ShowEngine.GetAxis16(_profile, values, ChannelType.Pan, ChannelType.PanFine);

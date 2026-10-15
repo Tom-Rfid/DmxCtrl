@@ -232,6 +232,126 @@ internal sealed class VerticalFader : Control
     }
 }
 
+/// <summary>
+/// Graphique des groupes de LED d'un projecteur (PAR UV : groupes A, B, C) + une derniere colonne
+/// "Tous". En X : la colonne = le groupe pilote ; en Y : son niveau (bas = 0 %, haut = 100 %).
+/// On clique ou on glisse : le groupe sous la souris prend le niveau de la hauteur du pointeur.
+/// </summary>
+[DesignerCategory("Code")]
+internal sealed class GroupLevelPad : Control
+{
+    private byte[] _levels = Array.Empty<byte>();
+    private int _active = -1;
+
+    /// <summary>Leve quand l'utilisateur regle une colonne : (index de colonne, niveau 0..255). Derniere colonne = tous.</summary>
+    public event Action<int, byte>? LevelChanged;
+
+    public GroupLevelPad()
+    {
+        DoubleBuffered = true;
+        SetStyle(ControlStyles.ResizeRedraw | ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint, true);
+        BackColor = Color.FromArgb(28, 30, 36);
+        Cursor = Cursors.Hand;
+    }
+
+    /// <summary>Noms des groupes (A, B, C...) ; une colonne "Tous" est ajoutee a la fin.</summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public string[] GroupNames { get; set; } = { "A", "B", "C" };
+
+    /// <summary>Niveaux actuels des groupes (affichage, sans lever d'evenement).</summary>
+    public void SetLevels(byte[] levels)
+    {
+        _levels = levels;
+        Invalidate();
+    }
+
+    private int Columns => GroupNames.Length + 1;
+
+    private Rectangle Area => new(6, 6, Math.Max(1, Width - 12), Math.Max(1, Height - 28));
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button == MouseButtons.Left)
+        {
+            Capture = true;
+            _active = ColumnAt(e.X);
+            Apply(e.Y);
+        }
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (e.Button == MouseButtons.Left)
+        {
+            _active = ColumnAt(e.X); // on peut glisser d'un groupe a l'autre
+            Apply(e.Y);
+        }
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+        _active = -1;
+        Invalidate();
+    }
+
+    private int ColumnAt(int x)
+    {
+        var r = Area;
+        return Math.Clamp((int)((x - r.Left) / (double)r.Width * Columns), 0, Columns - 1);
+    }
+
+    private void Apply(int y)
+    {
+        var r = Area;
+        double fraction = 1 - Math.Clamp((y - r.Top) / (double)r.Height, 0, 1); // haut = 100 %
+        LevelChanged?.Invoke(_active, (byte)Math.Round(fraction * 255));
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var r = Area;
+        float columnWidth = r.Width / (float)Columns;
+        using var grid = new Pen(Color.FromArgb(70, 74, 88));
+        using var uv = new SolidBrush(Color.FromArgb(140, 70, 230));
+        using var all = new SolidBrush(Color.FromArgb(190, 150, 255));
+        using var highlight = new SolidBrush(Color.FromArgb(40, 255, 255, 255));
+
+        for (int c = 0; c < Columns; c++)
+        {
+            float x = r.Left + c * columnWidth;
+            if (c == _active)
+            {
+                g.FillRectangle(highlight, x, r.Top, columnWidth, r.Height);
+            }
+
+            // Niveau : celui du groupe, ou le plus fort des groupes pour "Tous".
+            bool isAll = c == Columns - 1;
+            int level = isAll ? (_levels.Length == 0 ? 0 : _levels.Max()) : (c < _levels.Length ? _levels[c] : 0);
+            float h = level / 255f * r.Height;
+            g.FillRectangle(isAll ? all : uv, x + 8, r.Bottom - h, columnWidth - 16, h);
+
+            if (c > 0)
+            {
+                g.DrawLine(grid, x, r.Top, x, r.Bottom);
+            }
+            string name = isAll ? "Tous" : GroupNames[c];
+            TextRenderer.DrawText(g, $"{name}  {level * 100 / 255} %", Font, new Rectangle((int)x, Height - 22, (int)columnWidth, 20),
+                Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        }
+        // Reperes 50 % et bord.
+        using var half = new Pen(Color.FromArgb(90, 94, 110)) { DashStyle = DashStyle.Dot };
+        g.DrawLine(half, r.Left, r.Top + r.Height / 2, r.Right, r.Top + r.Height / 2);
+        using var border = new Pen(Color.FromArgb(110, 118, 140));
+        g.DrawRectangle(border, r);
+    }
+}
+
 /// <summary>Moniteur de sortie : une barre par canal DMX.</summary>
 [DesignerCategory("Code")]
 internal sealed class DmxMonitor : Control
