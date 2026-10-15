@@ -27,6 +27,7 @@ public static class FixtureLibrary
     public const string SpiderId = "mindi-mini-spider-15ch";
     public const string AyraFogId = "ayra-wsm02-mkiii";
     public const string GalacticLaserId = "showtec-galactic-rgy140-mkii";
+    public const string GalacticLaserRgId = "showtec-galactic-rgy140-mkii-rg"; // meme laser, couleurs rouge / vert
     public const string ParUvId = "par-led-36-rgb-uv-generic";   // RGB + UV (mis de cote : pas le PAR de l'utilisateur)
     public const string ParUvOnlyId = "par-led-36-uv-generic-7ch"; // UV seul (le PAR de l'utilisateur, table a verifier)
 
@@ -38,6 +39,7 @@ public static class FixtureLibrary
         MiniSpider(),
         AyraWsm02(),
         GalacticRgy140(),
+        GalacticRgy140RedGreen(),
         ParLed36Uv(),
         ParLed36RgbUv(),
     };
@@ -435,6 +437,45 @@ public static class FixtureLibrary
                 notes: "Le manuel indique « horaire » pour 128-191 et 192-255 (probable coquille : 192-255 = anti-horaire)."),
         },
     };
+
+    /// <summary>
+    /// Meme laser, couleurs nommees comme on les voit : il n'a que 2 diodes (rouge et verte) ; le
+    /// « jaune » de la notice est le rouge et le vert allumes ensemble.
+    /// </summary>
+    public static FixtureProfile GalacticRgy140RedGreen()
+    {
+        var profile = GalacticRgy140();
+        profile.Id = GalacticLaserRgId;
+        profile.Name = "Galactic RGY-140 MKII Value Line (laser rouge / vert, 10 canaux)";
+        profile.Notes = profile.Notes.Replace("Couleur 0-24 = laser éteint.",
+            "Couleur 0-24 = laser éteint. 2 diodes seulement (rouge et verte) : le « jaune » de la notice = rouge + vert ensemble.");
+
+        var color = profile.Channels[profile.IndexOf(ChannelType.LaserColor)];
+        color.Presets = new List<ChannelPreset>
+        {
+            new("Éteint", 0), new("Couleurs d'origine", 37), new("Rouge", 62), new("Vert", 87),
+            new("Rouge + vert", 112), new("Alternance rouge ↔ vert", 137), new("Vert ↔ rouge + vert", 162),
+            new("Rouge ↔ rouge + vert", 187), new("Rouge / vert / les deux", 212), new("Changement continu", 240),
+        };
+        color.Ranges = new List<ChannelRange>
+        {
+            new("Éteint (blackout)", 0, 24), new("Couleurs d'origine", 25, 49), new("Rouge", 50, 74),
+            new("Vert", 75, 99), new("Rouge + vert ensemble", 100, 124), new("Alternance rouge ↔ vert", 125, 149),
+            new("Alternance vert ↔ rouge + vert", 150, 174), new("Alternance rouge ↔ rouge + vert", 175, 199),
+            new("Alternance rouge / vert / les deux", 200, 224), new("Changement continu", 225, 255),
+        };
+
+        var mode = profile.Channels[profile.IndexOf(ChannelType.LaserMode)];
+        foreach (var preset in mode.Presets)
+        {
+            preset.Name = preset.Name.Replace("rouge/vert/jaune", "toutes couleurs").Replace("jaune", "rouge + vert");
+        }
+        foreach (var range in mode.Ranges)
+        {
+            range.Name = range.Name.Replace("rouge/vert/jaune", "toutes couleurs").Replace("jaune", "rouge + vert");
+        }
+        return profile;
+    }
 
     // =================================================================================
     //  PAR LED 36 RGB + UV (generique)

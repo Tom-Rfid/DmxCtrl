@@ -58,6 +58,10 @@ public class FeatureTests
         Assert.Equal(10, models[FixtureLibrary.GalacticLaserId].ChannelCount);
         Assert.Equal(8, models[FixtureLibrary.ParUvId].ChannelCount);
         Assert.Equal(7, models[FixtureLibrary.ParUvOnlyId].ChannelCount);
+        var rg = models[FixtureLibrary.GalacticLaserRgId];
+        Assert.True(FixtureLibrary.SameLayout(rg, models[FixtureLibrary.GalacticLaserId])); // meme table DMX
+        Assert.DoesNotContain(rg.Channels.SelectMany(c => c.Presets.Select(p => p.Name).Concat(c.Ranges.Select(r => r.Name))),
+            name => name.Contains("jaune", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(3, models[FixtureLibrary.ParUvOnlyId].IndicesOf(ChannelType.UV).Length);
 
         var spot = models[FixtureLibrary.Spot260X14Id];
