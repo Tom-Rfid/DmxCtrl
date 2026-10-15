@@ -123,6 +123,17 @@ public static class FixtureLibrary
         {
             var mine = target.Channels[i];
             var theirs = model.Channels[i];
+            // Libelle precise par la bibliotheque (« LED 1 » -> « LED 1 — rouge gauche ») : on le reprend,
+            // sauf si l'utilisateur a renomme le canal autrement.
+            if (theirs.Name.StartsWith(mine.Name, StringComparison.OrdinalIgnoreCase) && theirs.Name != mine.Name)
+            {
+                mine.Name = theirs.Name;
+                if (theirs.Verified)
+                {
+                    mine.Verified = true;
+                    mine.Notes = theirs.Notes;
+                }
+            }
             mine.StrobeSlow ??= theirs.StrobeSlow;
             mine.StrobeFast ??= theirs.StrobeFast;
             if (mine.Ranges.Count == 0)
@@ -300,23 +311,23 @@ public static class FixtureLibrary
         Name = "Mini Spider 8x3W RGBW (15 canaux)",
         Manufacturer = "Mindi",
         DefaultFixtureName = "Spider",
-        Revision = 2,
+        Revision = 3,
         Notes = "Table de la notice, 15 canaux à partir de l'adresse du Spider. " +
-                "La couleur de chaque LED (canaux 5 à 12) est SUPPOSÉE (rouge, vert, bleu, blanc, puis pareil).",
+                "Moteur 1 = aile gauche, moteur 2 = aile droite ; LED 1-4 = aile gauche (rouge, vert, bleu, blanc), LED 5-8 = aile droite (idem). Validé sur l'appareil.",
         Channels =
         {
-            Ch("Moteur 1 (0-135°)", ChannelType.Motor, 0, verified: true),
-            Ch("Moteur 2 (0-135°)", ChannelType.Motor, 0, verified: true),
+            Ch("Moteur 1 (0-135°) — aile gauche", ChannelType.Motor, 0, verified: true),
+            Ch("Moteur 2 (0-135°) — aile droite", ChannelType.Motor, 0, verified: true),
             Ch("Dimmer général", ChannelType.Dimmer, 0, verified: true),
             Ch("Strobe (0 = arrêt)", ChannelType.Strobe, 0, verified: true, strobeSlow: 10, strobeFast: 255),
-            Ch("LED 1", ChannelType.Red, 0, verified: false, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 2", ChannelType.Green, 0, verified: false, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 3", ChannelType.Blue, 0, verified: false, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 4", ChannelType.White, 0, verified: false, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 5", ChannelType.Red, 0, verified: false, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 6", ChannelType.Green, 0, verified: false, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 7", ChannelType.Blue, 0, verified: false, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 8", ChannelType.White, 0, verified: false, notes: "Intensité confirmée, couleur supposée."),
+            Ch("LED 1 — rouge gauche", ChannelType.Red, 0, verified: true),
+            Ch("LED 2 — vert gauche", ChannelType.Green, 0, verified: true),
+            Ch("LED 3 — bleu gauche", ChannelType.Blue, 0, verified: true),
+            Ch("LED 4 — blanc gauche", ChannelType.White, 0, verified: true),
+            Ch("LED 5 — rouge droite", ChannelType.Red, 0, verified: true),
+            Ch("LED 6 — vert droite", ChannelType.Green, 0, verified: true),
+            Ch("LED 7 — bleu droite", ChannelType.Blue, 0, verified: true),
+            Ch("LED 8 — blanc droite", ChannelType.White, 0, verified: true),
             Ch("Macros d'effets", ChannelType.Macro, 0, verified: true),
             Ch("Vitesse des effets", ChannelType.EffectSpeed, 0, verified: true),
             Ch("Reset", ChannelType.Control, 0, verified: true, notes: "Laisser à 0."),

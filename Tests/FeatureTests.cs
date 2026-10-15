@@ -140,7 +140,7 @@ public class FeatureTests
         Assert.Same(spider, show.FindProfile(FixtureLibrary.SpiderId));
         Assert.Equal("vérifié : rouge", spider.Channels[4].Notes);
         Assert.NotNull(spider.Channels[3].StrobeSlow);
-        Assert.Equal(2, spider.Revision);
+        Assert.Equal(3, spider.Revision);
     }
 
     // =================================================================================
