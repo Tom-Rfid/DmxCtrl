@@ -69,6 +69,39 @@ public sealed class ChannelPreset
     }
 }
 
+/// <summary>
+/// Plage de valeurs d'un canal qui a un sens precis, d'apres la notice
+/// (ex. laser, canal X : "Rotation horaire" = 128 a 191, de lent a rapide).
+/// Les onglets speciaux (laser) en font une liste deroulante + un curseur dans la plage.
+/// </summary>
+public sealed class ChannelRange
+{
+    public string Name { get; set; } = "";
+    public byte From { get; set; }
+    public byte To { get; set; }
+
+    public ChannelRange()
+    {
+    }
+
+    public ChannelRange(string name, byte from, byte to)
+    {
+        Name = name;
+        From = from;
+        To = to;
+    }
+
+    public bool Contains(byte value) => value >= From && value <= To;
+
+    /// <summary>Valeur a la position "fraction" (0 = debut de plage, 1 = fin).</summary>
+    public byte At(double fraction) => (byte)Math.Round(From + Math.Clamp(fraction, 0, 1) * (To - From));
+
+    /// <summary>Position (0..1) d'une valeur dans la plage.</summary>
+    public double FractionOf(byte value) => To == From ? 0 : Math.Clamp((value - From) / (double)(To - From), 0, 1);
+
+    public override string ToString() => From == To ? $"{Name} ({From})" : $"{Name} ({From}-{To})";
+}
+
 /// <summary>Un canal d'un profil.</summary>
 public sealed class ChannelDef
 {
@@ -77,6 +110,18 @@ public sealed class ChannelDef
 
     /// <summary>Valeur au demarrage et apres "Valeurs par defaut".</summary>
     public byte Default { get; set; }
+
+    /// <summary>
+    /// Strobe "materiel" de l'appareil sur ce canal : valeur du strobe le plus lent et du plus
+    /// rapide (ex. obturateur de la 260X : 8 et 76). Utilise par les interrupteurs de strobe
+    /// de l'onglet Soiree. Null = ce canal ne fait pas de strobe.
+    /// </summary>
+    public byte? StrobeSlow { get; set; }
+
+    public byte? StrobeFast { get; set; }
+
+    /// <summary>Plages de valeurs de la notice (optionnel, utilise par les onglets speciaux).</summary>
+    public List<ChannelRange> Ranges { get; set; } = new();
 
     /// <summary>
     /// true une fois que quelqu'un a verifie SUR L'APPAREIL que ce canal fait bien
@@ -95,6 +140,16 @@ public sealed class FixtureProfile
     public string Name { get; set; } = "Nouveau module";
     public string Manufacturer { get; set; } = "";
     public string Notes { get; set; } = "";
+
+    /// <summary>Debut du nom propose pour un nouvel appareil de ce modele (« Lyre » -> « Lyre 3 »).</summary>
+    public string DefaultFixtureName { get; set; } = "";
+
+    /// <summary>
+    /// Version du modele dans la bibliotheque integree (FixtureLibrary). Permet de mettre a
+    /// jour automatiquement un profil copie dans une ancienne configuration.
+    /// </summary>
+    public int Revision { get; set; }
+
     public List<ChannelDef> Channels { get; set; } = new();
 
     // Proprietes calculees : [JsonIgnore] sinon System.Text.Json les ecrirait dans le fichier.
@@ -104,6 +159,27 @@ public sealed class FixtureProfile
 
     /// <summary>true si l'appareil a un pan ou un tilt (lyre) : cible des effets de mouvement.</summary>
     [JsonIgnore] public bool CanMove => Has(ChannelType.Pan) || Has(ChannelType.Tilt);
+
+    /// <summary>Machine a fumee : onglet et bandeau "fumee".</summary>
+    [JsonIgnore] public bool IsFogMachine => Has(ChannelType.Fog);
+
+    /// <summary>Laser : onglet special laser.</summary>
+    [JsonIgnore] public bool IsLaser => Has(ChannelType.LaserPattern) || Has(ChannelType.LaserColor);
+
+    /// <summary>true si un canal sait faire un strobe materiel (voir ChannelDef.StrobeSlow).</summary>
+    [JsonIgnore] public bool HasHardwareStrobe => Channels.Any(c => c.StrobeSlow is not null && c.StrobeFast is not null);
+
+    /// <summary>"Lyre", "Spider"... : nom propose pour un nouvel appareil de ce modele.</summary>
+    [JsonIgnore]
+    public string FixtureNameBase => !string.IsNullOrWhiteSpace(DefaultFixtureName) ? DefaultFixtureName
+        : CanMove ? "Lyre"
+        : IsFogMachine ? "Fumée"
+        : IsLaser ? "Laser"
+        : "Appareil";
+
+    /// <summary>Indices des canaux d'un type, dans l'ordre du profil.</summary>
+    public int[] IndicesOf(ChannelType type) =>
+        Enumerable.Range(0, Channels.Count).Where(i => Channels[i].Type == type).ToArray();
 
     /// <summary>Index (0 = premier canal du profil) du premier canal de ce type, ou -1.</summary>
     public int IndexOf(ChannelType type) => Channels.FindIndex(c => c.Type == type);

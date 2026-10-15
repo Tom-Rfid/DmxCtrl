@@ -10,7 +10,9 @@
 //    2. fondu entre l'ancienne et la nouvelle scene (canaux continus uniquement)
 //    3. effet de mouvement (cercle, huit...) autour de la position reglee
 //    4. chenillard de couleurs
-//    5. intensite : strobe logiciel -> master -> blackout ; le FLASH passe par-dessus tout
+//    5. intensite : strobe logiciel -> master -> blackout ; le FLASH passe par-dessus tout,
+//       ainsi que les interrupteurs FLASH / STROBE de chaque appareil (onglet Soiree)
+//    5 bis. canal Fumee calcule par le moteur (manuel / coup / auto) ; laser eteint au blackout
 //    6. ecriture aux adresses du patch
 //  Si le MODE DEBUG est actif, tout ca est ignore et l'univers brut de l'onglet
 //  Debug est envoye tel quel.
@@ -29,6 +31,19 @@ namespace DmxController.Core.Engine;
 
 /// <summary>Resultat d'un clic sur une couleur : quels appareils ont pu l'afficher.</summary>
 public sealed record ColorResult(IReadOnlyList<string> Applied, IReadOnlyList<string> Unsupported);
+
+/// <summary>
+/// Etat d'une machine a fumee vu par le logiciel. ATTENTION : le DMX ne va que dans un sens,
+/// la machine ne renvoie rien. "Prete" est une ESTIMATION a partir du temps de chauffe.
+/// </summary>
+/// <param name="Fogging">true si de la fumee est demandee en ce moment.</param>
+/// <param name="OutputPercent">Debit envoye en ce moment (0 = pas de fumee).</param>
+/// <param name="Auto">Mode auto actif.</param>
+/// <param name="Hold">Bouton "fumee" maintenu.</param>
+/// <param name="JetRemaining">Secondes restantes du jet en cours (coup ou cycle auto), 0 sinon.</param>
+/// <param name="NextJetIn">Mode auto, en pause : secondes avant le prochain jet. 0 sinon.</param>
+/// <param name="WarmupRemaining">null = heure d'allumage inconnue ; 0 = chauffe terminee (estimation) ; sinon secondes restantes.</param>
+public sealed record FogStatus(bool Fogging, int OutputPercent, bool Auto, bool Hold, double JetRemaining, double NextJetIn, double? WarmupRemaining);
 
 public sealed class ShowEngine : IFrameSource
 {
@@ -54,6 +69,23 @@ public sealed class ShowEngine : IFrameSource
     private bool _blackout;
     private bool _flash;
     private double _bpm = 120;
+
+    // Interrupteurs FLASH (maintenu) et STROBE (bascule) par appareil, onglet Soiree.
+    private readonly HashSet<string> _fixtureFlash = new();
+    private readonly HashSet<string> _fixtureStrobe = new();
+    private int _strobeSpeed = 160; // 0 = lent .. 255 = rapide
+
+    // Machines a fumee : etat par Id d'appareil (non sauvegarde : tout repart a l'arret).
+    private sealed class FogState
+    {
+        public bool Hold;
+        public double ShotUntil = double.NegativeInfinity;
+        public bool Auto;
+        public double AutoStart;
+        public double? PoweredOnAt;
+    }
+
+    private readonly Dictionary<string, FogState> _fog = new();
 
     private bool _debugActive;
     private readonly byte[] _debugUniverse = DmxFrame.NewUniverse();
@@ -115,6 +147,9 @@ public sealed class ShowEngine : IFrameSource
             _bpm = Math.Clamp(show.Settings.Bpm, 30, 300);
             _blackout = false;
             _flash = false;
+            _fixtureFlash.Clear();
+            _fixtureStrobe.Clear();
+            _fog.Clear();
             _effects = ShowJson.Clone(show.LiveState.Effects);
             _moveEpoch = _chaseEpoch = _clock();
             _movePhaseAtEpoch = _chaseStepAtEpoch = 0;
@@ -162,6 +197,12 @@ public sealed class ShowEngine : IFrameSource
             _programmer.Remove(stale);
         }
         _selection.RemoveWhere(id => !ids.Contains(id));
+        _fixtureFlash.RemoveWhere(id => !ids.Contains(id));
+        _fixtureStrobe.RemoveWhere(id => !ids.Contains(id));
+        foreach (string stale in _fog.Keys.Where(k => !ids.Contains(k)).ToList())
+        {
+            _fog.Remove(stale);
+        }
         _fadeFrom = null;
     }
 
@@ -478,6 +519,140 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
+    //  Flash / strobe par appareil (interrupteurs de l'onglet Soiree)
+    // =================================================================================
+
+    /// <summary>Flash d'un appareil (tant que le bouton est maintenu) : plein feu, par-dessus master et blackout.</summary>
+    public void SetFixtureFlash(string fixtureId, bool on)
+    {
+        lock (_lock)
+        {
+            if (on)
+            {
+                _fixtureFlash.Add(fixtureId);
+            }
+            else
+            {
+                _fixtureFlash.Remove(fixtureId);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Strobe d'un appareil (interrupteur) : strobe materiel de l'appareil s'il en a un
+    /// (obturateur de la lyre, canal strobe du Spider...), sinon strobe logiciel sur son dimmer.
+    /// Sans effet si l'appareil a "Pas de strobe".
+    /// </summary>
+    public void SetFixtureStrobe(string fixtureId, bool on)
+    {
+        lock (_lock)
+        {
+            if (on)
+            {
+                _fixtureStrobe.Add(fixtureId);
+            }
+            else
+            {
+                _fixtureStrobe.Remove(fixtureId);
+            }
+        }
+    }
+
+    public bool IsFixtureStrobing(string fixtureId)
+    {
+        lock (_lock)
+        {
+            return _fixtureStrobe.Contains(fixtureId);
+        }
+    }
+
+    /// <summary>Vitesse des interrupteurs de strobe : 0 = lent, 255 = rapide.</summary>
+    public int StrobeSpeed
+    {
+        get { lock (_lock) { return _strobeSpeed; } }
+        set { lock (_lock) { _strobeSpeed = Math.Clamp(value, 0, 255); } }
+    }
+
+    // =================================================================================
+    //  Machines a fumee
+    // =================================================================================
+
+    /// <summary>Bouton "Fumee" maintenu : fume tant que on = true.</summary>
+    public void SetFogHold(string fixtureId, bool on)
+    {
+        lock (_lock)
+        {
+            FogLocked(fixtureId).Hold = on;
+        }
+    }
+
+    /// <summary>Un coup de fumee de la duree reglee (FogSettings.DurationSeconds), a partir de maintenant.</summary>
+    public void FogShot(string fixtureId)
+    {
+        lock (_lock)
+        {
+            var fixture = _show.Fixtures.FirstOrDefault(f => f.Id == fixtureId);
+            if (fixture is not null)
+            {
+                FogLocked(fixtureId).ShotUntil = _clock() + Math.Max(0.5, fixture.Fog.DurationSeconds);
+            }
+        }
+    }
+
+    /// <summary>Mode auto : un jet tout de suite, puis un jet toutes les (duree + delai) secondes.</summary>
+    public void SetFogAuto(string fixtureId, bool on)
+    {
+        lock (_lock)
+        {
+            var state = FogLocked(fixtureId);
+            if (on && !state.Auto)
+            {
+                state.AutoStart = _clock();
+            }
+            state.Auto = on;
+        }
+    }
+
+    /// <summary>Arrete tout : bouton, coup en cours et mode auto.</summary>
+    public void StopFog(string fixtureId)
+    {
+        lock (_lock)
+        {
+            var state = FogLocked(fixtureId);
+            state.Hold = false;
+            state.Auto = false;
+            state.ShotUntil = double.NegativeInfinity;
+        }
+    }
+
+    /// <summary>"Je viens d'allumer la machine" : demarre l'estimation du temps de chauffe.</summary>
+    public void MarkFogPoweredOn(string fixtureId)
+    {
+        lock (_lock)
+        {
+            FogLocked(fixtureId).PoweredOnAt = _clock();
+        }
+    }
+
+    public FogStatus GetFogStatus(string fixtureId)
+    {
+        lock (_lock)
+        {
+            var fixture = _show.Fixtures.FirstOrDefault(f => f.Id == fixtureId);
+            var settings = fixture?.Fog ?? new FogSettings();
+            var state = FogLocked(fixtureId);
+            double t = _clock();
+
+            var (fogging, jetRemaining, nextJetIn) = FogPhaseLocked(state, settings, t);
+            int output = fogging && fixture?.Enabled == true ? Math.Clamp(settings.LevelPercent, 0, 100) : 0;
+            double? warmup = state.PoweredOnAt is double on
+                ? Math.Max(0, settings.WarmupMinutes * 60 - (t - on))
+                : null;
+            return new FogStatus(output > 0, output, state.Auto, state.Hold, jetRemaining, nextJetIn, warmup);
+        }
+    }
+
+    // =================================================================================
     //  Scenes
     // =================================================================================
 
@@ -646,8 +821,8 @@ public sealed class ShowEngine : IFrameSource
                     }
                 }
 
-                // 5 : intensite (strobe, master, blackout, flash)
-                ApplyIntensityLocked(profile, values, selected && strobeDark);
+                // 5 : intensite (strobe, master, blackout, flash, interrupteurs flash/strobe de l'appareil)
+                ApplyIntensityLocked(fixture, profile, values, selected && strobeDark, t);
                 if (fixture.NoStrobe)
                 {
                     for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
@@ -658,6 +833,10 @@ public sealed class ShowEngine : IFrameSource
                         }
                     }
                 }
+
+                // 5 bis : fumee (pilotee par le moteur) et securite laser
+                ApplyFogLocked(fixture, profile, values, t);
+                ApplyLaserSafetyLocked(profile, values);
 
                 // 6 : ecriture aux adresses du patch
                 for (int i = 0; i < values.Length; i++)
@@ -809,10 +988,31 @@ public sealed class ShowEngine : IFrameSource
 
     /// <summary>
     /// Intensite : sur le canal Dimmer s'il existe, sinon sur les canaux de couleur.
-    /// Flash > blackout > master > strobe.
+    /// Flash (general ou de l'appareil) et strobe de l'appareil > blackout > master > strobe logiciel.
     /// </summary>
-    private void ApplyIntensityLocked(FixtureProfile profile, byte[] values, bool strobeDark)
+    private void ApplyIntensityLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, bool strobeDark, double t)
     {
+        bool flash = _flash || _fixtureFlash.Contains(fixture.Id);
+        bool fixtureStrobe = _fixtureStrobe.Contains(fixture.Id) && !fixture.NoStrobe;
+
+        if (flash || fixtureStrobe)
+        {
+            // Plein feu, obturateur ouvert : par-dessus le master et le blackout.
+            SetFullIntensity(profile, values);
+            if (fixtureStrobe && !flash)
+            {
+                if (profile.HasHardwareStrobe)
+                {
+                    WriteHardwareStrobe(profile, values, _strobeSpeed);
+                }
+                else if (Frac(t * StrobeHz(_strobeSpeed)) >= 0.5)
+                {
+                    SetIntensity(profile, values, 0); // strobe logiciel : phase eteinte
+                }
+            }
+            return;
+        }
+
         bool hasDimmer = profile.Has(ChannelType.Dimmer);
         for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
         {
@@ -820,12 +1020,6 @@ public sealed class ShowEngine : IFrameSource
             bool isIntensity = hasDimmer ? type == ChannelType.Dimmer : ChannelTypeInfo.IsColorMix(type);
             if (!isIntensity)
             {
-                continue;
-            }
-
-            if (_flash)
-            {
-                values[i] = 255;
                 continue;
             }
 
@@ -838,6 +1032,131 @@ public sealed class ShowEngine : IFrameSource
             values[i] = (byte)v;
         }
     }
+
+    /// <summary>Dimmer a fond (ou couleurs a fond sans dimmer) et obturateur ouvert (sa valeur par defaut).</summary>
+    private static void SetFullIntensity(FixtureProfile profile, byte[] values)
+    {
+        SetIntensity(profile, values, 255);
+        for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
+        {
+            var channel = profile.Channels[i];
+            if (channel.Type == ChannelType.Shutter)
+            {
+                values[i] = channel.Default > 0 ? channel.Default : (byte)255;
+            }
+        }
+    }
+
+    private static void SetIntensity(FixtureProfile profile, byte[] values, byte level)
+    {
+        bool hasDimmer = profile.Has(ChannelType.Dimmer);
+        for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
+        {
+            var type = profile.Channels[i].Type;
+            if (hasDimmer ? type == ChannelType.Dimmer : ChannelTypeInfo.IsColorMix(type))
+            {
+                values[i] = level;
+            }
+        }
+    }
+
+    /// <summary>Ecrit la valeur de strobe (entre StrobeSlow et StrobeFast) sur les canaux qui en ont.</summary>
+    private static void WriteHardwareStrobe(FixtureProfile profile, byte[] values, int speed)
+    {
+        for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
+        {
+            var channel = profile.Channels[i];
+            if (channel.StrobeSlow is byte slow && channel.StrobeFast is byte fast)
+            {
+                values[i] = (byte)Math.Round(slow + (fast - slow) * Math.Clamp(speed, 0, 255) / 255.0);
+            }
+        }
+    }
+
+    /// <summary>Strobe logiciel des interrupteurs : 1 a 5 flashs/s (limite par la cadence de 10 trames/s).</summary>
+    private static double StrobeHz(int speed) => 1 + 4 * Math.Clamp(speed, 0, 255) / 255.0;
+
+    /// <summary>Canal Fumee : debit choisi quand la machine doit fumer, 0 sinon (la valeur du programmeur est ignoree).</summary>
+    private void ApplyFogLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, double t)
+    {
+        if (!profile.IsFogMachine)
+        {
+            return;
+        }
+
+        bool fogging = _fog.TryGetValue(fixture.Id, out var state) && FogPhaseLocked(state, fixture.Fog, t).Fogging;
+        byte output = fogging ? (byte)Math.Round(Math.Clamp(fixture.Fog.LevelPercent, 0, 100) * 255 / 100.0) : (byte)0;
+        foreach (int i in profile.IndicesOf(ChannelType.Fog))
+        {
+            if (i < values.Length)
+            {
+                values[i] = output;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fumee en ce moment ? Retourne aussi le temps restant du jet et, en auto, le temps avant
+    /// le prochain jet. Cycle auto : DurationSeconds de fumee puis DelaySeconds de pause.
+    /// </summary>
+    private static (bool Fogging, double JetRemaining, double NextJetIn) FogPhaseLocked(FogState state, FogSettings settings, double t)
+    {
+        double shotRemaining = Math.Max(0, state.ShotUntil - t);
+        if (state.Hold)
+        {
+            return (true, shotRemaining, 0);
+        }
+        if (shotRemaining > 0)
+        {
+            return (true, shotRemaining, 0);
+        }
+        if (state.Auto)
+        {
+            double duration = Math.Max(0.5, settings.DurationSeconds);
+            double period = duration + Math.Max(1, settings.DelaySeconds);
+            double phase = Mod(t - state.AutoStart, period);
+            return phase < duration ? (true, duration - phase, 0) : (false, 0, period - phase);
+        }
+        return (false, 0, 0);
+    }
+
+    private FogState FogLocked(string fixtureId)
+    {
+        if (!_fog.TryGetValue(fixtureId, out var state))
+        {
+            state = new FogState();
+            _fog[fixtureId] = state;
+        }
+        return state;
+    }
+
+    /// <summary>
+    /// Laser : au blackout (ou master a 0), on repasse en mode DMX et on eteint le faisceau
+    /// (couleur 0 = blackout). Un laser ne doit jamais rester allume quand on a tout coupe.
+    /// </summary>
+    private void ApplyLaserSafetyLocked(FixtureProfile profile, byte[] values)
+    {
+        if (!profile.IsLaser || !(_blackout || _master == 0))
+        {
+            return;
+        }
+        for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
+        {
+            var channel = profile.Channels[i];
+            if (channel.Type == ChannelType.LaserColor)
+            {
+                values[i] = 0;
+            }
+            else if (channel.Type == ChannelType.LaserMode)
+            {
+                // Plage "DMX (manuel)" si elle est connue, sinon 255 (dernier mode = DMX sur les Galactic).
+                var dmx = channel.Ranges.LastOrDefault(r => TextKey.Normalize(r.Name).StartsWith("dmx"));
+                values[i] = dmx is not null ? dmx.At(0.5) : (byte)255;
+            }
+        }
+    }
+
+    private static double Mod(double a, double n) => ((a % n) + n) % n;
 
     private double MoveCyclesPerSecond() => _effects.MovementSyncToBpm
         ? _bpm / 60.0 / Math.Max(0.25, _effects.BeatsPerCycle)

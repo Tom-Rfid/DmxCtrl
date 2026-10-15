@@ -39,6 +39,10 @@ internal sealed class MainForm : Form
     private readonly TabPage _debugTab = new("Debug") { Tag = "debug" };
     private readonly LivePanel _live;
     private readonly DebugPanel _debug;
+    private readonly FogBanner _fogBanner;
+
+    // Messages de mise a jour des profils (bibliotheque) a afficher a l'ouverture.
+    private List<string> _pendingUpgradeNotes = new();
 
     // Barre de connexion
     private readonly ComboBox _portCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 100, Margin = new Padding(3, 7, 3, 3) };
@@ -77,6 +81,7 @@ internal sealed class MainForm : Form
         _settings = ShowStore.LoadAppSettings();
         var (show, path) = LoadInitialShow();
         _showPath = path;
+        _pendingUpgradeNotes = FixtureLibrary.UpgradeProfiles(show);
 
         _ctx = new ShowContext(_engine, _link, show);
         _engine.LoadShow(show);
@@ -102,14 +107,20 @@ internal sealed class MainForm : Form
 
         _live = new LivePanel(_ctx);
         _debug = new DebugPanel(_ctx);
+        _fogBanner = new FogBanner(_ctx);
         _liveTab.Controls.Add(_live);
         _debugTab.Controls.Add(_debug);
         _tabs.TabPages.Add(_liveTab);
         _tabs.TabPages.Add(_debugTab);
 
+        // Titres d'onglets dessines a la main : ceux des appareils desactives sont grises.
+        _tabs.DrawMode = TabDrawMode.OwnerDrawFixed;
+        _tabs.DrawItem += DrawTabTitle;
+
         var menu = BuildMenu();
         MainMenuStrip = menu;
         Controls.Add(_tabs);
+        Controls.Add(_fogBanner); // sous la barre de connexion, visible sur tous les onglets
         Controls.Add(BuildConnectionBar());
         Controls.Add(BuildStatusStrip());
         Controls.Add(menu);
@@ -126,6 +137,7 @@ internal sealed class MainForm : Form
 
         Shown += async (_, _) =>
         {
+            ReportUpgradeNotes();
             ReportPatchProblems(onlyIfAny: true);
             if (_settings.AutoConnect && _settings.LastPort is string port && _portCombo.Items.Contains(port))
             {
@@ -356,8 +368,11 @@ internal sealed class MainForm : Form
 
         try
         {
-            ApplyShow(ShowStore.LoadShow(path), path);
+            var show = ShowStore.LoadShow(path);
+            _pendingUpgradeNotes = FixtureLibrary.UpgradeProfiles(show);
+            ApplyShow(show, path);
             Log($"Configuration ouverte : {path}");
+            ReportUpgradeNotes();
             ReportPatchProblems(onlyIfAny: true);
         }
         catch (Exception ex)
@@ -500,7 +515,11 @@ internal sealed class MainForm : Form
         }
 
         var before = _ctx.Show.Fixtures.Select(f => f.Id).ToHashSet();
-        _engine.EditShow(show => show.Fixtures = dialog.ResultFixtures);
+        _engine.EditShow(show =>
+        {
+            show.Profiles = dialog.ResultProfiles; // + modeles ajoutes depuis la bibliotheque
+            show.Fixtures = dialog.ResultFixtures;
+        });
 
         // Les nouveaux appareils sont coches d'office dans l'onglet Soiree.
         var added = dialog.ResultFixtures.Where(f => !before.Contains(f.Id)).Select(f => f.Id).ToList();
@@ -555,11 +574,22 @@ internal sealed class MainForm : Form
             }
             else
             {
-                page.Controls.Add(new FixturePanel(_ctx, fixture, profile));
+                // Un onglet adapte au modele : fumee, laser, ou onglet generique (lyre, Spider, PAR...).
+                Control panel = profile.IsFogMachine ? new FogPanel(_ctx, fixture, profile)
+                    : profile.IsLaser ? new LaserPanel(_ctx, fixture, profile)
+                    : new FixturePanel(_ctx, fixture, profile);
+                page.Controls.Add(panel);
+                if (!fixture.Enabled)
+                {
+                    // Module desactive : onglet grise, commandes inactives, bouton pour le reactiver.
+                    panel.Enabled = false;
+                    page.Controls.Add(BuildDisabledBar(fixture));
+                }
             }
             _tabs.TabPages.Insert(insertAt++, page);
         }
         _tabs.ResumeLayout();
+        _fogBanner.Rebuild();
 
         foreach (TabPage page in _tabs.TabPages)
         {
@@ -575,6 +605,63 @@ internal sealed class MainForm : Form
 
     private static string TabTitle(FixtureInstance fixture, FixtureProfile? profile) =>
         fixture.Name + (fixture.Enabled ? "" : " (désactivé)") + (profile is not null && !profile.IsFullyVerified ? " (?)" : "");
+
+    private Control BuildDisabledBar(FixtureInstance fixture)
+    {
+        var enable = new Button { Text = "Activer ce module", AutoSize = true, Margin = new Padding(12, 4, 3, 4) };
+        enable.Click += (_, _) => SetFixtureEnabled(fixture.Id, true);
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, BackColor = Color.FromArgb(235, 235, 235), Padding = new Padding(8, 2, 8, 2) };
+        bar.Controls.Add(Ui.Text("Module DÉSACTIVÉ dans le patch : il n'envoie rien et n'est pas compté dans l'adressage.", bold: true, color: Color.DimGray));
+        bar.Controls.Add(enable);
+        return bar;
+    }
+
+    private void SetFixtureEnabled(string fixtureId, bool enabled)
+    {
+        _engine.EditShow(show =>
+        {
+            var fixture = show.Fixtures.FirstOrDefault(f => f.Id == fixtureId);
+            if (fixture is not null)
+            {
+                fixture.Enabled = enabled;
+            }
+        });
+        _ctx.MarkDirty();
+        RebuildFixtureTabs();
+        _live.ReloadAll();
+        ReportPatchProblems(onlyIfAny: true);
+    }
+
+    /// <summary>Titres d'onglets : gris pour un appareil desactive, gras pour l'onglet actif.</summary>
+    private void DrawTabTitle(object? sender, DrawItemEventArgs e)
+    {
+        var page = _tabs.TabPages[e.Index];
+        var fixture = _ctx.Show.Fixtures.FirstOrDefault(f => Equals(f.Id, page.Tag));
+        bool selected = e.Index == _tabs.SelectedIndex;
+        bool disabled = fixture is { Enabled: false };
+
+        e.Graphics.FillRectangle(selected ? SystemBrushes.Window : SystemBrushes.Control, e.Bounds);
+        var color = disabled ? Color.Gray : SystemColors.ControlText;
+        TextRenderer.DrawText(e.Graphics, page.Text, selected ? Ui.BoldFont : Font, e.Bounds, color,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+    }
+
+    private void ReportUpgradeNotes()
+    {
+        if (_pendingUpgradeNotes.Count == 0)
+        {
+            return;
+        }
+        var notes = _pendingUpgradeNotes;
+        _pendingUpgradeNotes = new();
+        foreach (string note in notes)
+        {
+            Log(note);
+        }
+        _ctx.MarkDirty();
+        MessageBox.Show(this, string.Join("\n\n", notes) + "\n\nEnregistre la configuration (Ctrl+S) pour garder ces corrections.",
+            "Profils mis à jour", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
 
     private void UpdateTabTitles()
     {

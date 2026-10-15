@@ -15,9 +15,10 @@ using System.Text;
 
 namespace DmxController.Core.Model;
 
-public sealed record NamedColor(string Name, byte R, byte G, byte B)
+/// <param name="IsUv">Couleur "UV" : allume la LED UV (lumiere noire) et eteint les autres.</param>
+public sealed record NamedColor(string Name, byte R, byte G, byte B, bool IsUv = false)
 {
-    public bool IsWhite => R == 255 && G == 255 && B == 255;
+    public bool IsWhite => !IsUv && R == 255 && G == 255 && B == 255;
 }
 
 public static class ColorPalette
@@ -33,6 +34,7 @@ public static class ColorPalette
         new NamedColor("Violet", 120, 0, 255),
         new NamedColor("Magenta", 255, 0, 255),
         new NamedColor("Blanc", 255, 255, 255),
+        new NamedColor("UV", 90, 0, 170, IsUv: true), // affiche en violet fonce dans l'IHM
     };
 
     public static NamedColor? Find(string? name) => All.FirstOrDefault(c => TextKey.Same(c.Name, name));
@@ -51,7 +53,22 @@ public static class ColorMapper
         bool hasRgb = profile.Has(ChannelType.Red) && profile.Has(ChannelType.Green) && profile.Has(ChannelType.Blue);
         bool hasWhite = profile.Has(ChannelType.White);
 
-        if (hasRgb || (hasWhite && color.IsWhite))
+        if (color.IsUv)
+        {
+            // UV : seulement les appareils qui ont une LED UV (ou un preset "UV" sur leur roue).
+            if (profile.Has(ChannelType.UV))
+            {
+                for (int i = 0; i < channels.Count && i < values.Length; i++)
+                {
+                    if (ChannelTypeInfo.IsColorMix(channels[i].Type))
+                    {
+                        values[i] = channels[i].Type == ChannelType.UV ? (byte)255 : (byte)0;
+                    }
+                }
+                applied = true;
+            }
+        }
+        else if (hasRgb || (hasWhite && color.IsWhite))
         {
             // Pour le blanc, on prefere la LED blanche dediee si elle existe (plus belle).
             bool whiteOnly = color.IsWhite && hasWhite;

@@ -2,13 +2,24 @@
 //  PatchValidator.cs
 // -------------------------------------------------------------------------------------
 //  Verifie l'adressage : appareils qui se chevauchent, qui depassent le canal 512,
-//  ou dont le profil a disparu. Calcule aussi la prochaine adresse libre (bouton
-//  "Adresse libre suivante" du patch).
+//  ou dont le profil a disparu. Les appareils DESACTIVES sont ignores (pas d'alerte :
+//  on peut laisser dans le patch un appareil absent ce soir).
+//
+//  Calcule aussi les plages libres et l'adresse a proposer pour un appareil :
+//  la premiere plage libre assez grande (entre deux appareils ou a la fin).
 // =====================================================================================
 
 namespace DmxController.Core.Model;
 
 public sealed record PatchProblem(string Message, IReadOnlyList<string> FixtureIds);
+
+/// <summary>Plage de canaux libres (inclusifs).</summary>
+public sealed record FreeRange(int Start, int End)
+{
+    public int Length => End - Start + 1;
+
+    public override string ToString() => Start == End ? $"{Start}" : $"{Start}-{End}";
+}
 
 public static class PatchValidator
 {
@@ -19,7 +30,7 @@ public static class PatchValidator
         var problems = new List<PatchProblem>();
         var ranges = new List<(FixtureInstance Fixture, int Start, int End)>();
 
-        foreach (var f in fixtures)
+        foreach (var f in fixtures.Where(f => f.Enabled))
         {
             var profile = profiles.FirstOrDefault(p => p.Id == f.ProfileId);
             if (profile is null)
@@ -40,10 +51,7 @@ public static class PatchValidator
                 continue;
             }
 
-            if (f.Enabled)
-            {
-                ranges.Add((f, f.Address, end));
-            }
+            ranges.Add((f, f.Address, end));
         }
 
         for (int i = 0; i < ranges.Count; i++)
@@ -64,14 +72,10 @@ public static class PatchValidator
         return problems;
     }
 
-    /// <summary>
-    /// Premiere adresse ou "channelCount" canaux consecutifs sont libres (appareils
-    /// actifs uniquement). Retourne -1 si l'univers est plein.
-    /// </summary>
-    public static int NextFreeAddress(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles,
-        int channelCount, string? ignoreFixtureId = null)
+    /// <summary>Plages occupees par les appareils actifs (sauf ignoreFixtureId), triees.</summary>
+    public static List<(int Start, int End)> UsedRanges(IReadOnlyList<FixtureInstance> fixtures,
+        IReadOnlyList<FixtureProfile> profiles, string? ignoreFixtureId = null)
     {
-        channelCount = Math.Max(1, channelCount);
         var used = new List<(int Start, int End)>();
         foreach (var f in fixtures)
         {
@@ -85,25 +89,61 @@ public static class PatchValidator
                 used.Add((f.Address, f.EndAddress(profile)));
             }
         }
+        return used.OrderBy(r => r.Start).ToList();
+    }
 
-        for (int address = 1; address + channelCount - 1 <= 512; address++)
+    /// <summary>true si les canaux address .. address+channelCount-1 sont dans l'univers et libres.</summary>
+    public static bool IsFree(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles,
+        int address, int channelCount, string? ignoreFixtureId = null)
+    {
+        int end = address + Math.Max(1, channelCount) - 1;
+        return address >= 1 && end <= 512 &&
+               UsedRanges(fixtures, profiles, ignoreFixtureId).All(r => end < r.Start || address > r.End);
+    }
+
+    /// <summary>Toutes les plages libres de l'univers (appareils actifs uniquement).</summary>
+    public static List<FreeRange> FreeRanges(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles,
+        string? ignoreFixtureId = null)
+    {
+        var free = new List<FreeRange>();
+        int next = 1;
+        foreach (var (start, end) in UsedRanges(fixtures, profiles, ignoreFixtureId))
         {
-            int end = address + channelCount - 1;
-            int clashEnd = -1;
-            foreach (var r in used)
+            if (start > next)
             {
-                if (address <= r.End && r.Start <= end)
-                {
-                    clashEnd = Math.Max(clashEnd, r.End);
-                }
+                free.Add(new FreeRange(next, Math.Min(start - 1, 512)));
             }
-            if (clashEnd < 0)
-            {
-                return address;
-            }
-            address = clashEnd; // la boucle fera +1 : on repart juste apres l'appareil genant
+            next = Math.Max(next, end + 1);
         }
+        if (next <= 512)
+        {
+            free.Add(new FreeRange(next, 512));
+        }
+        return free;
+    }
 
-        return -1;
+    /// <summary>
+    /// Premiere adresse ou "channelCount" canaux consecutifs sont libres (appareils
+    /// actifs uniquement) : dans un trou entre deux appareils s'il est assez grand,
+    /// sinon apres le dernier. Retourne -1 si l'univers est plein.
+    /// </summary>
+    public static int NextFreeAddress(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles,
+        int channelCount, string? ignoreFixtureId = null)
+    {
+        channelCount = Math.Max(1, channelCount);
+        var range = FreeRanges(fixtures, profiles, ignoreFixtureId).FirstOrDefault(r => r.Length >= channelCount);
+        return range?.Start ?? -1;
+    }
+
+    /// <summary>
+    /// Adresse a proposer pour un appareil : on garde "current" si ses canaux sont libres,
+    /// sinon la premiere plage libre assez grande. -1 si rien ne rentre.
+    /// </summary>
+    public static int SuggestAddress(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles,
+        int channelCount, int current, string? fixtureId)
+    {
+        return IsFree(fixtures, profiles, current, channelCount, fixtureId)
+            ? current
+            : NextFreeAddress(fixtures, profiles, channelCount, fixtureId);
     }
 }

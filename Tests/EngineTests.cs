@@ -9,7 +9,7 @@ namespace DmxController.Tests;
 public class EngineTests
 {
     // Index des canaux dans les profils par defaut (0 = premier canal du profil).
-    private const int SpotPan = 0, SpotPanFine = 1, SpotColorWheel = 5, SpotDimmer = 11;
+    private const int SpotPan = 0, SpotPanFine = 1, SpotColorWheel = 5, SpotDimmer = 10;
 
     // Adresses du patch par defaut (installation reelle : Spider en 1, lyres apres).
     private const int Lyre1 = 17, Lyre2 = 31, Spider = 1;
@@ -183,13 +183,14 @@ public class EngineTests
     }
 
     [Fact]
-    public void Color_goes_to_rgbw_fixtures_and_reports_wheel_fixtures_without_preset()
+    public void Color_goes_to_rgbw_fixtures_and_to_the_wheel_preset_of_the_260x()
     {
         _engine.SetSelection(new[] { "lyre-1", "spider-1" });
         var result = _engine.ApplyColor(ColorPalette.Find("Rouge")!, openDimmer: true);
 
-        Assert.Equal(new[] { "Spider" }, result.Applied);
-        Assert.Equal(new[] { "Lyre 1" }, result.Unsupported);
+        Assert.Equal(new[] { "Lyre 1", "Spider" }, result.Applied);
+        Assert.Empty(result.Unsupported);
+        Assert.Equal(10, _engine.GetValues("lyre-1")[SpotColorWheel]); // rouge = 7..13 sur la roue (guide Chauvet)
 
         var spider = _engine.GetValues("spider-1");
         Assert.Equal(255, spider[SpiderLed1]);
@@ -202,14 +203,30 @@ public class EngineTests
     [Fact]
     public void Color_uses_a_wheel_preset_with_the_same_name_ignoring_case_and_accents()
     {
-        _engine.EditShow(s => s.FindProfile(DefaultShow.Spot260XProfileId)!.Channels[SpotColorWheel]
-            .Presets.Add(new ChannelPreset("rouge", 18)));
+        _engine.EditShow(s =>
+        {
+            var presets = s.FindProfile(DefaultShow.Spot260XProfileId)!.Channels[SpotColorWheel].Presets;
+            presets.Clear();
+            presets.Add(new ChannelPreset("rouge", 18));
+        });
         _engine.SetSelection(new[] { "lyre-1" });
 
         var result = _engine.ApplyColor(ColorPalette.Find("Rouge")!, openDimmer: false);
 
         Assert.Equal(new[] { "Lyre 1" }, result.Applied);
         Assert.Equal(18, _engine.GetValues("lyre-1")[SpotColorWheel]);
+    }
+
+    [Fact]
+    public void Wheel_fixtures_without_a_matching_preset_are_reported()
+    {
+        _engine.EditShow(s => s.FindProfile(DefaultShow.Spot260XProfileId)!.Channels[SpotColorWheel].Presets.Clear());
+        _engine.SetSelection(new[] { "lyre-1", "spider-1" });
+
+        var result = _engine.ApplyColor(ColorPalette.Find("Rouge")!, openDimmer: false);
+
+        Assert.Equal(new[] { "Spider" }, result.Applied);
+        Assert.Equal(new[] { "Lyre 1" }, result.Unsupported);
     }
 
     [Fact]

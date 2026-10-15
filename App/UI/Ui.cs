@@ -118,8 +118,17 @@ internal static class Ui
             Margin = new Padding(6),
             Font = BoldFont,
         };
-        content.Dock = DockStyle.Top;
+        // PAS de Dock ici : un GroupBox a taille automatique se cale sur la taille de son contenu ;
+        // un contenu ancre (Dock) prendrait au contraire la largeur du GroupBox, et les deux se
+        // ratatinent mutuellement (groupes ecrases en une colonne de lettres).
+        content.Dock = DockStyle.None;
+        content.Location = new Point(8, 20);
         content.Font = new Font("Segoe UI", 9f); // le titre est en gras, pas le contenu
+        if (content is Panel panel)
+        {
+            panel.AutoSize = true;
+            panel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        }
         group.Controls.Add(content);
         return group;
     }

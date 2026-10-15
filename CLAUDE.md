@@ -6,6 +6,25 @@ Intimidator Spot 260X (adresses 17 et 31, mode 14 canaux) et un Mindi Mini Spide
 8x3W RGBW (adresse 1 : canaux 1-16, soit 15 canaux + 1 vide). Protocole obtenu par rétro-ingénierie de l'APK :
 voir `PROTOCOLE.md`.
 
+## Statut (2026-10-16)
+
+- **Bibliothèque de modèles** (`Core/Model/FixtureLibrary.cs`) : 260X 14 et 8 canaux (table officielle
+  Chauvet, guide rapide Rev. 1 — l'ancienne table « supposée » était fausse à partir du canal 10),
+  Mini Spider, fumée Ayra WSM02 MKIII (1 canal), laser Showtec Galactic RGY-140 MKII (10 canaux, manuel
+  Highlite 51335), PAR LED 36 RGB+UV **générique (canaux à vérifier, marque inconnue)**.
+  `UpgradeProfiles()` corrige les profils des anciennes configs (champ `Revision`), valeurs des scènes
+  reclassées par rôle.
+- Patch refait : liste + fiche ; choisir un modèle recharge le nombre de canaux et propose une adresse
+  libre (garde l'actuelle si elle tient, sinon 1re plage libre). Appareils désactivés : aucune alerte,
+  onglet grisé avec bouton « Activer ». Case « Flash / strobe » → interrupteurs FLASH/STROBE dans Soirée
+  (strobe matériel via `ChannelDef.StrobeSlow/StrobeFast`, sinon logiciel).
+- Fumée : bandeau en haut (état estimé PRÊTE/CHAUFFE, FUMÉE/PAS DE FUMÉE, manuel/coup/auto) + onglet
+  réglages (débit, durée, délai, chauffe). Le DMX ne renvoie RIEN : ni état prêt ni température.
+- Laser : onglet spécial (allumer/éteindre, mode, 32 motifs, couleurs, pad X/Y, plages de la notice) ;
+  blackout ou master 0 → laser en mode DMX + couleur 0 (éteint).
+- Bug corrigé : groupes de l'onglet Soirée écrasés (contenu ancré dans un GroupBox AutoSize, `Ui.Group`).
+- 43 tests OK, 0 avertissement. Captures vérifiées via un harnais hors dépôt. Pas encore testé avec le boîtier.
+
 ## Statut (2026-10-15)
 
 - Protocole **confirmé sur le vrai matériel** (test de clignotement OK, COM6 sortant).
@@ -29,7 +48,8 @@ dotnet run --project App
   - `Model/` : profils, patch (`FixtureInstance`), scènes, couleurs, `PatchValidator`, `DefaultShow`
   - `Engine/ShowEngine` : calcule l'univers à chaque trame (programmeur → fondu → mouvement → chenillard → strobe/master/blackout/flash). Thread-safe via `_lock` ; toute modif de structure passe par `EditShow()`.
   - `Storage/ShowStore` : fichiers `*.dmxshow.json`, `*.dmxprofile.json`, `%APPDATA%\DmxController\settings.json`
-- `App/UI/` : `MainForm`, `LivePanel` (Soirée), `FixturePanel`, `DebugPanel`, `PatchDialog`, `ProfileEditorDialog`. IHM construite par code (`[DesignerCategory("Code")]`).
+- `App/UI/` : `MainForm`, `LivePanel` (Soirée), `FixturePanel` (onglet générique), `FogPanel` (`FogStrip`, `FogBanner`), `LaserPanel` (`RangeControl`), `DebugPanel`, `PatchDialog`, `ProfileEditorDialog`. IHM construite par code (`[DesignerCategory("Code")]`). Onglet choisi d'après le profil : `IsFogMachine` → fumée, `IsLaser` → laser, sinon générique.
+  - Piège WinForms : jamais de `Dock` sur le contenu d'un GroupBox `AutoSize` (ni de FlowLayoutPanel à sauts de ligne autour de GroupBox AutoSize) → mise en page écrasée.
   - `FixturePanel` : pad pan/tilt pour les lyres ; pour un appareil à 2 moteurs (Spider) : pad ailes (X = position, Y = dimmer), case « Inverser » (ailes en miroir, `FixtureInstance.MirrorMotors`), faders verticaux LED gauche/droite (`LedGroups`, LED 1-4 / 5-8 supposées), case « Pas de strobe » (`FixtureInstance.NoStrobe`, forcé à 0 au rendu).
 - `Tests/` : xUnit (protocole, moteur, config).
 - `tools/` : `cipher.py`, `dmx_test.py` (test v1), `gen_reference_frame.py`.
@@ -42,8 +62,9 @@ Commentaires et textes d'IHM en français.
 
 1. Tester la v2 avec le boîtier (connexion, onglets, scènes, reconnexion auto).
 2. Vérifier les captures d'écran de l'IHM (mise en page des groupes de l'onglet Soirée).
-3. **Profil 260X : ordre des 14 canaux SUPPOSÉ** → vérifier canal par canal (onglet Debug / cases « OK »), corriger dans l'éditeur de profils.
-4. Relever les presets de la roue de couleurs 260X (bouton « + ») et la valeur « obturateur ouvert ».
+3. Profil 260X : table officielle Chauvet en place (presets couleurs/gobos/obturateur) → confirmer sur la lyre.
+4. PAR LED 36 RGB+UV : demander la marque / le menu DMX à l'utilisateur et corriger le profil générique.
+4b. Fumée : confirmer le débit (0-255 = 0-100 %) et le temps de chauffe ; laser : confirmer que le canal 1 en 240-255 = DMX.
 5. Spider : confirmer la couleur des LED (canaux 6-13 du profil, supposées R,V,B,Blanc ×2).
    Bizarrerie confirmée : réglé sur l'adresse N, le Spider ignore le canal N et démarre au N+1
    → profil de 16 canaux dont le 1er est vide (on saisit dans le patch l'adresse affichée sur l'appareil).

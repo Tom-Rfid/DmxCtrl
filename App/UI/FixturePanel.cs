@@ -229,7 +229,7 @@ internal sealed class FixturePanel : UserControl
 
             _values[i] = Ui.ValueLabel(36);
 
-            _presets[i] = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140, Margin = new Padding(3, 4, 3, 3) };
+            _presets[i] = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 170, DropDownWidth = 260, Margin = new Padding(3, 4, 3, 3) };
             _presets[i].SelectionChangeCommitted += (_, _) => OnPresetChosen(index);
 
             var add = new Button { Text = "+", Width = 28, Height = 26, Margin = new Padding(3, 3, 3, 3) };
@@ -467,7 +467,7 @@ internal sealed class FixturePanel : UserControl
             }
         }
         UpdateStrobeLock();
-        RefreshFromEngine();
+        _ctx.NotifyLiveStateChanged(); // ce panneau + l'onglet Soiree (interrupteur STROBE grise)
         _ctx.Status(noStrobe ? $"{_fixture.Name} : strobe coupé." : $"{_fixture.Name} : strobe de nouveau autorisé.");
     }
 

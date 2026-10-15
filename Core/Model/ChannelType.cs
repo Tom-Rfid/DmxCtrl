@@ -38,6 +38,18 @@ public enum ChannelType
     EffectSpeed,
     Motor,
     Control,
+
+    // --- Machine a fumee : le moteur pilote ce canal lui-meme (manuel / coup / auto) ---
+    Fog,
+
+    // --- Laser (Showtec Galactic...) : utilises par l'onglet laser ---
+    LaserMode,
+    LaserPattern,
+    LaserColor,
+    LaserZoom,
+    LaserX,
+    LaserY,
+    LaserRoll,
 }
 
 public static class ChannelTypeInfo
@@ -72,6 +84,14 @@ public static class ChannelTypeInfo
         ChannelType.EffectSpeed => "Vitesse d'effet",
         ChannelType.Motor => "Moteur (position)",
         ChannelType.Control => "Contrôle / reset",
+        ChannelType.Fog => "Fumée (débit)",
+        ChannelType.LaserMode => "Laser : mode / programmes",
+        ChannelType.LaserPattern => "Laser : motif",
+        ChannelType.LaserColor => "Laser : couleur (0 = éteint)",
+        ChannelType.LaserZoom => "Laser : zoom",
+        ChannelType.LaserX => "Laser : mouvement X",
+        ChannelType.LaserY => "Laser : mouvement Y",
+        ChannelType.LaserRoll => "Laser : rotation (roulis)",
         _ => type.ToString(),
     };
 

@@ -74,6 +74,20 @@ internal sealed class LivePanel : UserControl
     private readonly TrackBar _strobeHz = Ui.Slider(1, 10, 200);
     private readonly Label _strobeValue = Ui.ValueLabel(90);
 
+    // --- Interrupteurs flash / strobe par appareil (case "Flash / strobe" du patch) ---
+    private readonly TableLayoutPanel _flashRows = new()
+    {
+        ColumnCount = 3,
+        AutoSize = true,
+        AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        GrowStyle = TableLayoutPanelGrowStyle.AddRows,
+        Margin = new Padding(0),
+    };
+    private readonly TrackBar _flashSpeed = Ui.Slider(0, 255, 170);
+    private readonly Label _flashSpeedValue = Ui.ValueLabel(46);
+    private readonly List<(string FixtureId, CheckBox Toggle)> _strobeToggles = new();
+    private readonly ToolTip _tips = new();
+
     // --- Master / blackout / flash / tempo ---
     private readonly TrackBar _master = Ui.Slider(0, 255, 160);
     private readonly Label _masterValue = Ui.ValueLabel(46);
@@ -104,6 +118,7 @@ internal sealed class LivePanel : UserControl
 
         var center = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(4) };
         center.Controls.Add(BuildColorGroup());
+        center.Controls.Add(BuildFlashGroup());
         center.Controls.Add(BuildMovementGroup());
         center.Controls.Add(BuildChaseGroup());
         center.Controls.Add(BuildStrobeGroup());
@@ -188,6 +203,115 @@ internal sealed class LivePanel : UserControl
         return Ui.Group("Couleurs", table);
     }
 
+    /// <summary>
+    /// Une ligne par appareil coche "Flash / strobe" dans le patch : FLASH (maintenu, plein feu
+    /// par-dessus master et blackout) et STROBE (interrupteur : strobe de l'appareil lui-meme
+    /// si son profil en a un, sinon strobe logiciel).
+    /// </summary>
+    private Control BuildFlashGroup()
+    {
+        _flashSpeed.Value = _ctx.Engine.StrobeSpeed;
+        _flashSpeed.ValueChanged += (_, _) =>
+        {
+            _ctx.Engine.StrobeSpeed = _flashSpeed.Value;
+            _flashSpeedValue.Text = $"{_flashSpeed.Value * 100 / 255} %";
+        };
+        _flashSpeedValue.Text = $"{_flashSpeed.Value * 100 / 255} %";
+
+        var stopAll = new Button { Text = "Couper tous les strobes", AutoSize = true };
+        stopAll.Click += (_, _) =>
+        {
+            foreach (var (_, toggle) in _strobeToggles)
+            {
+                toggle.Checked = false;
+            }
+        };
+
+        var table = Ui.Table(1);
+        table.Controls.Add(Ui.Flow(0, Ui.Text("Vitesse"), _flashSpeed, _flashSpeedValue));
+        table.Controls.Add(_flashRows);
+        table.Controls.Add(stopAll);
+        return Ui.Group("Flash / strobe par appareil", table);
+    }
+
+    private void RebuildFlashRows()
+    {
+        _flashRows.SuspendLayout();
+        foreach (Control old in _flashRows.Controls.Cast<Control>().ToList())
+        {
+            old.Dispose();
+        }
+        _flashRows.Controls.Clear();
+        _flashRows.RowStyles.Clear();
+        _flashRows.RowCount = 0;
+        _strobeToggles.Clear();
+
+        int row = 0;
+        foreach (var fixture in _ctx.Show.Fixtures.Where(f => f.Flash && f.Enabled))
+        {
+            var profile = _ctx.ProfileOf(fixture);
+            if (profile is null || profile.IsFogMachine)
+            {
+                continue;
+            }
+
+            string id = fixture.Id;
+            var flash = new Button { Text = "FLASH", Size = new Size(84, 32), Font = Ui.BoldFont, Margin = new Padding(3, 2, 3, 2) };
+            flash.MouseDown += (_, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    _ctx.Engine.SetFixtureFlash(id, true);
+                    flash.BackColor = Color.Gold;
+                }
+            };
+            void Release()
+            {
+                _ctx.Engine.SetFixtureFlash(id, false);
+                flash.BackColor = SystemColors.Control;
+                flash.UseVisualStyleBackColor = true;
+            }
+            flash.MouseUp += (_, _) => Release();
+            flash.MouseCaptureChanged += (_, _) => Release();
+
+            var strobe = new CheckBox
+            {
+                Text = "STROBE",
+                Appearance = Appearance.Button,
+                Size = new Size(96, 32),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = Ui.BoldFont,
+                Margin = new Padding(3, 2, 3, 2),
+                Checked = _ctx.Engine.IsFixtureStrobing(id),
+                Enabled = !fixture.NoStrobe,
+            };
+            strobe.CheckedChanged += (_, _) =>
+            {
+                _ctx.Engine.SetFixtureStrobe(id, strobe.Checked);
+                strobe.BackColor = strobe.Checked ? Color.FromArgb(255, 210, 60) : SystemColors.Control;
+                strobe.UseVisualStyleBackColor = !strobe.Checked;
+            };
+            _tips.SetToolTip(strobe, fixture.NoStrobe
+                ? "« Pas de strobe » est coché dans l'onglet de cet appareil."
+                : profile.HasHardwareStrobe ? "Interrupteur : strobe de l'appareil lui-même." : "Interrupteur : strobe logiciel (dimmer coupé en rythme).");
+            _tips.SetToolTip(flash, "Maintenir : plein feu sur cet appareil (même en blackout).");
+            _strobeToggles.Add((id, strobe));
+
+            _flashRows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            _flashRows.Controls.Add(new Label { Text = fixture.Name, AutoSize = true, MinimumSize = new Size(110, 0), Margin = new Padding(3, 9, 3, 3) }, 0, row);
+            _flashRows.Controls.Add(flash, 1, row);
+            _flashRows.Controls.Add(strobe, 2, row);
+            row++;
+        }
+
+        if (row == 0)
+        {
+            _flashRows.Controls.Add(Ui.Text("Aucun appareil : coche « Flash / strobe » dans le patch (Ctrl+P).", color: Color.DimGray), 0, 0);
+            _flashRows.SetColumnSpan(_flashRows.Controls[0], 3);
+        }
+        _flashRows.ResumeLayout();
+    }
+
     private Control BuildMovementGroup()
     {
         foreach (var shape in MovementShapeInfo.All)
@@ -260,7 +384,7 @@ internal sealed class LivePanel : UserControl
         var panel = new FlowLayoutPanel
         {
             Dock = DockStyle.Right,
-            Width = 236,
+            Width = 256,
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             AutoScroll = true,
@@ -442,6 +566,7 @@ internal sealed class LivePanel : UserControl
         {
             _updating = false;
         }
+        RebuildFlashRows();
     }
 
     /// <summary>Recopie l'etat du moteur dans les controles (selection, effets, master, BPM...).</summary>
@@ -459,6 +584,17 @@ internal sealed class LivePanel : UserControl
             for (int i = 0; i < _fixtureList.Items.Count; i++)
             {
                 _fixtureList.SetItemChecked(i, selected.Contains(((FixtureItem)_fixtureList.Items[i]).Id));
+            }
+
+            // Interrupteurs STROBE : grises si "Pas de strobe" est coche dans l'onglet de l'appareil.
+            foreach (var (fixtureId, toggle) in _strobeToggles)
+            {
+                bool noStrobe = _ctx.Show.Fixtures.FirstOrDefault(f => f.Id == fixtureId)?.NoStrobe == true;
+                toggle.Enabled = !noStrobe;
+                if (noStrobe && toggle.Checked)
+                {
+                    toggle.Checked = false;
+                }
             }
 
             var e = _ctx.Engine.GetEffects();
@@ -869,6 +1005,7 @@ internal sealed class LivePanel : UserControl
         {
             _ctx.LiveStateChanged -= RefreshFromEngine;
             _autoTimer.Dispose();
+            _tips.Dispose();
         }
         base.Dispose(disposing);
     }

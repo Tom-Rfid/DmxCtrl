@@ -2,32 +2,24 @@
 //  DefaultShow.cs
 // -------------------------------------------------------------------------------------
 //  Configuration de depart : le Mini Spider (adresse 1, canaux 1-16) et les 2
-//  Intimidator Spot 260X (adresses 17 et 31), avec leurs profils et quelques scenes.
+//  Intimidator Spot 260X en 14 canaux (adresses 17 et 31), avec quelques scenes.
+//  Les profils viennent de la bibliotheque integree (FixtureLibrary).
 //
-//  !!! ATTENTION - CE QUI EST VERIFIE ET CE QUI NE L'EST PAS !!!
-//  - Liaison et protocole : confirmes (test de clignotement OK sur le vrai materiel).
-//  - Spider en adresse 1 : confirme. Lyres en 17 / 31 : a regler dans leur menu.
-//  - Spider : la table des 15 canaux vient de la notice (photo) -> canaux marques
-//    "verifies", SAUF la couleur de chaque LED qui est supposee. Le profil a 16
-//    canaux : le Spider ignore le canal de son adresse (decalage constate sur
-//    l'appareil), d'ou un premier canal vide.
-//  - 260X : L'ORDRE DES 14 CANAUX EST UNE SUPPOSITION (schema courant des lyres
-//    Chauvet), aucun canal n'est marque verifie. A confirmer canal par canal sur
-//    l'appareil (onglet Debug ou cases "OK" de l'onglet de la lyre), puis a corriger
-//    dans l'Editeur de profils si besoin.
+//  Pour ajouter la fumee, le laser ou le PAR UV : Appareils > Ajouter un appareil,
+//  puis choisir le modele (l'adresse libre est proposee toute seule).
 // =====================================================================================
 
 namespace DmxController.Core.Model;
 
 public static class DefaultShow
 {
-    public const string Spot260XProfileId = "chauvet-spot-260x-14ch";
-    public const string SpiderProfileId = "mindi-mini-spider-15ch";
+    public const string Spot260XProfileId = FixtureLibrary.Spot260X14Id;
+    public const string SpiderProfileId = FixtureLibrary.SpiderId;
 
     public static ShowConfig Create()
     {
-        var spot = CreateSpot260XProfile();
-        var spider = CreateSpiderProfile();
+        var spot = FixtureLibrary.Spot260X14();
+        var spider = FixtureLibrary.MiniSpider();
 
         var show = new ShowConfig
         {
@@ -58,10 +50,7 @@ public static class DefaultShow
             edit: (profile, values) =>
             {
                 SetType(profile, values, ChannelType.Dimmer, profile.Id == SpiderProfileId ? (byte)170 : (byte)200);
-                if (profile.Id == SpiderProfileId)
-                {
-                    ColorMapper.Apply(profile, values, ColorPalette.Find("Bleu")!);
-                }
+                ColorMapper.Apply(profile, values, ColorPalette.Find("Bleu")!);
             },
             effects: new LiveEffects { Shape = MovementShape.Circle, SpeedCyclesPerMinute = 6, SizePercent = 30, SpreadPercent = 100 }));
 
@@ -83,74 +72,6 @@ public static class DefaultShow
 
         return show;
     }
-
-    /// <summary>Profil SUPPOSE de la Chauvet Intimidator Spot 260X en mode 14 canaux.</summary>
-    public static FixtureProfile CreateSpot260XProfile() => new()
-    {
-        Id = Spot260XProfileId,
-        Name = "Intimidator Spot 260X (14 canaux)",
-        Manufacturer = "Chauvet DJ",
-        Notes = "ORDRE DES CANAUX SUPPOSÉ, non vérifié avec le manuel Chauvet. Teste chaque canal (onglet Debug, " +
-                "ou bouge son curseur ici) puis coche « OK », ou corrige dans Appareils > Éditeur de profils. " +
-                "La roue de couleurs n'a pas encore de presets : règle le curseur sur une couleur puis « + » pour l'enregistrer.",
-        Channels =
-        {
-            Ch("Pan", ChannelType.Pan, 128),
-            Ch("Pan fin", ChannelType.PanFine, 0),
-            Ch("Tilt", ChannelType.Tilt, 128),
-            Ch("Tilt fin", ChannelType.TiltFine, 0),
-            Ch("Vitesse pan/tilt", ChannelType.PanTiltSpeed, 0, notes: "Souvent 0 = le plus rapide."),
-            Ch("Roue de couleurs", ChannelType.ColorWheel, 0),
-            Ch("Gobo", ChannelType.Gobo, 0),
-            Ch("Rotation gobo", ChannelType.GoboRotation, 0),
-            Ch("Prisme", ChannelType.Prism, 0),
-            Ch("Rotation prisme", ChannelType.Generic, 0),
-            Ch("Focus", ChannelType.Focus, 128),
-            Ch("Dimmer", ChannelType.Dimmer, 0),
-            Ch("Obturateur / strobe", ChannelType.Shutter, 255, notes: "Valeur « ouvert » supposée = 255, à vérifier."),
-            Ch("Contrôle / reset", ChannelType.Control, 0, notes: "Laisser à 0 : une valeur haute peut lancer un reset ou un mode automatique."),
-        },
-    };
-
-    /// <summary>
-    /// Profil du Mindi Mini Spider 8x3W RGBW, d'apres la notice (15 canaux) + 1 canal vide en tete.
-    /// BIZARRERIE DU SPIDER (constatee sur l'appareil) : regle sur l'adresse N, il ecoute en
-    /// realite a partir du canal N+1 ; le canal N ne fait rien. On le declare donc sur 16 canaux
-    /// avec un premier canal "vide" : dans le patch, on saisit l'adresse affichee sur l'appareil.
-    /// </summary>
-    public static FixtureProfile CreateSpiderProfile() => new()
-    {
-        Id = SpiderProfileId,
-        Name = "Mini Spider 8x3W RGBW (15 canaux + 1 vide = 16)",
-        Manufacturer = "Mindi",
-        Notes = "Le Spider ignore le canal de son adresse et commence au suivant (constaté sur l'appareil) : " +
-                "le canal 1 du profil est donc vide. Saisis dans le patch l'adresse affichée sur le Spider. " +
-                "Table des canaux 2 à 16 relevée sur la notice ; la couleur de chaque LED (canaux 6 à 13) est SUPPOSÉE " +
-                "(rouge, vert, bleu, blanc, puis pareil) : à vérifier et corriger si besoin.",
-        Channels =
-        {
-            Ch("(vide : décalage du Spider)", ChannelType.Generic, 0, verified: true,
-                notes: "Le Spider n'écoute pas ce canal : il démarre au canal suivant. Laisser à 0."),
-            Ch("Moteur 1 (0-135°)", ChannelType.Motor, 0, verified: true),
-            Ch("Moteur 2 (0-135°)", ChannelType.Motor, 0, verified: true),
-            Ch("Dimmer général", ChannelType.Dimmer, 0, verified: true),
-            Ch("Strobe (0 = arrêt)", ChannelType.Strobe, 0, verified: true),
-            Ch("LED 1", ChannelType.Red, 0, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 2", ChannelType.Green, 0, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 3", ChannelType.Blue, 0, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 4", ChannelType.White, 0, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 5", ChannelType.Red, 0, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 6", ChannelType.Green, 0, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 7", ChannelType.Blue, 0, notes: "Intensité confirmée, couleur supposée."),
-            Ch("LED 8", ChannelType.White, 0, notes: "Intensité confirmée, couleur supposée."),
-            Ch("Macros d'effets", ChannelType.Macro, 0, verified: true),
-            Ch("Vitesse des effets", ChannelType.EffectSpeed, 0, verified: true),
-            Ch("Reset", ChannelType.Control, 0, verified: true, notes: "Laisser à 0."),
-        },
-    };
-
-    private static ChannelDef Ch(string name, ChannelType type, byte defaultValue, bool verified = false, string notes = "") =>
-        new() { Name = name, Type = type, Default = defaultValue, Verified = verified, Notes = notes };
 
     private static Scene BuildScene(ShowConfig show, string name, bool includeInAuto,
         Action<FixtureProfile, byte[]>? edit, LiveEffects effects)

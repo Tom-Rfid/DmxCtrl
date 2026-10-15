@@ -51,8 +51,36 @@ public sealed class FixtureInstance
     /// </summary>
     public bool NoStrobe { get; set; }
 
+    /// <summary>
+    /// Case "Flash / strobe" du patch : l'appareil a ses interrupteurs FLASH et STROBE dans
+    /// l'onglet Soiree.
+    /// </summary>
+    public bool Flash { get; set; } = true;
+
+    /// <summary>Reglages de la machine a fumee (utilises seulement si le profil a un canal Fumee).</summary>
+    public FogSettings Fog { get; set; } = new();
+
     /// <summary>Dernier canal DMX occupe par cet appareil.</summary>
     public int EndAddress(FixtureProfile? profile) => Address + Math.Max(1, profile?.ChannelCount ?? 1) - 1;
+}
+
+/// <summary>
+/// Reglages d'une machine a fumee. Le mode auto enchaine : fumee pendant DurationSeconds,
+/// puis pause pendant DelaySeconds, et recommence.
+/// </summary>
+public sealed class FogSettings
+{
+    /// <summary>Debit de fumee envoye (0..100 %).</summary>
+    public int LevelPercent { get; set; } = 100;
+
+    /// <summary>Duree d'un jet de fumee (coup manuel ou cycle auto), en secondes.</summary>
+    public double DurationSeconds { get; set; } = 5;
+
+    /// <summary>Pause entre deux jets en mode auto, en secondes.</summary>
+    public double DelaySeconds { get; set; } = 60;
+
+    /// <summary>Temps de chauffe de la machine apres allumage (notice Ayra WSM02 : environ 6 min).</summary>
+    public double WarmupMinutes { get; set; } = 6;
 }
 
 /// <summary>Reglages de la configuration (sauvegardes avec elle).</summary>

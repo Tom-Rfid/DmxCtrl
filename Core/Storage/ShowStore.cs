@@ -149,6 +149,11 @@ public static class ShowStore
             fixture.Id = string.IsNullOrWhiteSpace(fixture.Id) ? FixtureProfile.NewId() : fixture.Id;
             fixture.Name = string.IsNullOrWhiteSpace(fixture.Name) ? "Appareil" : fixture.Name;
             fixture.ProfileId ??= "";
+            fixture.Fog ??= new FogSettings();
+            fixture.Fog.LevelPercent = Math.Clamp(fixture.Fog.LevelPercent, 0, 100);
+            fixture.Fog.DurationSeconds = Math.Clamp(fixture.Fog.DurationSeconds, 0.5, 600);
+            fixture.Fog.DelaySeconds = Math.Clamp(fixture.Fog.DelaySeconds, 1, 3600);
+            fixture.Fog.WarmupMinutes = Math.Clamp(fixture.Fog.WarmupMinutes, 0, 30);
         }
 
         foreach (var scene in show.Scenes.Append(show.LiveState))
@@ -180,6 +185,12 @@ public static class ShowStore
             channel.Name ??= "Canal";
             channel.Notes ??= "";
             channel.Presets ??= new();
+            channel.Ranges ??= new();
+            foreach (var range in channel.Ranges)
+            {
+                range.Name ??= "";
+            }
         }
+        profile.DefaultFixtureName ??= "";
     }
 }

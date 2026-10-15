@@ -245,6 +245,7 @@ internal sealed class ProfileEditorDialog : Form
         }
 
         var row = _grid.Rows[index];
+        row.Tag = channel; // garde les reglages sans colonne (plages, strobe materiel) pour CommitCurrent
         row.Cells[ColName].Value = channel.Name;
         row.Cells[ColType].Value = channel.Type.ToString();
         row.Cells[ColDefault].Value = channel.Default.ToString();
@@ -300,6 +301,7 @@ internal sealed class ProfileEditorDialog : Form
                 presets = new();
             }
 
+            var original = row.Tag as ChannelDef; // null pour une ligne ajoutee dans l'editeur
             channels.Add(new ChannelDef
             {
                 Name = name.Length > 0 ? name : $"Canal {number}",
@@ -308,6 +310,9 @@ internal sealed class ProfileEditorDialog : Form
                 Verified = row.Cells[ColVerified].Value is true,
                 Presets = presets,
                 Notes = (Convert.ToString(row.Cells[ColNotes].Value) ?? "").Trim(),
+                StrobeSlow = original?.StrobeSlow,
+                StrobeFast = original?.StrobeFast,
+                Ranges = original?.Ranges ?? new(),
             });
         }
 

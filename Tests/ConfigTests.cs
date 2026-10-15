@@ -24,7 +24,10 @@ public class ConfigTests
             var loaded = ShowStore.LoadShow(path);
             Assert.Equal(show.Fixtures.Select(f => (f.Id, f.Name, f.Address)), loaded.Fixtures.Select(f => (f.Id, f.Name, f.Address)));
             Assert.Equal(show.Profiles[0].Channels.Select(c => c.Name), loaded.Profiles[0].Channels.Select(c => c.Name));
-            Assert.Equal(42, loaded.Profiles[0].Channels[5].Presets.Single().Value);
+            Assert.Contains(loaded.Profiles[0].Channels[5].Presets, p => p.Name == "Bleu" && p.Value == 42);
+            Assert.Equal((byte?)76, loaded.Profiles[0].Channels[11].StrobeFast);            // strobe de l'obturateur 260X
+            Assert.Equal(show.Profiles[0].Channels[5].Ranges.Count, loaded.Profiles[0].Channels[5].Ranges.Count);
+            Assert.Equal(show.Fixtures[0].Fog.DelaySeconds, loaded.Fixtures[0].Fog.DelaySeconds);
             Assert.Equal(show.Scenes.Count, loaded.Scenes.Count);
             Assert.Equal(show.Scenes[2].Effects.Shape, loaded.Scenes[2].Effects.Shape);
         }
