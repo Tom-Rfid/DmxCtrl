@@ -64,8 +64,12 @@ internal sealed class FixturePanel : UserControl
     private readonly NumericUpDown? _sweepBeats;
     private readonly CheckBox? _micListen;   // ecouter le micro (partage avec l'onglet Soiree)
     private readonly Label? _micBpm;
-    private readonly CheckBox? _micFollow;   // BPM = tempo du micro, et effet cale dessus
+    private readonly CheckBox? _micFollow;   // mode "tempo du micro"
+    private readonly CheckBox? _modeDelay;   // mode "delai en secondes"
+    private readonly NumericUpDown? _bpmBox; // mode "tempo en BPM" (= BPM de l'onglet Soiree)
     private bool _micUpdating;
+
+    private enum SweepMode { Delay, Bpm, Mic }
     private readonly Label _warning = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 6, 3, 3) };
     private readonly ToolTip _tips = new();
     private bool _updating;
@@ -212,16 +216,21 @@ internal sealed class FixturePanel : UserControl
             _sweep.CheckedChanged += (_, _) => OnSweepToggled();
             _sweepDelay = new NumericUpDown { Minimum = 0.2m, Maximum = 60, DecimalPlaces = 1, Increment = 0.1m, Width = 70 };
             _sweepAmplitude = new NumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Width = 70 };
-            _sweepSync = new CheckBox { Text = "Caler sur le tempo, 1 aller =", AutoSize = true, Checked = fixture.WingSweepSyncToBpm, Margin = new Padding(3, 6, 3, 3) };
+            // 3 modes qui s'excluent : delai fixe (s), tempo saisi en BPM, tempo detecte au micro.
+            _modeDelay = new CheckBox { Text = "Délai", AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
+            _sweepSync = new CheckBox { Text = "Tempo", AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
+            _bpmBox = new NumericUpDown { Minimum = 30, Maximum = 300, DecimalPlaces = 1, Increment = 1, Width = 70 };
             _sweepBeats = new NumericUpDown { Minimum = 0.25m, Maximum = 64, DecimalPlaces = 2, Increment = 0.25m, Width = 70 };
             Ui.SetValue(_sweepDelay, fixture.WingSweepDelaySeconds);
             Ui.SetValue(_sweepAmplitude, fixture.WingSweepAmplitudePercent);
             Ui.SetValue(_sweepBeats, fixture.WingSweepBeats);
+            Ui.SetValue(_bpmBox, ctx.Engine.Bpm);
             _sweepDelay.ValueChanged += (_, _) => SaveSweepSettings();
             _sweepAmplitude.ValueChanged += (_, _) => SaveSweepSettings();
-            _sweepSync.CheckedChanged += (_, _) => SaveSweepSettings();
             _sweepBeats.ValueChanged += (_, _) => SaveSweepSettings();
-            _sweepDelay.Enabled = !fixture.WingSweepSyncToBpm;
+            _modeDelay.CheckedChanged += (_, _) => OnModeChecked(SweepMode.Delay, _modeDelay);
+            _sweepSync.CheckedChanged += (_, _) => OnModeChecked(SweepMode.Bpm, _sweepSync);
+            _bpmBox.ValueChanged += (_, _) => OnBpmTyped();
 
             // Micro : meme micro que l'onglet Soiree (_ctx.Mic).
             _micListen = new CheckBox
@@ -234,12 +243,13 @@ internal sealed class FixturePanel : UserControl
             };
             _micListen.CheckedChanged += (_, _) => OnMicListenToggled();
             _micBpm = new Label { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 8, 3, 3) };
-            _micFollow = new CheckBox { Text = "Caler sur le tempo du micro", AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
-            _micFollow.CheckedChanged += (_, _) => OnMicFollowToggled();
+            _micFollow = new CheckBox { Text = "Tempo du micro", AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
+            _micFollow.CheckedChanged += (_, _) => OnModeChecked(SweepMode.Mic, _micFollow);
 
             _tips.SetToolTip(_sweep, "Les ailes vont à gauche, attendent le délai, vont à droite, attendent… " +
                                      "Avec « Inverser », l'aile 2 fait le mouvement opposé.");
-            _tips.SetToolTip(_sweepSync, "Le délai suit le BPM (tap tempo de l'onglet Soirée, ou micro) : 1 aller = ce nombre de temps.");
+            _tips.SetToolTip(_modeDelay, "Un aller toutes les N secondes.");
+            _tips.SetToolTip(_sweepSync, "Tempo saisi en BPM (le même que l'onglet Soirée / tap tempo) : 1 aller = N temps.");
             _tips.SetToolTip(_micListen, "Écoute le micro pour détecter le tempo (le même micro que l'onglet Soirée).");
             _tips.SetToolTip(_micFollow, "Le BPM suit le tempo détecté au micro, et l'effet gauche/droite se cale dessus.");
 
@@ -272,13 +282,14 @@ internal sealed class FixturePanel : UserControl
                 }
             }
             Row(_sweep);
-            Row(Ui.Text("Délai gauche/droite"), _sweepDelay, "s");
+            Row(_modeDelay, _sweepDelay, "s");
+            Row(_sweepSync, _bpmBox, "BPM");
+            Row(_micFollow, _micListen);
+            Row(_micBpm);
+            Row(Ui.Text("1 aller (tempo) ="), _sweepBeats, "temps");
             Row(Ui.Text("Amplitude"), _sweepAmplitude, "%");
-            Row(_sweepSync, _sweepBeats, "temps");
-            Row(_micListen, _micBpm);
-            effect.SetColumnSpan(_micBpm, 2);
-            Row(_micFollow);
             left.Controls.Add(effect);
+            ShowMode(CurrentMode());
 
             _ctx.Mic.Changed += UpdateMicUi;
             UpdateMicUi();
@@ -398,6 +409,7 @@ internal sealed class FixturePanel : UserControl
         {
             _updating = false;
         }
+        UpdateMicUi(); // BPM de l'effet (tap tempo de l'onglet Soiree...)
     }
 
     /// <summary>Met a jour presets, cases "OK", libelles "(?)" et avertissement.</summary>
@@ -654,26 +666,68 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
-    /// <summary>
-    /// "Caler sur le tempo du micro" : le BPM suit le micro (qui est allume si besoin) et
-    /// l'effet gauche/droite passe en mode "cale sur le tempo".
-    /// </summary>
-    private void OnMicFollowToggled()
+    /// <summary>Mode actuel, d'apres l'appareil (cale ou non sur le tempo) et le micro (le BPM le suit ou non).</summary>
+    private SweepMode CurrentMode() =>
+        !_fixture.WingSweepSyncToBpm ? SweepMode.Delay
+        : _ctx.Mic.FollowBpm ? SweepMode.Mic
+        : SweepMode.Bpm;
+
+    /// <summary>Une case de mode cochee : les autres se decochent. Decocher la case active la recoche.</summary>
+    private void OnModeChecked(SweepMode mode, CheckBox box)
     {
-        if (_micUpdating || _micFollow is null || _sweepSync is null)
+        if (_micUpdating)
         {
             return;
         }
-        bool follow = _micFollow.Checked;
-        if (follow && !_ctx.Mic.IsListening && _micListen is not null)
+        if (!box.Checked)
         {
-            _micListen.Checked = true; // -> OnMicListenToggled
+            ShowMode(CurrentMode()); // il faut toujours un mode
+            return;
         }
-        _ctx.Mic.FollowBpm = follow;
-        if (follow)
+
+        if (mode == SweepMode.Mic && !_ctx.Mic.IsListening && _micListen is not null)
         {
-            _sweepSync.Checked = true; // -> SaveSweepSettings
+            _micListen.Checked = true; // -> OnMicListenToggled : allume le micro
         }
+        _ctx.Mic.FollowBpm = mode == SweepMode.Mic;
+        _ctx.Engine.EditShow(_ => _fixture.WingSweepSyncToBpm = mode != SweepMode.Delay);
+        _ctx.MarkDirty();
+        ShowMode(mode);
+    }
+
+    /// <summary>Coche la case du mode et n'active que les reglages utiles.</summary>
+    private void ShowMode(SweepMode mode)
+    {
+        if (_modeDelay is null || _sweepSync is null || _micFollow is null || _sweepDelay is null || _bpmBox is null || _sweepBeats is null)
+        {
+            return;
+        }
+        _micUpdating = true;
+        try
+        {
+            _modeDelay.Checked = mode == SweepMode.Delay;
+            _sweepSync.Checked = mode == SweepMode.Bpm;
+            _micFollow.Checked = mode == SweepMode.Mic;
+        }
+        finally
+        {
+            _micUpdating = false;
+        }
+        _sweepDelay.Enabled = mode == SweepMode.Delay;
+        _bpmBox.Enabled = mode == SweepMode.Bpm;
+        _sweepBeats.Enabled = mode != SweepMode.Delay;
+    }
+
+    /// <summary>BPM saisi : c'est le BPM general (onglet Soiree), utilise par l'effet en mode Tempo.</summary>
+    private void OnBpmTyped()
+    {
+        if (_micUpdating || _bpmBox is null)
+        {
+            return;
+        }
+        _ctx.Engine.Bpm = (double)_bpmBox.Value;
+        _ctx.Show.Settings.Bpm = _ctx.Engine.Bpm;
+        _ctx.NotifyLiveStateChanged(); // l'onglet Soiree affiche le nouveau BPM
     }
 
     /// <summary>Etat du micro -> controles de l'onglet (10 fois/s pendant l'ecoute).</summary>
@@ -688,12 +742,16 @@ internal sealed class FixturePanel : UserControl
         try
         {
             _micListen.Checked = mic.IsListening;
-            _micFollow.Checked = mic.FollowBpm;
+            if (_bpmBox is not null && !_bpmBox.Focused)
+            {
+                Ui.SetValue(_bpmBox, _ctx.Engine.Bpm); // tap tempo ou micro
+            }
         }
         finally
         {
             _micUpdating = false;
         }
+        ShowMode(CurrentMode()); // le micro a pu etre cale / decale depuis l'onglet Soiree
         _micListen.Text = mic.IsListening ? "Micro : ON" : "Micro";
         _micListen.BackColor = mic.IsListening ? Color.FromArgb(120, 200, 120) : SystemColors.Control;
         _micListen.UseVisualStyleBackColor = !mic.IsListening;
@@ -706,22 +764,19 @@ internal sealed class FixturePanel : UserControl
     /// <summary>Delai et amplitude de l'effet : enregistres avec la configuration.</summary>
     private void SaveSweepSettings()
     {
-        if (_sweepDelay is null || _sweepAmplitude is null || _sweepSync is null || _sweepBeats is null)
+        if (_sweepDelay is null || _sweepAmplitude is null || _sweepBeats is null)
         {
             return;
         }
         double delay = (double)_sweepDelay.Value;
         int amplitude = (int)_sweepAmplitude.Value;
-        bool sync = _sweepSync.Checked;
         double beats = (double)_sweepBeats.Value;
         _ctx.Engine.EditShow(_ =>
         {
             _fixture.WingSweepDelaySeconds = delay;
             _fixture.WingSweepAmplitudePercent = amplitude;
-            _fixture.WingSweepSyncToBpm = sync;
             _fixture.WingSweepBeats = beats;
         });
-        _sweepDelay.Enabled = !sync;
         _ctx.MarkDirty();
     }
 
