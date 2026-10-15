@@ -124,8 +124,15 @@ public static class FixtureLibrary
     {
         // Laser Galactic : « Son rouge » (180-209) met l'appareil en mode « tst » (test) dont il ne
         // sort plus ; « Couleurs d'origine » retire a la demande de l'utilisateur.
-        [GalacticLaserId] = new[] { "Son rouge", "Couleurs d'origine" },
+        [GalacticLaserId] = new[] { "Son rouge", "Couleurs d'origine" }, // « Son rouge ⚠ tst » (avec avertissement) le remplace
         [GalacticLaserRgId] = new[] { "Son rouge", "Couleurs d'origine" },
+    };
+
+    /// <summary>Canaux renommes dans un modele (ancien nom -> nouveau), appliques aux configurations.</summary>
+    private static readonly Dictionary<string, (string Old, string New)[]> RenamedChannels = new()
+    {
+        [GalacticLaserId] = new[] { ("Strobe / vitesse de changement", "Clignotement") },
+        [GalacticLaserRgId] = new[] { ("Strobe / vitesse de changement", "Clignotement") },
     };
 
     private static void MergeDetails(FixtureProfile target, FixtureProfile model)
@@ -135,6 +142,29 @@ public static class FixtureLibrary
             foreach (var channel in target.Channels)
             {
                 channel.Presets.RemoveAll(p => retired.Any(name => TextKey.Same(name, p.Name)));
+            }
+        }
+        if (RenamedChannels.TryGetValue(model.Id, out var renames))
+        {
+            foreach (var channel in target.Channels)
+            {
+                var rename = renames.FirstOrDefault(r => TextKey.Same(r.Old, channel.Name));
+                if (rename.New is not null)
+                {
+                    channel.Name = rename.New;
+                }
+            }
+        }
+        // Presets « a avertissement » (⚠) du modele : rajoutes s'ils manquent (ex. « Son rouge ⚠ tst »).
+        for (int i = 0; i < target.ChannelCount && i < model.ChannelCount; i++)
+        {
+            foreach (var preset in model.Channels[i].Presets.Where(p => p.Name.Contains('⚠')))
+            {
+                if (!target.Channels[i].Presets.Any(p => TextKey.Same(p.Name, preset.Name)))
+                {
+                    target.Channels[i].Presets.Add(new ChannelPreset(preset.Name, preset.Value));
+                    target.Channels[i].Presets.Sort((a, b) => a.Value.CompareTo(b.Value));
+                }
             }
         }
         target.Revision = model.Revision;
@@ -400,7 +430,7 @@ public static class FixtureLibrary
         Name = "Galactic RGY-140 MKII Value Line (laser, 10 canaux)",
         Manufacturer = "Showtec",
         DefaultFixtureName = "Laser",
-        Revision = 3, // 2 : boutons « Son rouge » et « Couleurs d'origine » retires ; 3 : sens des rotations (manuel V3)
+        Revision = 4, // 2 : « Son rouge » et « Couleurs d'origine » retires ; 3 : rotations (manuel V3) ; 4 : « Son rouge ⚠ tst » de retour, Clignotement
         Notes = "Table DMX des manuels Highlite (code 51335, V1 et V3 : un seul mode DMX de 10 canaux, pas de réglage d'intensité). Le canal 1 doit être en « DMX » (240-255) pour piloter " +
                 "motifs, couleurs et mouvements ; sinon le laser joue ses programmes internes. Couleur 0-24 = laser éteint. " +
                 "SÉCURITÉ : connecteur d'interlock obligatoire ; ne jamais viser le public à hauteur des yeux.",
@@ -410,7 +440,7 @@ public static class FixtureLibrary
                 presets: new ChannelPreset[]
                 {
                     new("Auto rouge/vert/jaune", 15), new("Auto vert", 45), new("Auto rouge", 75), new("Auto jaune", 105),
-                    new("Son rouge/vert/jaune", 135), new("Son vert", 165), new("Son jaune", 225),
+                    new("Son rouge/vert/jaune", 135), new("Son vert", 165), new("Son rouge ⚠ tst", 195), new("Son jaune", 225),
                     new("DMX (manuel)", 250),
                 },
                 ranges: new ChannelRange[]
@@ -418,7 +448,7 @@ public static class FixtureLibrary
                     new("Programme auto rouge/vert/jaune", 0, 29), new("Programme auto vert", 30, 59),
                     new("Programme auto rouge", 60, 89), new("Programme auto jaune", 90, 119),
                     new("Programme au son rouge/vert/jaune", 120, 149), new("Programme au son vert", 150, 179),
-                    new("Programme au son rouge", 180, 209), new("Programme au son jaune", 210, 239),
+                    new("Programme au son rouge (⚠ met ce laser en mode test « tst »)", 180, 209), new("Programme au son jaune", 210, 239),
                     new("DMX (manuel)", 240, 255),
                 }),
             Ch("Motif", ChannelType.LaserPattern, 0, notes: "32 motifs de 8 valeurs chacun (motif 1 = 0-7, motif 2 = 8-15…).",
@@ -437,11 +467,11 @@ public static class FixtureLibrary
                     new("Alternance vert ↔ jaune", 150, 174), new("Alternance rouge ↔ jaune", 175, 199),
                     new("Alternance rouge / vert / jaune", 200, 224), new("Changement continu", 225, 255),
                 }),
-            Ch("Strobe / vitesse de changement", ChannelType.Strobe, 0,
-                notes: "Couleur fixe (25-124) : vitesse du strobe. Couleur alternée (125-255) : vitesse du changement. 0-24 = arrêt.",
-                ranges: new ChannelRange[] { new("Arrêt", 0, 24), new("Lent → rapide", 25, 255) },
+            Ch("Clignotement", ChannelType.Strobe, 0,
+                notes: "Couleur fixe (25-124) : vitesse du clignotement. Couleur alternée (125-255) : vitesse du changement de couleur. 0-24 = arrêt.",
+                ranges: new ChannelRange[] { new("Pas de clignotement", 0, 24), new("Clignotement (lent → rapide)", 25, 255) },
                 strobeSlow: 25, strobeFast: 255),
-            Ch("Zoom", ChannelType.LaserZoom, 0,
+            Ch("Zoom", ChannelType.LaserZoom, 0, notes: "Mode DMX (canal 1 à 240-255) et laser allumé (couleur ≥ 25) : 0-127 = taille fixe 100 % → 5 %, 128-255 = zoom animé.",
                 ranges: new ChannelRange[]
                 {
                     new("Taille fixe (100 % → 5 %)", 0, 127), new("Zoom avant animé (lent → rapide)", 128, 169),

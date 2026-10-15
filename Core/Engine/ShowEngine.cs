@@ -1038,6 +1038,7 @@ public sealed class ShowEngine : IFrameSource
 
                 // 5 bis : fumee (pilotee par le moteur) et securite laser
                 ApplyFogLocked(fixture, profile, values, t);
+                ApplyLaserInvertLocked(fixture, profile, values);
                 ApplyLaserSafetyLocked(profile, values);
 
                 // 5 ter : masque de couleurs (en dernier : rien ne passe par-dessus)
@@ -1353,6 +1354,34 @@ public sealed class ShowEngine : IFrameSource
     /// Laser : au blackout (ou master a 0), on repasse en mode DMX et on eteint le faisceau
     /// (couleur 0 = blackout). Un laser ne doit jamais rester allume quand on a tout coupe.
     /// </summary>
+    /// <summary>
+    /// Laser retourne (cases « Inverser X / Y » = InvertPan / InvertTilt) : position fixe 0-127
+    /// miroir (127 - v) et sens des mouvements echange (128-191 <-> 192-255).
+    /// </summary>
+    private static void ApplyLaserInvertLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values)
+    {
+        if (!profile.IsLaser || !(fixture.InvertPan || fixture.InvertTilt))
+        {
+            return;
+        }
+        for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
+        {
+            var type = profile.Channels[i].Type;
+            if ((type == ChannelType.LaserX && fixture.InvertPan) || (type == ChannelType.LaserY && fixture.InvertTilt))
+            {
+                values[i] = InvertLaserAxis(values[i]);
+            }
+        }
+    }
+
+    /// <summary>Miroir d'une valeur d'axe laser : 0-127 -> 127-v ; 128-191 <-> 192-255.</summary>
+    public static byte InvertLaserAxis(byte v) => v switch
+    {
+        <= 127 => (byte)(127 - v),
+        <= 191 => (byte)(v + 64),
+        _ => (byte)(v - 64),
+    };
+
     private void ApplyLaserSafetyLocked(FixtureProfile profile, byte[] values)
     {
         if (!profile.IsLaser || !(_blackout || _master == 0))

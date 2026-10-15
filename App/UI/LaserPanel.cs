@@ -168,7 +168,17 @@ internal sealed class LaserPanel : UserControl
             foreach (var preset in profile.Channels[_mode].Presets)
             {
                 var button = new Button { Text = preset.Name, AutoSize = true, Tag = preset.Value, Margin = new Padding(3) };
-                button.Click += (_, _) => SetChannel(_mode, preset.Value);
+                if (preset.Name.Contains('⚠'))
+                {
+                    // Bouton a risque (ex. « Son rouge » qui met ce laser en mode test) : confirmation.
+                    button.ForeColor = Ui.WarningColor;
+                    button.Font = Ui.BoldFont;
+                    button.Click += (_, _) => ConfirmRiskyMode(preset);
+                }
+                else
+                {
+                    button.Click += (_, _) => SetChannel(_mode, preset.Value);
+                }
                 _modeButtons.Add(button);
                 modes.Controls.Add(button);
             }
@@ -226,9 +236,17 @@ internal sealed class LaserPanel : UserControl
                 SetChannel(_x, 64);
                 SetChannel(_y, 64);
             };
+            // Laser retourne / accroche a l'envers : le moteur inverse X et / ou Y en sortie DMX.
+            var invertX = new CheckBox { Text = "Inverser X (gauche ↔ droite)", AutoSize = true, Checked = fixture.InvertPan };
+            var invertY = new CheckBox { Text = "Inverser Y (haut ↔ bas)", AutoSize = true, Checked = fixture.InvertTilt };
+            invertX.CheckedChanged += (_, _) => SetInvert(x: invertX.Checked, y: invertY.Checked);
+            invertY.CheckedChanged += (_, _) => SetInvert(x: invertX.Checked, y: invertY.Checked);
+
             var padBox = Ui.Table(1);
             padBox.Controls.Add(_pad);
             padBox.Controls.Add(Ui.Flow(0, center, Ui.Text("Position fixe du motif (X et Y)", color: Color.DimGray)));
+            padBox.Controls.Add(Ui.Flow(0, invertX, invertY));
+            padBox.Controls.Add(Ui.Text("(laser retourné : inverse les positions et le sens des mouvements)", color: Color.DimGray));
             right.Controls.Add(Ui.Group("Position", padBox));
         }
         right.Dock = DockStyle.None;
@@ -293,6 +311,38 @@ internal sealed class LaserPanel : UserControl
             (true, true, true) => Color.FromArgb(210, 170, 60),
             _ => Color.FromArgb(180, 140, 220),
         };
+    }
+
+    /// <summary>Cases « Inverser X / Y » : enregistrees avec l'appareil (InvertPan / InvertTilt).</summary>
+    private void SetInvert(bool x, bool y)
+    {
+        _ctx.Engine.EditShow(_ =>
+        {
+            _fixture.InvertPan = x;
+            _fixture.InvertTilt = y;
+        });
+        _ctx.MarkDirty();
+        _ctx.Status($"{_fixture.Name} : X {(x ? "inversé" : "normal")}, Y {(y ? "inversé" : "normal")}.");
+    }
+
+    /// <summary>
+    /// Mode a risque (⚠) : sur ce laser, « Son rouge » le met en mode test (« tst ») ; il n'ecoute
+    /// alors plus le DMX et rien ne permet d'en sortir a distance. Confirmation obligatoire.
+    /// </summary>
+    private void ConfirmRiskyMode(ChannelPreset preset)
+    {
+        bool ok = Ui.Confirm(FindForm()!,
+            $"« {preset.Name} » : sur ton laser, ce programme le fait passer en mode TEST (« tst » sur l'écran).\n\n" +
+            "En mode test, le laser N'ÉCOUTE PLUS LE DMX (son adressage est coupé) : plus aucun bouton de ce logiciel ne " +
+            "le pilote, et le manuel ne prévoit ni délai ni commande DMX pour en sortir.\n\n" +
+            "Pour en sortir, SUR LE LASER : bouton FUNC jusqu'à l'adresse DMX (« d… »), puis ENTER — ou l'éteindre et le rallumer.\n\n" +
+            "Envoyer quand même ?",
+            "Mode test du laser");
+        if (ok)
+        {
+            SetChannel(_mode, preset.Value);
+            _ctx.Status($"{_fixture.Name} : « {preset.Name} » envoyé — pour sortir du mode test : FUNC → adresse DMX → ENTER sur le laser.");
+        }
     }
 
     private void SetChannel(int index, byte value)

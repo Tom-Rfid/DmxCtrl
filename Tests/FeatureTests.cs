@@ -147,7 +147,8 @@ public class FeatureTests
         Assert.DoesNotContain("Son rouge", names);
         Assert.DoesNotContain("Couleurs d'origine", names);
         Assert.Contains("Son vert", names);
-        Assert.Equal(3, old.Revision);
+        Assert.Contains("Son rouge ⚠ tst", names); // remis, avec avertissement
+        Assert.Equal(4, old.Revision);
         Assert.Contains(old.Channels[^1].Ranges, r => r.From == 192 && r.Name.StartsWith("Rotation horaire")); // manuel V3
     }
 
@@ -410,6 +411,37 @@ public class FeatureTests
         Assert.False(string.IsNullOrWhiteSpace(error));
         Assert.False(link.IsConnected);
         link.Disconnect(); // ne leve jamais, meme sans port
+    }
+
+    [Fact]
+    public void Laser_upside_down_mirrors_x_positions_and_swaps_the_moving_direction()
+    {
+        var laser = Add(FixtureLibrary.GalacticLaserRgId, "laser", 50); // X = canal 55, Y = 56
+        _engine.SetValue("laser", 5, 20);   // X position fixe 20
+        _engine.SetValue("laser", 6, 150);  // Y mouvement 128-191
+        _engine.EditShow(_ => laser.InvertPan = true);
+
+        var u = Render();
+        Assert.Equal(107, u[55]);           // 127 - 20
+        Assert.Equal(150, u[56]);           // Y non inverse
+        Assert.Equal(214, ShowEngine.InvertLaserAxis(150)); // 128-191 -> 192-255
+        Assert.Equal(150, ShowEngine.InvertLaserAxis(214));
+    }
+
+    [Fact]
+    public void Old_laser_configs_get_the_tst_warning_button_back_and_the_blink_name()
+    {
+        var show = DefaultShow.Create();
+        var old = FixtureLibrary.GalacticRgy140RedGreen();
+        old.Revision = 3;
+        old.Channels[0].Presets.RemoveAll(p => p.Name.Contains('⚠'));
+        old.Channels[3].Name = "Strobe / vitesse de changement";
+        show.Profiles.Add(old);
+
+        FixtureLibrary.UpgradeProfiles(show);
+
+        Assert.Contains(old.Channels[0].Presets, p => p.Name == "Son rouge ⚠ tst" && p.Value == 195);
+        Assert.Equal("Clignotement", old.Channels[3].Name);
     }
 
     [Fact]
