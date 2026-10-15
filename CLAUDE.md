@@ -2,8 +2,8 @@
 
 Logiciel Windows (C# / .NET 10 / WinForms) pour piloter en DMX, via un boîtier
 Bluetooth bon marché « USB-RDM-DMX » (appli Android RY-AI), 2 lyres Chauvet
-Intimidator Spot 260X (adresses 1 et 15, mode 14 canaux) et un Mindi Mini Spider
-8x3W RGBW (adresse 29, 15 canaux). Protocole obtenu par rétro-ingénierie de l'APK :
+Intimidator Spot 260X (adresses 17 et 31, mode 14 canaux) et un Mindi Mini Spider
+8x3W RGBW (adresse 1 : canaux 1-16, soit 15 canaux + 1 vide). Protocole obtenu par rétro-ingénierie de l'APK :
 voir `PROTOCOLE.md`.
 
 ## Statut (2026-10-15)
@@ -30,6 +30,7 @@ dotnet run --project App
   - `Engine/ShowEngine` : calcule l'univers à chaque trame (programmeur → fondu → mouvement → chenillard → strobe/master/blackout/flash). Thread-safe via `_lock` ; toute modif de structure passe par `EditShow()`.
   - `Storage/ShowStore` : fichiers `*.dmxshow.json`, `*.dmxprofile.json`, `%APPDATA%\DmxController\settings.json`
 - `App/UI/` : `MainForm`, `LivePanel` (Soirée), `FixturePanel`, `DebugPanel`, `PatchDialog`, `ProfileEditorDialog`. IHM construite par code (`[DesignerCategory("Code")]`).
+  - `FixturePanel` : pad pan/tilt pour les lyres ; pour un appareil à 2 moteurs (Spider) : pad ailes (X = position, Y = dimmer), case « Inverser » (ailes en miroir, `FixtureInstance.MirrorMotors`), faders verticaux LED gauche/droite (`LedGroups`, LED 1-4 / 5-8 supposées), case « Pas de strobe » (`FixtureInstance.NoStrobe`, forcé à 0 au rendu).
 - `Tests/` : xUnit (protocole, moteur, config).
 - `tools/` : `cipher.py`, `dmx_test.py` (test v1), `gen_reference_frame.py`.
 - `archive/v1-test-clignotement/` : version qui a validé le protocole.
@@ -43,7 +44,10 @@ Commentaires et textes d'IHM en français.
 2. Vérifier les captures d'écran de l'IHM (mise en page des groupes de l'onglet Soirée).
 3. **Profil 260X : ordre des 14 canaux SUPPOSÉ** → vérifier canal par canal (onglet Debug / cases « OK »), corriger dans l'éditeur de profils.
 4. Relever les presets de la roue de couleurs 260X (bouton « + ») et la valeur « obturateur ouvert ».
-5. Spider : confirmer la couleur des LED 5-12 (supposées R,V,B,Blanc ×2).
+5. Spider : confirmer la couleur des LED (canaux 6-13 du profil, supposées R,V,B,Blanc ×2).
+   Bizarrerie confirmée : réglé sur l'adresse N, le Spider ignore le canal N et démarre au N+1
+   → profil de 16 canaux dont le 1er est vide (on saisit dans le patch l'adresse affichée sur l'appareil).
+   À vérifier : les lyres n'ont PAS ce décalage (sinon le décalage serait dans notre trame, pas dans le Spider).
 6. Tester une cadence d'envoi < 100 ms (onglet Debug) pour des mouvements plus fluides.
 7. Mettre à jour le doc Claude Docs « Protocole DMX RY-AI Bluetooth » (statut + nouvelle archi).
 8. Plus tard : scan RDM (voir PROTOCOLE.md §7), portage Mac (Core est prêt), contrôleur MIDI.

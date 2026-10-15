@@ -39,6 +39,18 @@ public sealed class FixtureInstance
 
     public bool InvertTilt { get; set; }
 
+    /// <summary>
+    /// Appareils a 2 moteurs (ailes du Spider) : le pad de l'onglet fait partir les ailes en
+    /// miroir (cotes opposes) au lieu de les faire bouger dans le meme sens.
+    /// </summary>
+    public bool MirrorMotors { get; set; }
+
+    /// <summary>
+    /// "Pas de strobe" : les canaux de type Strobe de cet appareil sont forces a 0 a chaque
+    /// trame, meme si une scene ou un curseur demande un strobe.
+    /// </summary>
+    public bool NoStrobe { get; set; }
+
     /// <summary>Dernier canal DMX occupe par cet appareil.</summary>
     public int EndAddress(FixtureProfile? profile) => Address + Math.Max(1, profile?.ChannelCount ?? 1) - 1;
 }

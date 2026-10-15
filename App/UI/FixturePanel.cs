@@ -4,6 +4,8 @@
 //  Onglet d'UN appareil, genere automatiquement a partir de son profil :
 //    - en-tete : nom, profil, plage d'adresses, avertissement si canaux non verifies
 //    - pad XY pour orienter la lyre (si le profil a pan/tilt)
+//    - pad "ailes" pour un appareil a 2 moteurs (Spider) : gauche/droite = position
+//      des 2 ailes, haut/bas = dimmer ; case "Inverser" = ailes en miroir
 //    - une ligne par canal : curseur 0-255, valeur, liste de presets,
 //      bouton "+" (enregistrer la valeur actuelle comme preset), case "OK" (verifie)
 //
@@ -38,6 +40,21 @@ internal sealed class FixturePanel : UserControl
     private readonly ComboBox[] _presets;
     private readonly CheckBox[] _verified;
     private readonly XYPad? _xy;
+    private readonly XYPad? _wings;
+    private readonly CheckBox? _mirrorWings;
+    private readonly Label? _wingsInfo;
+    private readonly int[] _motors;   // index des canaux Moteur dans le profil
+    private readonly int _dimmer;     // index du canal Dimmer (-1 si aucun)
+
+    // Faders "LED gauche / droite" (appareils a ailes) : groupes de canaux de couleur, et
+    // memoire des proportions de chaque groupe pour retrouver la couleur apres un passage a 0.
+    private readonly VerticalFader? _ledLeft;
+    private readonly VerticalFader? _ledRight;
+    private readonly int[] _groupLeft = Array.Empty<int>();
+    private readonly int[] _groupRight = Array.Empty<int>();
+    private readonly double[]?[] _groupRatios = new double[]?[2];
+
+    private readonly CheckBox? _noStrobe; // "Pas de strobe" (si le profil a un canal Strobe)
     private readonly Label _warning = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 6, 3, 3) };
     private readonly ToolTip _tips = new();
     private bool _updating;
@@ -56,6 +73,8 @@ internal sealed class FixturePanel : UserControl
         _names = new Label[count];
         _presets = new ComboBox[count];
         _verified = new CheckBox[count];
+        _motors = Enumerable.Range(0, count).Where(i => profile.Channels[i].Type == ChannelType.Motor).ToArray();
+        _dimmer = profile.IndexOf(ChannelType.Dimmer);
 
         // ---------------- En-tete ----------------
         var header = new FlowLayoutPanel
@@ -103,7 +122,7 @@ internal sealed class FixturePanel : UserControl
                 _ctx.Engine.SetPanTilt16(_fixture.Id, 32768, 32768);
                 RefreshFromEngine();
             };
-            var reset = new Button { Text = "Valeurs par défaut", Location = new Point(146, 274), Width = 126, Height = 30 };
+            var reset = new Button { Text = "Par défaut", Location = new Point(146, 274), Width = 126, Height = 30 };
             reset.Click += (_, _) => ResetDefaults();
 
             var hint = new Label
@@ -115,6 +134,64 @@ internal sealed class FixturePanel : UserControl
                 ForeColor = Color.DimGray,
             };
             left.Controls.AddRange(new Control[] { _xy, center, reset, hint });
+        }
+        else if (_motors.Length >= 2)
+        {
+            // Appareil a 2 moteurs (ailes du Spider) : X = position des ailes, Y = dimmer (haut = 100 %),
+            // et a droite du pad, un fader vertical par aile pour ses LED.
+            left = new Panel { Dock = DockStyle.Left, Width = 400, Padding = new Padding(10) };
+
+            (_groupLeft, _groupRight) = LedGroups.Split(profile);
+            if (_groupLeft.Length > 0 && _groupRight.Length > 0)
+            {
+                _ledLeft = new VerticalFader { Location = new Point(284, 6), Size = new Size(48, 260) };
+                _ledRight = new VerticalFader { Location = new Point(340, 6), Size = new Size(48, 260) };
+                _ledLeft.ValueChanged += (_, _) => OnLedFader(0);
+                _ledRight.ValueChanged += (_, _) => OnLedFader(1);
+                _tips.SetToolTip(_ledLeft, $"LED de l'aile gauche ({LedNames(_groupLeft)}) : bas = 0 %, haut = 100 %.\nGarde la couleur en cours (les proportions entre LED).");
+                _tips.SetToolTip(_ledRight, $"LED de l'aile droite ({LedNames(_groupRight)}) : bas = 0 %, haut = 100 %.\nGarde la couleur en cours (les proportions entre LED).");
+                left.Controls.Add(_ledLeft);
+                left.Controls.Add(_ledRight);
+                left.Controls.Add(new Label { Text = "LED\ngauche", Location = new Point(276, 270), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
+                left.Controls.Add(new Label { Text = "LED\ndroite", Location = new Point(332, 270), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
+            }
+            _wings = new XYPad
+            {
+                Location = new Point(12, 6),
+                Size = new Size(260, 260),
+                XLabel = "Ailes ← gauche · droite →",
+                YLabel = _dimmer >= 0 ? "Dimmer : haut = 100 %, bas = 0" : "",
+            };
+            _wings.ValueChanged += OnWingsChanged;
+
+            _mirrorWings = new CheckBox
+            {
+                Text = "Inverser (ailes en miroir)",
+                Checked = fixture.MirrorMotors,
+                Location = new Point(12, 272),
+                AutoSize = true,
+            };
+            _mirrorWings.CheckedChanged += (_, _) => OnMirrorChanged();
+
+            var center = new Button { Text = "Ailes au milieu", Location = new Point(12, 298), Width = 126, Height = 30 };
+            center.Click += (_, _) =>
+            {
+                _ctx.Engine.SetMotors(_fixture.Id, 128, _mirrorWings.Checked);
+                RefreshFromEngine();
+            };
+            var reset = new Button { Text = "Par défaut", Location = new Point(146, 298), Width = 126, Height = 30 };
+            reset.Click += (_, _) => ResetDefaults();
+
+            _wingsInfo = new Label { Location = new Point(12, 334), Size = new Size(260, 20), Font = Ui.BoldFont };
+            var hint = new Label
+            {
+                Text = "Gauche / droite : les 2 ailes ensemble. Avec « Inverser », elles partent " +
+                       "chacune de leur côté et reviennent ensemble au milieu.\nHaut / bas : dimmer.",
+                Location = new Point(12, 358),
+                Size = new Size(260, 80),
+                ForeColor = Color.DimGray,
+            };
+            left.Controls.AddRange(new Control[] { _wings, _mirrorWings, center, reset, _wingsInfo, hint });
         }
         else
         {
@@ -129,11 +206,11 @@ internal sealed class FixturePanel : UserControl
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 6,
+            ColumnCount = 7,
             Location = new Point(6, 4),
             GrowStyle = TableLayoutPanelGrowStyle.AddRows,
         };
-        for (int c = 0; c < 6; c++)
+        for (int c = 0; c < 7; c++)
         {
             table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
@@ -143,16 +220,16 @@ internal sealed class FixturePanel : UserControl
             int index = i; // capture pour les lambdas
             var channel = profile.Channels[i];
 
-            _names[i] = new Label { AutoSize = false, Width = 260, Height = 26, TextAlign = ContentAlignment.MiddleLeft };
+            _names[i] = new Label { AutoSize = true, MinimumSize = new Size(260, 0), Anchor = AnchorStyles.Left, Margin = new Padding(3, 6, 3, 3) };
             _tips.SetToolTip(_names[i], $"{ChannelTypeInfo.DisplayName(channel.Type)}" +
                                         (string.IsNullOrWhiteSpace(channel.Notes) ? "" : $"\n{channel.Notes}"));
 
-            _sliders[i] = Ui.Slider(0, 255, 330);
+            _sliders[i] = Ui.Slider(0, 255, left is null ? 330 : 230); // plus etroit si un pad occupe la gauche
             _sliders[i].ValueChanged += (_, _) => OnSlider(index);
 
             _values[i] = Ui.ValueLabel(36);
 
-            _presets[i] = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 170, Margin = new Padding(3, 4, 3, 3) };
+            _presets[i] = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140, Margin = new Padding(3, 4, 3, 3) };
             _presets[i].SelectionChangeCommitted += (_, _) => OnPresetChosen(index);
 
             var add = new Button { Text = "+", Width = 28, Height = 26, Margin = new Padding(3, 3, 3, 3) };
@@ -170,8 +247,25 @@ internal sealed class FixturePanel : UserControl
             table.Controls.Add(_presets[i], 3, i);
             table.Controls.Add(add, 4, i);
             table.Controls.Add(_verified[i], 5, i);
+
+            // Case "Pas de strobe" a cote du (premier) canal Strobe : force ce canal a 0 en sortie.
+            if (channel.Type == ChannelType.Strobe && _noStrobe is null)
+            {
+                _noStrobe = new CheckBox
+                {
+                    Text = "Pas de strobe",
+                    AutoSize = true,
+                    Checked = fixture.NoStrobe,
+                    Font = Ui.BoldFont,
+                    Margin = new Padding(10, 6, 3, 3),
+                };
+                _tips.SetToolTip(_noStrobe, "Coché : le strobe de cet appareil reste coupé, même si une scène ou le curseur en demande un.");
+                _noStrobe.CheckedChanged += (_, _) => OnNoStrobeChanged();
+                table.Controls.Add(_noStrobe, 6, i);
+            }
         }
         scroll.Controls.Add(table);
+        UpdateStrobeLock();
 
         // Ordre d'ajout : la zone "Fill" en premier, les bords ensuite.
         Controls.Add(scroll);
@@ -208,11 +302,7 @@ internal sealed class FixturePanel : UserControl
                 _values[i].Text = values[i].ToString();
                 SyncPresetCombo(i, values[i]);
             }
-            if (_xy is not null)
-            {
-                _xy.ValueX = ShowEngine.GetAxis16(_profile, values, ChannelType.Pan, ChannelType.PanFine);
-                _xy.ValueY = ShowEngine.GetAxis16(_profile, values, ChannelType.Tilt, ChannelType.TiltFine);
-            }
+            SyncPads(values);
         }
         finally
         {
@@ -275,12 +365,165 @@ internal sealed class FixturePanel : UserControl
         SyncPresetCombo(index, value);
 
         var type = _profile.Channels[index].Type;
-        if (_xy is not null && type is ChannelType.Pan or ChannelType.PanFine or ChannelType.Tilt or ChannelType.TiltFine)
+        if (type is ChannelType.Pan or ChannelType.PanFine or ChannelType.Tilt or ChannelType.TiltFine
+            or ChannelType.Motor or ChannelType.Dimmer || ChannelTypeInfo.IsColorMix(type))
         {
-            byte[] values = _ctx.Engine.GetValues(_fixture.Id);
+            SyncPads(_ctx.Engine.GetValues(_fixture.Id));
+        }
+    }
+
+    /// <summary>Recale les pads (lyre et ailes) sur les valeurs actuelles des canaux.</summary>
+    private void SyncPads(byte[] values)
+    {
+        if (_xy is not null)
+        {
             _xy.ValueX = ShowEngine.GetAxis16(_profile, values, ChannelType.Pan, ChannelType.PanFine);
             _xy.ValueY = ShowEngine.GetAxis16(_profile, values, ChannelType.Tilt, ChannelType.TiltFine);
         }
+
+        if (_wings is not null && _wingsInfo is not null && _motors.Length >= 2 && _motors[1] < values.Length)
+        {
+            byte wing1 = values[_motors[0]];
+            byte wing2 = values[_motors[1]];
+            _wings.ValueX = wing1 * 257; // 0..255 -> 0..65535
+            if (_dimmer >= 0 && _dimmer < values.Length)
+            {
+                _wings.ValueY = (255 - values[_dimmer]) * 257; // haut du pad = dimmer a fond
+            }
+            _wingsInfo.Text = $"Aile 1 : {Degrees(wing1)}°   Aile 2 : {Degrees(wing2)}°" +
+                              (_dimmer >= 0 && _dimmer < values.Length ? $"   Dimmer : {values[_dimmer] * 100 / 255} %" : "");
+        }
+
+        if (_ledLeft is not null && _ledRight is not null && _groupRight.All(i => i < values.Length))
+        {
+            _ledLeft.Value = LedGroups.Level(values, _groupLeft);
+            _ledRight.Value = LedGroups.Level(values, _groupRight);
+            RememberRatios(0, values, _groupLeft);
+            RememberRatios(1, values, _groupRight);
+        }
+    }
+
+    /// <summary>
+    /// Memorise les proportions d'un groupe de LED tant qu'elles sont assez lumineuses pour etre
+    /// precises : ainsi, une aile rouge descendue a 0 puis remontee redevient rouge.
+    /// </summary>
+    private void RememberRatios(int side, byte[] values, int[] group)
+    {
+        if (LedGroups.Level(values, group) >= 32)
+        {
+            _groupRatios[side] = LedGroups.Ratios(values, group);
+        }
+    }
+
+    private void OnLedFader(int side)
+    {
+        if (_updating)
+        {
+            return;
+        }
+
+        var fader = side == 0 ? _ledLeft! : _ledRight!;
+        var group = side == 0 ? _groupLeft : _groupRight;
+        _ctx.Engine.SetGroupLevel(_fixture.Id, group, (byte)fader.Value, _groupRatios[side]);
+
+        // Mise a jour des curseurs des LED sans relire la position du fader en cours de glisse.
+        byte[] values = _ctx.Engine.GetValues(_fixture.Id);
+        _updating = true;
+        try
+        {
+            foreach (int i in group)
+            {
+                _sliders[i].Value = values[i];
+                _values[i].Text = values[i].ToString();
+            }
+        }
+        finally
+        {
+            _updating = false;
+        }
+    }
+
+    private string LedNames(int[] group) => string.Join(", ", group.Select(i => _profile.Channels[i].Name));
+
+    private void OnNoStrobeChanged()
+    {
+        if (_updating || _noStrobe is null)
+        {
+            return;
+        }
+
+        bool noStrobe = _noStrobe.Checked;
+        _ctx.Engine.EditShow(_ => _fixture.NoStrobe = noStrobe);
+        _ctx.MarkDirty();
+        if (noStrobe)
+        {
+            // On remet aussi le curseur a 0 : sinon il afficherait une valeur qui n'est pas envoyee.
+            for (int i = 0; i < _profile.ChannelCount; i++)
+            {
+                if (_profile.Channels[i].Type == ChannelType.Strobe)
+                {
+                    _ctx.Engine.SetValue(_fixture.Id, i, 0);
+                }
+            }
+        }
+        UpdateStrobeLock();
+        RefreshFromEngine();
+        _ctx.Status(noStrobe ? $"{_fixture.Name} : strobe coupé." : $"{_fixture.Name} : strobe de nouveau autorisé.");
+    }
+
+    /// <summary>Grise le(s) curseur(s) Strobe quand "Pas de strobe" est coche.</summary>
+    private void UpdateStrobeLock()
+    {
+        bool locked = _noStrobe?.Checked == true;
+        for (int i = 0; i < _profile.ChannelCount; i++)
+        {
+            if (_profile.Channels[i].Type == ChannelType.Strobe)
+            {
+                _sliders[i].Enabled = !locked;
+            }
+        }
+    }
+
+    /// <summary>Moteur du Spider : 0..255 = 0..135° (notice).</summary>
+    private static int Degrees(byte value) => (int)Math.Round(value * 135.0 / 255);
+
+    private void OnWingsChanged(object? sender, EventArgs e)
+    {
+        if (_updating || _wings is null)
+        {
+            return;
+        }
+
+        byte position = (byte)Math.Round(_wings.ValueX / 65535.0 * 255);
+        _ctx.Engine.SetMotors(_fixture.Id, position, _mirrorWings?.Checked == true);
+        if (_dimmer >= 0)
+        {
+            _ctx.Engine.SetFixtureDimmer(_fixture.Id, (byte)Math.Round(255 - _wings.ValueY / 65535.0 * 255));
+        }
+        RefreshFromEngine();
+    }
+
+    /// <summary>
+    /// Case "Inverser" : memorisee dans le patch (sauvegardee avec la config). On realigne
+    /// tout de suite l'aile 2 sur l'aile 1 (en miroir ou dans le meme sens).
+    /// </summary>
+    private void OnMirrorChanged()
+    {
+        if (_updating || _mirrorWings is null)
+        {
+            return;
+        }
+
+        bool mirror = _mirrorWings.Checked;
+        _ctx.Engine.EditShow(_ => _fixture.MirrorMotors = mirror);
+        _ctx.MarkDirty();
+
+        byte[] values = _ctx.Engine.GetValues(_fixture.Id);
+        if (_motors.Length >= 2 && _motors[0] < values.Length)
+        {
+            _ctx.Engine.SetMotors(_fixture.Id, values[_motors[0]], mirror);
+        }
+        RefreshFromEngine();
     }
 
     private void OnXyChanged(object? sender, EventArgs e)

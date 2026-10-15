@@ -12,9 +12,14 @@ Piloter en DMX, depuis un PC Windows, via un boitier Bluetooth bon marche
 
 | Appareil | Adresse DMX | Canaux |
 |---|---|---|
-| Chauvet DJ Intimidator Spot 260X #1 | 1 | 1 – 14 (mode 14CH) |
-| Chauvet DJ Intimidator Spot 260X #2 | 15 | 15 – 28 (mode 14CH) |
-| Mindi Mini Spider 8x3W RGBW | 29 | 29 – 43 (15 canaux) |
+| Mindi Mini Spider 8x3W RGBW | 1 | 1 – 16 (15 canaux + 1 vide) |
+| Chauvet DJ Intimidator Spot 260X #1 | 17 | 17 – 30 (mode 14CH) |
+| Chauvet DJ Intimidator Spot 260X #2 | 31 | 31 – 44 (mode 14CH) |
+
+**Bizarrerie du Spider (constatée sur l'appareil)** : réglé sur l'adresse N, il
+ignore le canal N et commence à écouter au canal N+1 (moteur 1 = N+1, etc.). Le
+profil le déclare donc sur 16 canaux, le premier étant vide : dans le patch, on
+saisit simplement l'adresse affichée sur le Spider.
 
 **[A VERIFIER]** : l'adressage ci-dessus a ete choisi en suivant la doc Chauvet
 generale, mais la fonction precise de chaque canal (lequel est Pan, Tilt,

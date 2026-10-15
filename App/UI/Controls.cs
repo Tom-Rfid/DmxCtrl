@@ -12,12 +12,22 @@ using DmxController.Core.Protocol;
 
 namespace DmxController.UI;
 
-/// <summary>Pad 2D : X = pan, Y = tilt, en valeurs 16 bits (0..65535).</summary>
+/// <summary>Pad 2D en valeurs 16 bits (0..65535) : pan/tilt pour une lyre, ailes/dimmer pour le Spider.</summary>
 [DesignerCategory("Code")]
 internal sealed class XYPad : Control
 {
     private int _x = 32768;
     private int _y = 32768;
+
+    /// <summary>Libelle de l'axe horizontal (dessine en bas a gauche).</summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public string XLabel { get; set; } = "Pan →";
+
+    /// <summary>Libelle de l'axe vertical (dessine en haut a gauche).</summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public string YLabel { get; set; } = "Tilt ↓";
 
     /// <summary>Leve quand l'utilisateur deplace le point (pas lors d'un changement par code).</summary>
     public event EventHandler? ValueChanged;
@@ -109,8 +119,116 @@ internal sealed class XYPad : Control
         using var dot = new SolidBrush(Color.Orange);
         g.FillEllipse(dot, px - 8, py - 8, 16, 16);
 
-        TextRenderer.DrawText(g, "Pan →", Font, new Point(r.Left + 4, r.Bottom - 20), Color.Silver);
-        TextRenderer.DrawText(g, "Tilt ↓", Font, new Point(r.Left + 4, r.Top + 2), Color.Silver);
+        TextRenderer.DrawText(g, XLabel, Font, new Point(r.Left + 4, r.Bottom - 20), Color.Silver);
+        TextRenderer.DrawText(g, YLabel, Font, new Point(r.Left + 4, r.Top + 2), Color.Silver);
+    }
+}
+
+/// <summary>
+/// Fader vertical facon console : bas = 0 %, haut = 100 % (valeur 0..255). On clique ou on
+/// glisse n'importe ou dans la zone ; la molette ajuste par pas de 5 %.
+/// </summary>
+[DesignerCategory("Code")]
+internal sealed class VerticalFader : Control
+{
+    private int _value;
+
+    /// <summary>Leve quand l'utilisateur change la valeur (pas lors d'un changement par code).</summary>
+    public event EventHandler? ValueChanged;
+
+    public VerticalFader()
+    {
+        DoubleBuffered = true;
+        SetStyle(ControlStyles.ResizeRedraw | ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.Selectable, true);
+        BackColor = Color.FromArgb(28, 30, 36);
+        Cursor = Cursors.SizeNS;
+    }
+
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public int Value
+    {
+        get => _value;
+        set
+        {
+            _value = Math.Clamp(value, 0, 255);
+            Invalidate();
+        }
+    }
+
+    /// <summary>Couleur de remplissage (ex. blanc chaud pour des LED).</summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Color FillColor { get; set; } = Color.FromArgb(255, 200, 80);
+
+    private Rectangle Track => new(6, 6, Math.Max(1, Width - 12), Math.Max(1, Height - 30));
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button == MouseButtons.Left)
+        {
+            Focus();
+            Capture = true;
+            SetFromY(e.Y);
+        }
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (e.Button == MouseButtons.Left)
+        {
+            SetFromY(e.Y);
+        }
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        Change(_value + Math.Sign(e.Delta) * 13); // ~5 %
+    }
+
+    private void SetFromY(int y)
+    {
+        var r = Track;
+        double fraction = 1 - Math.Clamp((y - r.Top) / (double)r.Height, 0, 1); // bas = 0, haut = 1
+        Change((int)Math.Round(fraction * 255));
+    }
+
+    private void Change(int value)
+    {
+        value = Math.Clamp(value, 0, 255);
+        if (value == _value)
+        {
+            return;
+        }
+        _value = value;
+        Invalidate();
+        ValueChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var r = Track;
+        using var empty = new SolidBrush(Color.FromArgb(48, 52, 64));
+        g.FillRectangle(empty, r);
+
+        int h = (int)Math.Round(_value / 255.0 * r.Height);
+        using var fill = new SolidBrush(FillColor);
+        g.FillRectangle(fill, r.Left, r.Bottom - h, r.Width, h);
+
+        using var border = new Pen(Color.FromArgb(110, 118, 140));
+        g.DrawRectangle(border, r);
+
+        // Petit repere horizontal au niveau actuel (la "manette" du fader).
+        using var knob = new Pen(Color.White, 3);
+        g.DrawLine(knob, r.Left - 3, r.Bottom - h, r.Right + 3, r.Bottom - h);
+
+        string text = $"{_value * 100 / 255} %";
+        TextRenderer.DrawText(g, text, Font, new Rectangle(0, Height - 22, Width, 20), Color.White,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
     }
 }
 

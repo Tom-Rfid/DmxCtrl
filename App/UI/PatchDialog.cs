@@ -24,6 +24,11 @@ internal sealed class PatchDialog : Form
     private const int ColName = 0, ColProfile = 1, ColAddress = 2, ColCount = 3, ColEnd = 4, ColEnabled = 5, ColInvPan = 6, ColInvTilt = 7;
 
     private readonly IReadOnlyList<FixtureProfile> _profiles;
+
+    // Reglages d'appareil sans colonne dans la grille (ailes en miroir, pas de strobe : regles
+    // dans l'onglet de l'appareil) : on les conserve par Id pour ne pas les perdre en validant.
+    private readonly Dictionary<string, (bool MirrorMotors, bool NoStrobe)> _hidden = new();
+
     private readonly DataGridView _grid = new()
     {
         Dock = DockStyle.Fill,
@@ -44,6 +49,10 @@ internal sealed class PatchDialog : Form
     public PatchDialog(ShowConfig show, bool addNewOnOpen)
     {
         _profiles = show.Profiles;
+        foreach (var fixture in show.Fixtures)
+        {
+            _hidden[fixture.Id] = (fixture.MirrorMotors, fixture.NoStrobe);
+        }
         Text = "Patch — appareils et adressage DMX";
         Font = new Font("Segoe UI", 9f);
         Size = new Size(1040, 560);
@@ -192,6 +201,8 @@ internal sealed class PatchDialog : Form
                 Enabled = row.Cells[ColEnabled].Value is true,
                 InvertPan = row.Cells[ColInvPan].Value is true,
                 InvertTilt = row.Cells[ColInvTilt].Value is true,
+                MirrorMotors = _hidden.GetValueOrDefault((string)row.Tag!).MirrorMotors,
+                NoStrobe = _hidden.GetValueOrDefault((string)row.Tag!).NoStrobe,
             });
         }
         return list;
@@ -288,6 +299,7 @@ internal sealed class PatchDialog : Form
             InvertPan = original.InvertPan,
             InvertTilt = original.InvertTilt,
         };
+        _hidden[copy.Id] = (original.MirrorMotors, original.NoStrobe);
         SelectRow(AddRow(copy, source.Index + 1), editName: true);
         ValidateRows();
     }

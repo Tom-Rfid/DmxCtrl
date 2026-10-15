@@ -62,8 +62,8 @@ public class ConfigTests
     public void Overlapping_and_out_of_range_fixtures_are_reported()
     {
         var show = DefaultShow.Create();
-        show.Fixtures[1].Address = 10;   // Lyre 2 (14 canaux) sur 10-23 : chevauche Lyre 1 (1-14)
-        show.Fixtures[2].Address = 505;  // Spider (15 canaux) jusqu'a 519 : hors univers
+        show.Fixtures[1].Address = 20;   // Lyre 2 (14 canaux) sur 20-33 : chevauche Lyre 1 (17-30)
+        show.Fixtures[2].Address = 505;  // Spider (16 canaux) jusqu'a 520 : hors univers
 
         var problems = PatchValidator.Validate(show);
         Assert.Equal(2, problems.Count);
@@ -84,8 +84,9 @@ public class ConfigTests
     public void Next_free_address_follows_the_last_fixture()
     {
         var show = DefaultShow.Create();
-        Assert.Equal(44, PatchValidator.NextFreeAddress(show.Fixtures, show.Profiles, 14));
-        Assert.Equal(15, PatchValidator.NextFreeAddress(show.Fixtures, show.Profiles, 14, ignoreFixtureId: "lyre-2"));
+        // Spider 1-16, Lyre 1 17-30, Lyre 2 31-44
+        Assert.Equal(45, PatchValidator.NextFreeAddress(show.Fixtures, show.Profiles, 14));
+        Assert.Equal(31, PatchValidator.NextFreeAddress(show.Fixtures, show.Profiles, 14, ignoreFixtureId: "lyre-2"));
     }
 
     [Fact]

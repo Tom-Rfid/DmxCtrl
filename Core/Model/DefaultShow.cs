@@ -1,13 +1,16 @@
 // =====================================================================================
 //  DefaultShow.cs
 // -------------------------------------------------------------------------------------
-//  Configuration de depart : les 2 Intimidator Spot 260X (adresses 1 et 15) et le
-//  Mini Spider (adresse 29), avec leurs profils et quelques scenes d'exemple.
+//  Configuration de depart : le Mini Spider (adresse 1, canaux 1-16) et les 2
+//  Intimidator Spot 260X (adresses 17 et 31), avec leurs profils et quelques scenes.
 //
 //  !!! ATTENTION - CE QUI EST VERIFIE ET CE QUI NE L'EST PAS !!!
-//  - Adressage 1 / 15 / 29 : confirme (test de clignotement OK sur le vrai materiel).
+//  - Liaison et protocole : confirmes (test de clignotement OK sur le vrai materiel).
+//  - Spider en adresse 1 : confirme. Lyres en 17 / 31 : a regler dans leur menu.
 //  - Spider : la table des 15 canaux vient de la notice (photo) -> canaux marques
-//    "verifies", SAUF la couleur de chaque LED (5 a 12) qui est supposee.
+//    "verifies", SAUF la couleur de chaque LED qui est supposee. Le profil a 16
+//    canaux : le Spider ignore le canal de son adresse (decalage constate sur
+//    l'appareil), d'ou un premier canal vide.
 //  - 260X : L'ORDRE DES 14 CANAUX EST UNE SUPPOSITION (schema courant des lyres
 //    Chauvet), aucun canal n'est marque verifie. A confirmer canal par canal sur
 //    l'appareil (onglet Debug ou cases "OK" de l'onglet de la lyre), puis a corriger
@@ -32,9 +35,11 @@ public static class DefaultShow
             Profiles = { spot, spider },
             Fixtures =
             {
-                new FixtureInstance { Id = "lyre-1", Name = "Lyre 1", ProfileId = spot.Id, Address = 1 },
-                new FixtureInstance { Id = "lyre-2", Name = "Lyre 2", ProfileId = spot.Id, Address = 15 },
-                new FixtureInstance { Id = "spider-1", Name = "Spider", ProfileId = spider.Id, Address = 29 },
+                // Installation reelle : Spider en adresse 1 (canaux 1 a 16 avec son canal vide),
+                // lyres juste apres. Les adresses doivent correspondre au menu de chaque appareil.
+                new FixtureInstance { Id = "lyre-1", Name = "Lyre 1", ProfileId = spot.Id, Address = 17 },
+                new FixtureInstance { Id = "lyre-2", Name = "Lyre 2", ProfileId = spot.Id, Address = 31 },
+                new FixtureInstance { Id = "spider-1", Name = "Spider", ProfileId = spider.Id, Address = 1 },
             },
         };
 
@@ -107,16 +112,25 @@ public static class DefaultShow
         },
     };
 
-    /// <summary>Profil du Mindi Mini Spider 8x3W RGBW (15 canaux), d'apres la notice.</summary>
+    /// <summary>
+    /// Profil du Mindi Mini Spider 8x3W RGBW, d'apres la notice (15 canaux) + 1 canal vide en tete.
+    /// BIZARRERIE DU SPIDER (constatee sur l'appareil) : regle sur l'adresse N, il ecoute en
+    /// realite a partir du canal N+1 ; le canal N ne fait rien. On le declare donc sur 16 canaux
+    /// avec un premier canal "vide" : dans le patch, on saisit l'adresse affichee sur l'appareil.
+    /// </summary>
     public static FixtureProfile CreateSpiderProfile() => new()
     {
         Id = SpiderProfileId,
-        Name = "Mini Spider 8x3W RGBW (15 canaux)",
+        Name = "Mini Spider 8x3W RGBW (15 canaux + 1 vide = 16)",
         Manufacturer = "Mindi",
-        Notes = "Table des canaux relevée sur la notice. La couleur de chaque LED (canaux 5 à 12) est SUPPOSÉE " +
+        Notes = "Le Spider ignore le canal de son adresse et commence au suivant (constaté sur l'appareil) : " +
+                "le canal 1 du profil est donc vide. Saisis dans le patch l'adresse affichée sur le Spider. " +
+                "Table des canaux 2 à 16 relevée sur la notice ; la couleur de chaque LED (canaux 6 à 13) est SUPPOSÉE " +
                 "(rouge, vert, bleu, blanc, puis pareil) : à vérifier et corriger si besoin.",
         Channels =
         {
+            Ch("(vide : décalage du Spider)", ChannelType.Generic, 0, verified: true,
+                notes: "Le Spider n'écoute pas ce canal : il démarre au canal suivant. Laisser à 0."),
             Ch("Moteur 1 (0-135°)", ChannelType.Motor, 0, verified: true),
             Ch("Moteur 2 (0-135°)", ChannelType.Motor, 0, verified: true),
             Ch("Dimmer général", ChannelType.Dimmer, 0, verified: true),

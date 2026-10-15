@@ -215,6 +215,67 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>
+    /// Positionne les canaux "Moteur" d'un appareil (ex. les 2 ailes du Spider) : le 1er moteur
+    /// prend "position". Si mirror, un moteur sur deux prend la position symetrique (255 - position) :
+    /// les ailes partent de cotes opposes et reviennent ensemble au milieu.
+    /// </summary>
+    public void SetMotors(string fixtureId, byte position, bool mirror)
+    {
+        lock (_lock)
+        {
+            var (profile, values) = FindLocked(fixtureId);
+            if (profile is null || values is null)
+            {
+                return;
+            }
+
+            int motor = 0;
+            for (int i = 0; i < profile.ChannelCount && i < values.Length; i++)
+            {
+                if (profile.Channels[i].Type != ChannelType.Motor)
+                {
+                    continue;
+                }
+                values[i] = mirror && motor % 2 == 1 ? (byte)(255 - position) : position;
+                motor++;
+            }
+        }
+    }
+
+    /// <summary>Fader d'un groupe de LED (voir LedGroups) : niveau en gardant les proportions.</summary>
+    public void SetGroupLevel(string fixtureId, int[] group, byte level, double[]? ratios)
+    {
+        lock (_lock)
+        {
+            var (profile, values) = FindLocked(fixtureId);
+            if (profile is not null && values is not null && group.All(i => i >= 0 && i < values.Length))
+            {
+                LedGroups.SetLevel(values, group, level, ratios);
+            }
+        }
+    }
+
+    /// <summary>Regle tous les canaux Dimmer d'un appareil.</summary>
+    public void SetFixtureDimmer(string fixtureId, byte level)
+    {
+        lock (_lock)
+        {
+            var (profile, values) = FindLocked(fixtureId);
+            if (profile is null || values is null)
+            {
+                return;
+            }
+            for (int i = 0; i < profile.ChannelCount && i < values.Length; i++)
+            {
+                if (profile.Channels[i].Type == ChannelType.Dimmer)
+                {
+                    values[i] = level;
+                }
+            }
+        }
+    }
+
     /// <summary>Lit un axe (pan ou tilt) en 16 bits : coarse * 256 + fin (ou 128 sans canal fin).</summary>
     public static int GetAxis16(FixtureProfile profile, byte[] values, ChannelType coarse, ChannelType fine)
     {
@@ -587,6 +648,16 @@ public sealed class ShowEngine : IFrameSource
 
                 // 5 : intensite (strobe, master, blackout, flash)
                 ApplyIntensityLocked(profile, values, selected && strobeDark);
+                if (fixture.NoStrobe)
+                {
+                    for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
+                    {
+                        if (profile.Channels[i].Type == ChannelType.Strobe)
+                        {
+                            values[i] = 0;
+                        }
+                    }
+                }
 
                 // 6 : ecriture aux adresses du patch
                 for (int i = 0; i < values.Length; i++)
