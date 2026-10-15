@@ -8,7 +8,7 @@
 //
 //  Sources des tables :
 //    - Chauvet Intimidator Spot 260X : guide rapide officiel (Quick Reference Guide Rev. 1)
-//    - Mindi Mini Spider : notice + decalage d'adresse constate sur l'appareil
+//    - Mindi Mini Spider : notice (15 canaux)
 //    - Ayra WSM02 MKIII  : notice Ayra WSM02/WSM03 (1 canal = debit de fumee 0-100 %)
 //    - Showtec Galactic RGY-140 MKII : manuel Highlite (code 51335), 10 canaux
 //    - PAR LED 36 RGB+UV : modele GENERIQUE (marque inconnue), canaux a verifier
@@ -291,24 +291,20 @@ public static class FixtureLibrary
     // =================================================================================
 
     /// <summary>
-    /// 15 canaux de la notice + 1 canal vide en tete. BIZARRERIE (constatee sur l'appareil) :
-    /// regle sur l'adresse N, il ecoute a partir du canal N+1. Dans le patch, on saisit
-    /// l'adresse affichee sur le Spider.
+    /// 15 canaux de la notice, lus a partir de l'adresse du Spider. (Un decalage d'un canal avait
+    /// ete observe au debut ; il a disparu : revision 2 = plus de canal vide en tete.)
     /// </summary>
     public static FixtureProfile MiniSpider() => new()
     {
         Id = SpiderId,
-        Name = "Mini Spider 8x3W RGBW (15 canaux + 1 vide = 16)",
+        Name = "Mini Spider 8x3W RGBW (15 canaux)",
         Manufacturer = "Mindi",
         DefaultFixtureName = "Spider",
-        Revision = 1,
-        Notes = "Le Spider ignore le canal de son adresse et commence au suivant (constaté sur l'appareil) : " +
-                "le canal 1 du profil est donc vide. Saisis dans le patch l'adresse affichée sur le Spider. " +
-                "La couleur de chaque LED (canaux 6 à 13) est SUPPOSÉE (rouge, vert, bleu, blanc, puis pareil).",
+        Revision = 2,
+        Notes = "Table de la notice, 15 canaux à partir de l'adresse du Spider. " +
+                "La couleur de chaque LED (canaux 5 à 12) est SUPPOSÉE (rouge, vert, bleu, blanc, puis pareil).",
         Channels =
         {
-            Ch("(vide : décalage du Spider)", ChannelType.Generic, 0, verified: true,
-                notes: "Le Spider n'écoute pas ce canal : il démarre au canal suivant. Laisser à 0."),
             Ch("Moteur 1 (0-135°)", ChannelType.Motor, 0, verified: true),
             Ch("Moteur 2 (0-135°)", ChannelType.Motor, 0, verified: true),
             Ch("Dimmer général", ChannelType.Dimmer, 0, verified: true),

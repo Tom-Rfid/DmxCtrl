@@ -2,8 +2,8 @@
 
 Logiciel Windows (C# / .NET 10 / WinForms) pour piloter en DMX, via un boîtier
 Bluetooth bon marché « USB-RDM-DMX » (appli Android RY-AI), 2 lyres Chauvet
-Intimidator Spot 260X (adresses 17 et 31, mode 14 canaux) et un Mindi Mini Spider
-8x3W RGBW (adresse 1 : canaux 1-16, soit 15 canaux + 1 vide). Protocole obtenu par rétro-ingénierie de l'APK :
+Intimidator Spot 260X (adresses 16 et 30, mode 14 canaux) et un Mindi Mini Spider
+8x3W RGBW (adresse 1 : canaux 1-15). Protocole obtenu par rétro-ingénierie de l'APK :
 voir `PROTOCOLE.md`.
 
 ## Statut (2026-10-16)
@@ -65,10 +65,9 @@ Commentaires et textes d'IHM en français.
 3. Profil 260X : table officielle Chauvet en place (presets couleurs/gobos/obturateur) → confirmer sur la lyre.
 4. PAR LED 36 RGB+UV : demander la marque / le menu DMX à l'utilisateur et corriger le profil générique.
 4b. Fumée : confirmer le débit (0-255 = 0-100 %) et le temps de chauffe ; laser : confirmer que le canal 1 en 240-255 = DMX.
-5. Spider : confirmer la couleur des LED (canaux 6-13 du profil, supposées R,V,B,Blanc ×2).
-   Bizarrerie confirmée : réglé sur l'adresse N, le Spider ignore le canal N et démarre au N+1
-   → profil de 16 canaux dont le 1er est vide (on saisit dans le patch l'adresse affichée sur l'appareil).
-   À vérifier : les lyres n'ont PAS ce décalage (sinon le décalage serait dans notre trame, pas dans le Spider).
+5. Spider : confirmer la couleur des LED (canaux 5-12, supposées R,V,B,Blanc ×2).
+   Le décalage d'un canal observé au début a disparu (2026-10-16) : profil revenu à 15 canaux (révision 2,
+   les anciennes configs à 16 canaux sont converties automatiquement).
 6. Tester une cadence d'envoi < 100 ms (onglet Debug) pour des mouvements plus fluides.
 7. Mettre à jour le doc Claude Docs « Protocole DMX RY-AI Bluetooth » (statut + nouvelle archi).
 8. Plus tard : scan RDM (voir PROTOCOLE.md §7), portage Mac (Core est prêt), contrôleur MIDI.

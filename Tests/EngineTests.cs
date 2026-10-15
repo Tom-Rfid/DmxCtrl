@@ -12,9 +12,9 @@ public class EngineTests
     private const int SpotPan = 0, SpotPanFine = 1, SpotColorWheel = 5, SpotDimmer = 10;
 
     // Adresses du patch par defaut (installation reelle : Spider en 1, lyres apres).
-    private const int Lyre1 = 17, Lyre2 = 31, Spider = 1;
-    // Spider : canal 0 du profil = canal vide (le Spider ignore le canal de son adresse).
-    private const int SpiderDimmer = 3, SpiderLed1 = 5, SpiderLed2 = 6, SpiderLed4 = 8, SpiderLed5 = 9;
+    private const int Lyre1 = 16, Lyre2 = 30, Spider = 1;
+    // Spider : 15 canaux a partir de son adresse (moteur 1 = canal 0 du profil).
+    private const int SpiderDimmer = 2, SpiderLed1 = 4, SpiderLed2 = 5, SpiderLed4 = 7, SpiderLed5 = 8;
 
     private double _now;
     private readonly ShowEngine _engine;
@@ -44,18 +44,18 @@ public class EngineTests
     }
 
     [Fact]
-    public void Spider_ignores_its_own_address_so_motor_1_is_one_channel_further()
+    public void Spider_motor_1_is_on_the_spider_address()
     {
-        _engine.SetValue("spider-1", 1, 99); // Moteur 1 = 2e canal du profil
+        _engine.SetValue("spider-1", 0, 99); // Moteur 1 = 1er canal du profil
         var universe = Render();
-        Assert.Equal(0, universe[Spider]);  // adresse du Spider : canal vide
-        Assert.Equal(99, universe[Spider + 1]); // ce que le Spider lit comme son « moteur 1 »
+        Assert.Equal(99, universe[Spider]);  // canal de l'adresse du Spider
+        Assert.Equal(15, _show.FindProfile(DefaultShow.SpiderProfileId)!.ChannelCount);
     }
 
     [Fact]
     public void Spider_wings_move_together_or_mirrored_and_meet_in_the_middle()
     {
-        const int Motor1 = 1, Motor2 = 2;
+        const int Motor1 = 0, Motor2 = 1;
 
         _engine.SetMotors("spider-1", 200, mirror: false);
         Assert.Equal(new byte[] { 200, 200 }, _engine.GetValues("spider-1")[Motor1..(Motor2 + 1)]);
@@ -74,7 +74,7 @@ public class EngineTests
     [Fact]
     public void No_strobe_forces_the_strobe_channel_to_zero_whatever_the_value()
     {
-        const int SpiderStrobe = 4;
+        const int SpiderStrobe = 3;
         _engine.SetValue("spider-1", SpiderStrobe, 197);
         Assert.Equal(197, Render()[Spider + SpiderStrobe]);
 
@@ -87,12 +87,12 @@ public class EngineTests
     {
         var profile = _show.FindProfile(DefaultShow.SpiderProfileId)!;
         var (left, right) = LedGroups.Split(profile);
-        Assert.Equal(new[] { 5, 6, 7, 8 }, left);    // LED 1-4
-        Assert.Equal(new[] { 9, 10, 11, 12 }, right); // LED 5-8
+        Assert.Equal(new[] { 4, 5, 6, 7 }, left);    // LED 1-4
+        Assert.Equal(new[] { 8, 9, 10, 11 }, right); // LED 5-8
 
         // Aile gauche "orange" (rouge 200, vert 100) baissee a 50 % : reste orange.
-        _engine.SetValue("spider-1", 5, 200);
-        _engine.SetValue("spider-1", 6, 100);
+        _engine.SetValue("spider-1", 4, 200);
+        _engine.SetValue("spider-1", 5, 100);
         var ratios = LedGroups.Ratios(_engine.GetValues("spider-1"), left);
         _engine.SetGroupLevel("spider-1", left, 100, ratios);
         var values = _engine.GetValues("spider-1");

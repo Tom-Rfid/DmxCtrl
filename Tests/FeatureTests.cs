@@ -53,7 +53,7 @@ public class FeatureTests
         Assert.Equal(models.Count, FixtureLibrary.All().Select(p => p.Id).Distinct().Count());
         Assert.Equal(14, models[FixtureLibrary.Spot260X14Id].ChannelCount);
         Assert.Equal(8, models[FixtureLibrary.Spot260X8Id].ChannelCount);
-        Assert.Equal(16, models[FixtureLibrary.SpiderId].ChannelCount);
+        Assert.Equal(15, models[FixtureLibrary.SpiderId].ChannelCount);
         Assert.Equal(1, models[FixtureLibrary.AyraFogId].ChannelCount);
         Assert.Equal(10, models[FixtureLibrary.GalacticLaserId].ChannelCount);
         Assert.Equal(8, models[FixtureLibrary.ParUvId].ChannelCount);
@@ -102,20 +102,45 @@ public class FeatureTests
     }
 
     [Fact]
+    public void Old_16_channel_spider_with_an_empty_first_channel_becomes_15_channels()
+    {
+        // Profil des versions precedentes : un canal vide en tete (decalage d'adresse disparu depuis).
+        var old = FixtureLibrary.MiniSpider();
+        old.Revision = 1;
+        old.Channels.Insert(0, new ChannelDef { Name = "(vide : décalage du Spider)", Type = ChannelType.Generic });
+        var show = DefaultShow.Create();
+        show.Profiles[show.Profiles.FindIndex(p => p.Id == old.Id)] = old;
+        var values = old.DefaultValues().Select(v => (int)v).ToArray();
+        values[1] = 200;                                  // moteur 1
+        values[old.IndexOf(ChannelType.Dimmer)] = 180;    // dimmer
+        show.LiveState.Values["spider-1"] = values;
+
+        Assert.Single(FixtureLibrary.UpgradeProfiles(show));
+
+        var profile = show.FindProfile(FixtureLibrary.SpiderId)!;
+        Assert.Equal(15, profile.ChannelCount);
+        Assert.Equal(ChannelType.Motor, profile.Channels[0].Type);
+        var remapped = show.LiveState.Values["spider-1"];
+        Assert.Equal(15, remapped.Length);
+        Assert.Equal(200, remapped[0]);
+        Assert.Equal(180, remapped[profile.IndexOf(ChannelType.Dimmer)]);
+    }
+
+    [Fact]
     public void Same_layout_profile_keeps_the_user_changes_and_gets_the_new_details()
     {
         var show = DefaultShow.Create();
         var spider = show.FindProfile(FixtureLibrary.SpiderId)!;
         spider.Revision = 0;
-        spider.Channels[4].StrobeSlow = null;
-        spider.Channels[4].StrobeFast = null;
-        spider.Channels[5].Notes = "vérifié : rouge";
+        spider.Channels[3].StrobeSlow = null;
+        spider.Channels[3].StrobeFast = null;
+        spider.Channels[4].Notes = "vérifié : rouge";
 
         Assert.Empty(FixtureLibrary.UpgradeProfiles(show));
         Assert.Same(spider, show.FindProfile(FixtureLibrary.SpiderId));
-        Assert.Equal("vérifié : rouge", spider.Channels[5].Notes);
-        Assert.NotNull(spider.Channels[4].StrobeSlow);
-        Assert.Equal(1, spider.Revision);
+        Assert.Equal("vérifié : rouge", spider.Channels[4].Notes);
+        Assert.NotNull(spider.Channels[3].StrobeSlow);
+        Assert.Equal(2, spider.Revision);
     }
 
     // =================================================================================
@@ -137,23 +162,23 @@ public class FeatureTests
     [Fact]
     public void Suggested_address_fits_in_a_gap_or_goes_after_the_last_fixture()
     {
-        // Patch par defaut : Spider 1-16, lyres 17-30 et 31-44.
+        // Patch par defaut : Spider 1-15, lyres 16-29 et 30-43.
         var profiles = _show.Profiles.ToList();
         FixtureLibrary.EnsureProfile(profiles, FixtureLibrary.AyraFogId);
         var fixtures = _show.Fixtures.ToList();
-        Assert.Equal(45, PatchValidator.NextFreeAddress(fixtures, profiles, 1));
+        Assert.Equal(44, PatchValidator.NextFreeAddress(fixtures, profiles, 1));
 
-        // On libere 17-30 (lyre 1 desactivee) : la fumee (1 canal) va dans le trou.
+        // On libere 16-29 (lyre 1 desactivee) : la fumee (1 canal) va dans le trou.
         fixtures.First(f => f.Id == "lyre-1").Enabled = false;
-        Assert.Equal(17, PatchValidator.NextFreeAddress(fixtures, profiles, 1));
-        // 16 canaux ne rentrent pas dans 17-30 (14 libres) : apres la derniere lyre.
-        Assert.Equal(45, PatchValidator.NextFreeAddress(fixtures, profiles, 16));
+        Assert.Equal(16, PatchValidator.NextFreeAddress(fixtures, profiles, 1));
+        // 16 canaux ne rentrent pas dans 16-29 (14 libres) : apres la derniere lyre.
+        Assert.Equal(44, PatchValidator.NextFreeAddress(fixtures, profiles, 16));
 
         // Changement de modele : l'adresse actuelle est gardee si elle tient encore.
         var spider = fixtures.First(f => f.Id == "spider-1");
         Assert.Equal(1, PatchValidator.SuggestAddress(fixtures, profiles, 14, spider.Address, spider.Id));
-        Assert.Equal(45, PatchValidator.SuggestAddress(fixtures, profiles, 40, spider.Address, spider.Id));
-        Assert.Contains(PatchValidator.FreeRanges(fixtures, profiles), r => r.Start == 17 && r.End == 30);
+        Assert.Equal(44, PatchValidator.SuggestAddress(fixtures, profiles, 40, spider.Address, spider.Id));
+        Assert.Contains(PatchValidator.FreeRanges(fixtures, profiles), r => r.Start == 16 && r.End == 29);
     }
 
     // =================================================================================
@@ -234,12 +259,12 @@ public class FeatureTests
         _engine.SetFixtureStrobe("lyre-1", true);
 
         var universe = Render();
-        Assert.Equal(255, universe[17 + SpotDimmer]);
-        Assert.Equal(76, universe[17 + SpotShutter]);     // strobe le plus rapide de l'obturateur
-        Assert.Equal(0, universe[31 + SpotDimmer]);       // lyre 2 : toujours en blackout
+        Assert.Equal(255, universe[16 + SpotDimmer]);
+        Assert.Equal(76, universe[16 + SpotShutter]);     // strobe le plus rapide de l'obturateur
+        Assert.Equal(0, universe[30 + SpotDimmer]);       // lyre 2 : toujours en blackout
 
         _engine.StrobeSpeed = 0;
-        Assert.Equal(8, Render()[17 + SpotShutter]);      // strobe le plus lent
+        Assert.Equal(8, Render()[16 + SpotShutter]);      // strobe le plus lent
     }
 
     [Fact]
@@ -247,7 +272,7 @@ public class FeatureTests
     {
         _engine.EditShow(s => s.Fixtures.First(f => f.Id == "spider-1").NoStrobe = true);
         _engine.SetFixtureStrobe("spider-1", true);
-        Assert.Equal(0, Render()[1 + 4]); // canal strobe du Spider
+        Assert.Equal(0, Render()[1 + 3]); // canal strobe du Spider
     }
 
     [Fact]
@@ -256,9 +281,9 @@ public class FeatureTests
         _engine.Master = 0;
         _engine.SetFixtureFlash("lyre-2", true);
         var universe = Render();
-        Assert.Equal(255, universe[31 + SpotDimmer]);
-        Assert.Equal(255, universe[31 + SpotShutter]); // obturateur ouvert
-        Assert.Equal(0, universe[17 + SpotDimmer]);
+        Assert.Equal(255, universe[30 + SpotDimmer]);
+        Assert.Equal(255, universe[30 + SpotShutter]); // obturateur ouvert
+        Assert.Equal(0, universe[16 + SpotDimmer]);
     }
 
     // =================================================================================

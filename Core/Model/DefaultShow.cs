@@ -1,8 +1,8 @@
 // =====================================================================================
 //  DefaultShow.cs
 // -------------------------------------------------------------------------------------
-//  Configuration de depart : le Mini Spider (adresse 1, canaux 1-16) et les 2
-//  Intimidator Spot 260X en 14 canaux (adresses 17 et 31), avec quelques scenes.
+//  Configuration de depart : le Mini Spider (adresse 1, canaux 1-15) et les 2
+//  Intimidator Spot 260X en 14 canaux (adresses 16 et 30), avec quelques scenes.
 //  Les profils viennent de la bibliotheque integree (FixtureLibrary).
 //
 //  Pour ajouter la fumee, le laser ou le PAR UV : Appareils > Ajouter un appareil,
@@ -27,10 +27,10 @@ public static class DefaultShow
             Profiles = { spot, spider },
             Fixtures =
             {
-                // Installation reelle : Spider en adresse 1 (canaux 1 a 16 avec son canal vide),
+                // Installation reelle : Spider en adresse 1 (canaux 1 a 15),
                 // lyres juste apres. Les adresses doivent correspondre au menu de chaque appareil.
-                new FixtureInstance { Id = "lyre-1", Name = "Lyre 1", ProfileId = spot.Id, Address = 17 },
-                new FixtureInstance { Id = "lyre-2", Name = "Lyre 2", ProfileId = spot.Id, Address = 31 },
+                new FixtureInstance { Id = "lyre-1", Name = "Lyre 1", ProfileId = spot.Id, Address = 16 },
+                new FixtureInstance { Id = "lyre-2", Name = "Lyre 2", ProfileId = spot.Id, Address = 30 },
                 new FixtureInstance { Id = "spider-1", Name = "Spider", ProfileId = spider.Id, Address = 1 },
             },
         };
