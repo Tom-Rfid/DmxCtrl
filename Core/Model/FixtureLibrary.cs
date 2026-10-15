@@ -159,10 +159,8 @@ public static class FixtureLibrary
             }
             mine.StrobeSlow ??= theirs.StrobeSlow;
             mine.StrobeFast ??= theirs.StrobeFast;
-            if (mine.Ranges.Count == 0)
-            {
-                mine.Ranges = theirs.Ranges;
-            }
+            // Plages de la notice : toujours reprises du modele (pas modifiables dans l'editeur de profils).
+            mine.Ranges = theirs.Ranges.Count > 0 ? theirs.Ranges : mine.Ranges;
         }
     }
 
@@ -383,10 +381,11 @@ public static class FixtureLibrary
     //  Showtec Galactic RGY-140 MKII Value Line (laser rouge / vert / jaune)
     // =================================================================================
 
+    // Rotations (canaux 8 a 10) : sens d'apres le manuel V3 (le V1 inversait horaire / anti-horaire).
     private static IEnumerable<ChannelRange> RollRanges() => new ChannelRange[]
     {
-        new("Angle fixe (0-359°)", 0, 127), new("Rotation horaire (lent → rapide)", 128, 191),
-        new("Rotation anti-horaire (lent → rapide)", 192, 255),
+        new("Angle fixe (0-359°)", 0, 127), new("Rotation anti-horaire (lent → rapide)", 128, 191),
+        new("Rotation horaire (lent → rapide)", 192, 255),
     };
 
     private static IEnumerable<ChannelRange> MoveRanges() => new ChannelRange[]
@@ -401,8 +400,8 @@ public static class FixtureLibrary
         Name = "Galactic RGY-140 MKII Value Line (laser, 10 canaux)",
         Manufacturer = "Showtec",
         DefaultFixtureName = "Laser",
-        Revision = 2, // 2 : boutons « Son rouge » et « Couleurs d'origine » retires (voir RetiredPresets)
-        Notes = "Table DMX du manuel Highlite (code 51335). Le canal 1 doit être en « DMX » (240-255) pour piloter " +
+        Revision = 3, // 2 : boutons « Son rouge » et « Couleurs d'origine » retires ; 3 : sens des rotations (manuel V3)
+        Notes = "Table DMX des manuels Highlite (code 51335, V1 et V3 : un seul mode DMX de 10 canaux, pas de réglage d'intensité). Le canal 1 doit être en « DMX » (240-255) pour piloter " +
                 "motifs, couleurs et mouvements ; sinon le laser joue ses programmes internes. Couleur 0-24 = laser éteint. " +
                 "SÉCURITÉ : connecteur d'interlock obligatoire ; ne jamais viser le public à hauteur des yeux.",
         Channels =
@@ -453,7 +452,7 @@ public static class FixtureLibrary
             Ch("Rotation axe Y", ChannelType.LaserRoll, 0, ranges: RollRanges()),
             Ch("Rotation axe X", ChannelType.LaserRoll, 0, ranges: RollRanges()),
             Ch("Rotation axe Z", ChannelType.LaserRoll, 0, ranges: RollRanges(),
-                notes: "Le manuel indique « horaire » pour 128-191 et 192-255 (probable coquille : 192-255 = anti-horaire)."),
+                notes: "Rotation sur l'axe Z (sens d'apres le manuel V3)."),
         },
     };
 

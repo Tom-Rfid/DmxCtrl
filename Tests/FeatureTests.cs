@@ -147,7 +147,8 @@ public class FeatureTests
         Assert.DoesNotContain("Son rouge", names);
         Assert.DoesNotContain("Couleurs d'origine", names);
         Assert.Contains("Son vert", names);
-        Assert.Equal(2, old.Revision);
+        Assert.Equal(3, old.Revision);
+        Assert.Contains(old.Channels[^1].Ranges, r => r.From == 192 && r.Name.StartsWith("Rotation horaire")); // manuel V3
     }
 
     [Fact]
