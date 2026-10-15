@@ -220,11 +220,13 @@ internal sealed class PatchDialog : Form
         return side;
     }
 
-    /// <summary>Profils de la config d'abord, puis les modeles de la bibliotheque qui n'y sont pas encore.</summary>
+    /// <summary>Profils de la config + modeles de la bibliotheque qui n'y sont pas encore, par ordre alphabetique.</summary>
     private void FillModelCombos()
     {
+        // Ordre alphabetique (sans tenir compte des majuscules ni des accents).
         var items = _profiles.Select(p => new ModelItem(p.Id, p.Name, FromLibrary: false))
             .Concat(FixtureLibrary.All().Where(m => _profiles.All(p => p.Id != m.Id)).Select(m => new ModelItem(m.Id, m.Name, FromLibrary: true)))
+            .OrderBy(m => TextKey.Normalize(m.Name), StringComparer.Ordinal)
             .ToArray();
 
         string? selectedAdd = (_addModel.SelectedItem as ModelItem)?.Id;
