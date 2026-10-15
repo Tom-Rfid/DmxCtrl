@@ -18,6 +18,10 @@ static class Program
             MessageBox.Show($"Erreur inattendue :\n{e.Exception.Message}\n\nLe programme continue de fonctionner.",
                 "Contrôleur DMX", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
+        // Une tache de fond en erreur que personne n'attend (port Bluetooth mort...) ne doit pas
+        // faire planter le programme.
+        TaskScheduler.UnobservedTaskException += (_, e) => e.SetObserved();
+
         Application.Run(new UI.MainForm());
     }
 }

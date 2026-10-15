@@ -738,39 +738,34 @@ internal sealed class MainForm : Form
 
         _connecting = true;
         UpdateConnectionUi();
-        try
-        {
-            await Task.Run(() =>
-            {
-                _link.Connect(port);
-                _link.StartSending();
-            });
 
+        // TryConnectAndStart ne leve jamais : un boitier eteint ou hors de portee donne juste un
+        // message (aucune exception ne traverse le await, donc plus d'"exception non geree").
+        string? error = null;
+        bool ok = await Task.Run(() => _link.TryConnectAndStart(port, out error));
+
+        _connecting = false;
+        if (ok)
+        {
             _wantConnected = true;
             _wantedPort = port;
             _reconnectAttempts = 0;
             _settings.LastPort = port;
             SaveAppSettings();
             Log($"Connecté au boîtier sur {port} (une trame toutes les {_link.SendIntervalMs} ms).");
-            return true;
         }
-        catch (Exception ex)
+        else
         {
-            try { _link.Disconnect(); } catch (Exception) { /* deja ferme */ }
-            Log($"Échec de connexion sur {port} : {ex.Message}");
+            Log($"Échec de connexion sur {port} : {error}");
             if (!quiet)
             {
-                MessageBox.Show(this, $"Impossible de se connecter sur {port} :\n{ex.Message}\n\n" +
+                MessageBox.Show(this, $"Impossible de se connecter sur {port} :\n{error}\n\n" +
                                       "Vérifie que le boîtier est allumé, appairé, et que c'est bien le port « sortant ».",
                     "Connexion", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            return false;
         }
-        finally
-        {
-            _connecting = false;
-            UpdateConnectionUi();
-        }
+        UpdateConnectionUi();
+        return ok;
     }
 
     private void Disconnect()
@@ -784,7 +779,7 @@ internal sealed class MainForm : Form
     private void OnConnectionLost(string message)
     {
         Log($"Liaison perdue : {message}");
-        try { _link.Disconnect(); } catch (Exception) { /* deja coupe */ }
+        _link.Disconnect(); // ne leve jamais (liaison morte comprise)
         _nextReconnect = DateTime.Now.AddSeconds(2);
         UpdateConnectionUi();
     }

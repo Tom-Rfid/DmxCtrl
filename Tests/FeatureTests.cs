@@ -379,6 +379,17 @@ public class FeatureTests
     }
 
     [Fact]
+    public void Failed_connection_returns_a_message_instead_of_throwing()
+    {
+        using var link = new DmxLink();
+        bool ok = link.TryConnectAndStart("COM255", out string? error); // port qui n'existe pas
+        Assert.False(ok);
+        Assert.False(string.IsNullOrWhiteSpace(error));
+        Assert.False(link.IsConnected);
+        link.Disconnect(); // ne leve jamais, meme sans port
+    }
+
+    [Fact]
     public void Muted_colors_are_forced_to_zero_even_during_a_flash()
     {
         // Spider en 29 : LED 1 rouge gauche = canal 29 + 4, LED 2 vert gauche = 29 + 5.

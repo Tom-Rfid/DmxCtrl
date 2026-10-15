@@ -94,18 +94,81 @@ public sealed class DmxLink : IDisposable
             try
             {
                 port.Open();
+
+                // Defaut connu de .NET avec les ports COM Bluetooth : si la liaison meurt, le
+                // "finaliseur" du flux serie leve une IOException ("delai de temporisation de
+                // semaphore expire") sur un thread interne, ce qui ferait planter l'appli. On le
+                // desactive : c'est SafeClose() qui ferme le port, en avalant ces erreurs.
+                GC.SuppressFinalize(port.BaseStream);
+
                 byte[] hello = DmxFrame.HandshakeConnect();
                 port.Write(hello, 0, hello.Length);
             }
             catch
             {
-                port.Dispose();
+                SafeClose(port);
                 throw;
             }
 
             _port = port;
             LastError = null;
             Interlocked.Exchange(ref _framesSent, 0);
+        }
+    }
+
+    /// <summary>
+    /// Comme Connect + StartSending, mais sans jamais lever d'exception : retourne false et le
+    /// message d'erreur (boitier eteint, hors de portee, port occupe...).
+    /// </summary>
+    public bool TryConnectAndStart(string portName, out string? error)
+    {
+        try
+        {
+            Connect(portName);
+            StartSending();
+            error = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Disconnect(); // ne leve jamais
+            error = FriendlyError(ex);
+            LastError = error;
+            return false;
+        }
+    }
+
+    /// <summary>Message comprehensible pour les erreurs typiques d'un port Bluetooth.</summary>
+    public static string FriendlyError(Exception ex) => ex switch
+    {
+        IOException io when io.Message.Contains("maphore", StringComparison.OrdinalIgnoreCase) =>
+            "le boîtier ne répond pas (éteint, hors de portée ou non appairé). " + io.Message,
+        UnauthorizedAccessException => "le port est déjà utilisé par un autre programme (appli RY-AI, autre fenêtre…).",
+        TimeoutException => "le boîtier ne répond pas (délai dépassé).",
+        _ => ex.Message,
+    };
+
+    /// <summary>Ferme et libere un port sans jamais lever d'exception (liaison Bluetooth morte...).</summary>
+    private static void SafeClose(SerialPort port)
+    {
+        try
+        {
+            if (port.IsOpen)
+            {
+                port.BaseStream.Close();
+            }
+        }
+        catch (Exception)
+        {
+            // liaison deja morte
+        }
+        try
+        {
+            port.Dispose();
+        }
+        catch (Exception)
+        {
+            // idem
         }
     }
 
@@ -145,30 +208,33 @@ public sealed class DmxLink : IDisposable
         }
     }
 
-    /// <summary>Arrete l'envoi, envoie le handshake de deconnexion et ferme le port.</summary>
+    /// <summary>Arrete l'envoi, envoie le handshake de deconnexion et ferme le port. Ne leve jamais.</summary>
     public void Disconnect()
     {
         lock (_stateLock)
         {
             StopSending();
 
-            if (_port is { IsOpen: true })
+            var port = _port;
+            _port = null;
+            if (port is null)
             {
-                try
-                {
-                    byte[] bye = DmxFrame.HandshakeDisconnect();
-                    _port.Write(bye, 0, bye.Length);
-                }
-                catch (Exception)
-                {
-                    // Le boitier a peut-etre deja coupe la liaison : on ferme quand meme.
-                }
-
-                try { _port.Close(); } catch (Exception) { /* idem */ }
+                return;
             }
 
-            _port?.Dispose();
-            _port = null;
+            try
+            {
+                if (port.IsOpen)
+                {
+                    byte[] bye = DmxFrame.HandshakeDisconnect();
+                    port.Write(bye, 0, bye.Length);
+                }
+            }
+            catch (Exception)
+            {
+                // Le boitier a peut-etre deja coupe la liaison : on ferme quand meme.
+            }
+            SafeClose(port);
         }
     }
 
@@ -203,11 +269,11 @@ public sealed class DmxLink : IDisposable
             }
             catch (Exception ex)
             {
-                LastError = ex.Message;
+                LastError = FriendlyError(ex);
                 _sending = false;
                 try
                 {
-                    ConnectionLost?.Invoke(this, ex.Message);
+                    ConnectionLost?.Invoke(this, LastError);
                 }
                 catch (Exception)
                 {
