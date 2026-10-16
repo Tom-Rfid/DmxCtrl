@@ -33,8 +33,9 @@ internal sealed class FogStrip : FlowLayoutPanel
     private readonly Label _output = Chip();
     private readonly Label _info = new() { AutoSize = true, Margin = new Padding(6, 9, 3, 3), ForeColor = Color.DimGray };
     private readonly Button _hold = new() { Text = "FUMÉE (maintenir)", AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(8, 3, 3, 3) };
-    private readonly Button _shot = new() { AutoSize = true, Margin = new Padding(3) };
+    private readonly Button _shot = new() { Margin = new Padding(3) }; // largeur fixe : ne bouge pas avec la duree
     private readonly TrackBar _shotLength = Ui.Slider(1, (int)(FogSettings.MaxShotSeconds * 2), 110); // demi-secondes
+    private readonly NumericUpDown _interval = new() { Minimum = 1, Maximum = 30, Width = 48, Margin = new Padding(0, 6, 0, 3) };
     private readonly CheckBox _auto = new() { Text = "Auto", Appearance = Appearance.Button, AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3), TextAlign = ContentAlignment.MiddleCenter };
     private readonly Button _stop = new() { Text = "Stop", AutoSize = true, Margin = new Padding(3) };
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 250 };
@@ -53,7 +54,24 @@ internal sealed class FogStrip : FlowLayoutPanel
         {
             Controls.Add(Ui.Text(fixture.Name + " :", bold: true));
         }
-        Controls.AddRange(new Control[] { _ready, _output, _hold, _shot, _shotLength, _auto, _stop, _info });
+        var every = new Label { Text = "un jet toutes les", AutoSize = true, Margin = new Padding(3, 9, 2, 3) };
+        var minutes = new Label { Text = "min", AutoSize = true, Margin = new Padding(2, 9, 3, 3) };
+        Controls.AddRange(new Control[] { _ready, _output, _hold, _shot, _shotLength, _auto, every, _interval, minutes, _stop, _info });
+        // Largeur du texte le plus long (« Coup de 2,5 s ») : le bouton garde la meme taille quelle que soit la duree.
+        _shot.Size = new Size(TextRenderer.MeasureText("Coup de 2,5 s", _shot.Font).Width + 20, 26);
+        _interval.Value = fixture.Fog.IntervalMinutes;
+        _interval.ValueChanged += (_, _) =>
+        {
+            if (_updating)
+            {
+                return;
+            }
+            int n = (int)_interval.Value;
+            _ctx.Engine.EditShow(_ => _fixture.Fog.SetIntervalMinutes(n));
+            _ctx.MarkDirty();
+            _ctx.Status($"{_fixture.Name} : mode auto, un jet de {_fixture.Fog.DurationSeconds:0.#} s toutes les {n} min.");
+            UpdateStatus();
+        };
         _shotLength.Margin = new Padding(0, 3, 6, 0);
         _shotLength.Value = Math.Clamp((int)Math.Round(fixture.Fog.ShotSeconds * 2), _shotLength.Minimum, _shotLength.Maximum);
         _shotLength.ValueChanged += (_, _) =>
@@ -68,6 +86,7 @@ internal sealed class FogStrip : FlowLayoutPanel
         tips.SetToolTip(_hold, "Fume tant que le bouton est enfoncé.");
         tips.SetToolTip(_shot, "Un jet de la durée réglée avec le curseur à droite (0,5 à 5 s).");
         tips.SetToolTip(_shotLength, "Durée du bouton « Coup » : 0,5 à 5 s.");
+        tips.SetToolTip(_interval, "Fréquence du mode auto : un jet toutes les 1 à 30 minutes.");
         tips.SetToolTip(_auto, "Mode auto : un jet, une pause (délai), un jet… Réglages dans l'onglet de la machine.");
         tips.SetToolTip(_ready, "ESTIMATION : la machine ne renvoie rien en DMX. Clique « Je viens d'allumer la machine » dans son onglet pour lancer le décompte de chauffe.");
         Disposed += (_, _) => tips.Dispose();
@@ -160,6 +179,10 @@ internal sealed class FogStrip : FlowLayoutPanel
         _shot.Text = $"Coup de {_fixture.Fog.ShotSeconds:0.#} s";
         _updating = true;
         _auto.Checked = s.Auto;
+        if (!_interval.Focused && (int)_interval.Value != _fixture.Fog.IntervalMinutes)
+        {
+            _interval.Value = _fixture.Fog.IntervalMinutes; // change ailleurs (bandeau / onglet)
+        }
         _updating = false;
         _auto.Text = s.Auto ? "AUTO (actif)" : "Manuel → Auto";
         _auto.BackColor = s.Auto ? Color.FromArgb(30, 110, 200) : SystemColors.Control;
@@ -265,7 +288,6 @@ internal sealed class FogPanel : UserControl
     private readonly FixtureInstance _fixture;
     private readonly NumericUpDown _level = new() { Minimum = 1, Maximum = 100, Width = 70 };
     private readonly NumericUpDown _duration = new() { Minimum = 0.5m, Maximum = 600, DecimalPlaces = 1, Increment = 0.5m, Width = 70 };
-    private readonly NumericUpDown _delay = new() { Minimum = 1, Maximum = 3600, Width = 70 };
     private readonly NumericUpDown _warmup = new() { Minimum = 0, Maximum = 30, DecimalPlaces = 1, Increment = 0.5m, Width = 70 };
     private readonly Label _cycle = new() { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(3, 6, 3, 3) };
     private bool _loading;
@@ -319,7 +341,6 @@ internal sealed class FogPanel : UserControl
         var settings = Ui.Table(3);
         Ui.Row(settings, "Débit de fumée", _level, Ui.Text("%"));
         Ui.Row(settings, "Durée d'un jet (auto)", _duration, Ui.Text("s  (mode auto ; le bouton « Coup » a son propre curseur, 0,5 à 5 s)"));
-        Ui.Row(settings, "Délai entre deux jets", _delay, Ui.Text("s  (mode auto : pause après chaque jet)"));
         Ui.Row(settings, "Temps de chauffe", _warmup, Ui.Text("min  (notice Ayra WSM02 : environ 6 min)"));
         settings.Controls.Add(_cycle);
         settings.SetColumnSpan(_cycle, 3);
@@ -335,12 +356,11 @@ internal sealed class FogPanel : UserControl
         _loading = true;
         Ui.SetValue(_level, fixture.Fog.LevelPercent);
         Ui.SetValue(_duration, fixture.Fog.DurationSeconds);
-        Ui.SetValue(_delay, fixture.Fog.DelaySeconds);
         Ui.SetValue(_warmup, fixture.Fog.WarmupMinutes);
         _loading = false;
         UpdateCycleText();
 
-        foreach (var box in new[] { _level, _duration, _delay, _warmup })
+        foreach (var box in new[] { _level, _duration, _warmup })
         {
             box.ValueChanged += (_, _) => SaveSettings();
         }
@@ -354,13 +374,13 @@ internal sealed class FogPanel : UserControl
         }
         int level = (int)_level.Value;
         double duration = (double)_duration.Value;
-        double delay = (double)_delay.Value;
         double warmup = (double)_warmup.Value;
         _ctx.Engine.EditShow(_ =>
         {
             _fixture.Fog.LevelPercent = level;
+            int interval = _fixture.Fog.IntervalMinutes; // la frequence (curseur « toutes les N min ») reste la meme
             _fixture.Fog.DurationSeconds = duration;
-            _fixture.Fog.DelaySeconds = delay;
+            _fixture.Fog.SetIntervalMinutes(interval);
             _fixture.Fog.WarmupMinutes = warmup;
         });
         _ctx.MarkDirty();
@@ -370,7 +390,7 @@ internal sealed class FogPanel : UserControl
     private void UpdateCycleText()
     {
         var fog = _fixture.Fog;
-        _cycle.Text = $"Mode auto : {fog.DurationSeconds:0.#} s de fumée à {fog.LevelPercent} %, puis {fog.DelaySeconds:0} s de pause " +
-                      $"→ un jet toutes les {fog.DurationSeconds + fog.DelaySeconds:0.#} s.";
+        _cycle.Text = $"Mode auto : un jet de {fog.DurationSeconds:0.#} s à {fog.LevelPercent} % toutes les {fog.IntervalMinutes} min " +
+                      "(fréquence réglable à côté du bouton Auto, 1 à 30 min).";
     }
 }

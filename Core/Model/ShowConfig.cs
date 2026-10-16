@@ -128,6 +128,13 @@ public sealed class FogSettings
 
     public const double MaxShotSeconds = 5;
 
+    /// <summary>Mode auto : un jet toutes les N minutes (periode = duree du jet + pause), arrondi a la minute.</summary>
+    public int IntervalMinutes => (int)Math.Clamp(Math.Round((DurationSeconds + DelaySeconds) / 60.0), 1, 30);
+
+    /// <summary>Regle la pause pour avoir un jet toutes les <paramref name="minutes"/> minutes (1 a 30).</summary>
+    public void SetIntervalMinutes(int minutes) =>
+        DelaySeconds = Math.Max(1, Math.Clamp(minutes, 1, 30) * 60 - DurationSeconds);
+
     /// <summary>Pause entre deux jets en mode auto, en secondes.</summary>
     public double DelaySeconds { get; set; } = 60;
 
