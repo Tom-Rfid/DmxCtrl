@@ -120,8 +120,13 @@ public sealed class FogSettings
     /// <summary>Debit de fumee envoye (0..100 %).</summary>
     public int LevelPercent { get; set; } = 100;
 
-    /// <summary>Duree d'un jet de fumee (coup manuel ou cycle auto), en secondes.</summary>
+    /// <summary>Duree d'un jet de fumee en mode auto, en secondes.</summary>
     public double DurationSeconds { get; set; } = 5;
+
+    /// <summary>Duree du bouton « Coup » (jet manuel), en secondes : de 0,5 a <see cref="MaxShotSeconds"/>.</summary>
+    public double ShotSeconds { get; set; } = 3;
+
+    public const double MaxShotSeconds = 5;
 
     /// <summary>Pause entre deux jets en mode auto, en secondes.</summary>
     public double DelaySeconds { get; set; } = 60;

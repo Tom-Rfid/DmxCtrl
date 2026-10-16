@@ -780,7 +780,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Un coup de fumee de la duree reglee (FogSettings.DurationSeconds), a partir de maintenant.</summary>
+    /// <summary>Un coup de fumee de la duree reglee (FogSettings.ShotSeconds), a partir de maintenant.</summary>
     public void FogShot(string fixtureId)
     {
         lock (_lock)
@@ -788,7 +788,7 @@ public sealed class ShowEngine : IFrameSource
             var fixture = _show.Fixtures.FirstOrDefault(f => f.Id == fixtureId);
             if (fixture is not null)
             {
-                FogLocked(fixtureId).ShotUntil = _clock() + Math.Max(0.5, fixture.Fog.DurationSeconds);
+                FogLocked(fixtureId).ShotUntil = _clock() + Math.Clamp(fixture.Fog.ShotSeconds, 0.5, FogSettings.MaxShotSeconds);
             }
         }
     }

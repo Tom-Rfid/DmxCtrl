@@ -158,6 +158,7 @@ public static class ShowStore
             fixture.MutedColors ??= new();
             fixture.Fog.LevelPercent = Math.Clamp(fixture.Fog.LevelPercent, 0, 100);
             fixture.Fog.DurationSeconds = Math.Clamp(fixture.Fog.DurationSeconds, 0.5, 600);
+            fixture.Fog.ShotSeconds = Math.Clamp(fixture.Fog.ShotSeconds, 0.5, FogSettings.MaxShotSeconds);
             fixture.Fog.DelaySeconds = Math.Clamp(fixture.Fog.DelaySeconds, 1, 3600);
             fixture.Fog.WarmupMinutes = Math.Clamp(fixture.Fog.WarmupMinutes, 0, 30);
         }

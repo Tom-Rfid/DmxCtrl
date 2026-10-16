@@ -220,6 +220,7 @@ public class FeatureTests
         {
             fog.Fog.LevelPercent = 50;
             fog.Fog.DurationSeconds = 5;
+            fog.Fog.ShotSeconds = 3;
             fog.Fog.DelaySeconds = 10;
         });
 
@@ -230,10 +231,10 @@ public class FeatureTests
         _engine.SetFogHold("fumee", false);
         Assert.Equal(0, Render()[45]);
 
-        _engine.FogShot("fumee");           // 5 s de fumee
-        _now = 4.9;
+        _engine.FogShot("fumee");           // coup : 3 s de fumee (pas la duree du mode auto)
+        _now = 2.9;
         Assert.Equal(128, Render()[45]);
-        _now = 5.1;
+        _now = 3.1;
         Assert.Equal(0, Render()[45]);
 
         _now = 100;
