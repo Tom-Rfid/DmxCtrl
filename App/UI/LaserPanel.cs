@@ -25,7 +25,7 @@ namespace DmxController.UI;
 internal sealed class RangeControl : FlowLayoutPanel
 {
     private readonly ChannelDef _channel;
-    private readonly ComboBox _ranges = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300, Margin = new Padding(3, 4, 3, 3) };
+    private readonly ComboBox _ranges = new() { DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(3, 4, 3, 3) };
     private readonly TrackBar _slider = Ui.Slider(0, 100, 200);
     private readonly Label _value = Ui.ValueLabel(40);
     private bool _updating;
@@ -33,9 +33,10 @@ internal sealed class RangeControl : FlowLayoutPanel
     /// <summary>Leve quand l'utilisateur change la valeur.</summary>
     public event Action<byte>? ValueChanged;
 
-    public RangeControl(ChannelDef channel)
+    public RangeControl(ChannelDef channel, int listWidth = 300)
     {
         _channel = channel;
+        _ranges.Width = listWidth;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         WrapContents = false;
@@ -106,6 +107,7 @@ internal sealed class LaserPanel : UserControl
     private readonly int _color;
     private readonly int _x;
     private readonly int _y;
+    private readonly int _zoom;
 
     private readonly Button _onOff = new() { Size = new Size(260, 56), Font = Ui.BigFont, Margin = new Padding(6) };
     private readonly Label _state = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(6, 8, 3, 3) };
@@ -124,7 +126,7 @@ internal sealed class LaserPanel : UserControl
     private readonly Label _speedValue = Ui.ValueLabel(80);
     private ColorKind _shownKind = (ColorKind)(-1);
     private readonly XYPad _pad = new() { Size = new Size(240, 240), XLabel = "X →", YLabel = "Y ↓" };
-    private readonly Dictionary<int, RangeControl> _rangeControls = new();
+    private readonly List<(int Index, RangeControl Control)> _rangeControls = new();
     private byte _lastColor = 62; // couleur rendue a l'allumage (rouge) si aucune autre n'a ete choisie
     private bool _updating;
 
@@ -141,6 +143,7 @@ internal sealed class LaserPanel : UserControl
         _x = profile.IndexOf(ChannelType.LaserX);
         _y = profile.IndexOf(ChannelType.LaserY);
         _blink = profile.IndexOf(ChannelType.Strobe);
+        _zoom = profile.IndexOf(ChannelType.LaserZoom);
 
         // Page = une colonne de sections (TableLayoutPanel) dans une zone qui defile : plus fiable
         // qu'un FlowLayoutPanel avec des sauts de ligne autour de GroupBox a taille automatique.
@@ -202,8 +205,8 @@ internal sealed class LaserPanel : UserControl
         var middle = Ui.Flow(0);
         if (_pattern >= 0)
         {
-            // 2 colonnes (1-16 | 17-32) : bouton numero + legende du motif.
-            var grid = Ui.Table(4);
+            // 2 colonnes (1-16 | 17-32) : bouton numero + mini dessin + legende du motif.
+            var grid = Ui.Table(6);
             grid.Dock = DockStyle.None;
             var ranges = profile.Channels[_pattern].Ranges;
             int rows = (ranges.Count + 1) / 2;
@@ -225,9 +228,12 @@ internal sealed class LaserPanel : UserControl
                     Anchor = AnchorStyles.Left,
                     Margin = new Padding(2, 0, 14, 0),
                 };
-                int column = n < rows ? 0 : 2;
+                var icon = new LaserPatternIcon(n);
+                icon.Click += (_, _) => button.PerformClick();
+                int column = n < rows ? 0 : 3;
                 grid.Controls.Add(button, column, n % rows);
-                grid.Controls.Add(legend, column + 1, n % rows);
+                grid.Controls.Add(icon, column + 1, n % rows);
+                grid.Controls.Add(legend, column + 2, n % rows);
             }
             middle.Controls.Add(Ui.Group("Motif (32 motifs)", grid));
         }
@@ -237,6 +243,11 @@ internal sealed class LaserPanel : UserControl
         if (_color >= 0)
         {
             right.Controls.Add(Ui.Group("Couleur", BuildColorSection()));
+        }
+        if (_zoom >= 0)
+        {
+            // Copie du curseur Zoom (aussi dans « Effets ») : sous la main, juste sous les couleurs.
+            right.Controls.Add(Ui.Group("Zoom", BuildZoomControl(listWidth: 190)));
         }
         if (_x >= 0 && _y >= 0)
         {
@@ -273,19 +284,16 @@ internal sealed class LaserPanel : UserControl
             {
                 continue; // le clignotement est dans la section Couleur
             }
+            if (i == _zoom)
+            {
+                Ui.Row(others, $"{channel.Name}  [DMX {fixture.Address + i}]", BuildZoomControl(listWidth: 300));
+                continue;
+            }
             int index = i;
             var control = new RangeControl(channel);
             control.ValueChanged += value => SetChannel(index, value);
-            _rangeControls[i] = control;
-            Control? extra = null;
-            if (channel.Type == ChannelType.LaserZoom)
-            {
-                // Sous 60 le motif se deforme sur ce laser : bouton de retour a 60.
-                var zoomReset = new Button { Text = $"{FixtureLibrary.ZoomDefault}", AutoSize = true, Margin = new Padding(3, 4, 3, 3) };
-                zoomReset.Click += (_, _) => SetChannel(index, FixtureLibrary.ZoomDefault);
-                extra = zoomReset;
-            }
-            Ui.Row(others, $"{channel.Name}  [DMX {fixture.Address + i}]", control, extra);
+            _rangeControls.Add((i, control));
+            Ui.Row(others, $"{channel.Name}  [DMX {fixture.Address + i}]", control);
         }
         var reset = new Button { Text = "Tout remettre par défaut (laser éteint, mode DMX)", AutoSize = true };
         reset.Click += (_, _) =>
@@ -323,6 +331,17 @@ internal sealed class LaserPanel : UserControl
     //  couleur fixe -> vitesse du CLIGNOTEMENT ; alternance / defilement -> VITESSE DU
     //  CHANGEMENT de couleur (0-24 = arret : sans lui, une alternance reste figee).
     // =================================================================================
+
+    /// <summary>Curseur du zoom + bouton de retour a 60 (sous 60 le motif se deforme sur ce laser).</summary>
+    private Control BuildZoomControl(int listWidth)
+    {
+        var control = new RangeControl(_profile.Channels[_zoom], listWidth);
+        control.ValueChanged += value => SetChannel(_zoom, value);
+        _rangeControls.Add((_zoom, control));
+        var reset = new Button { Text = $"{FixtureLibrary.ZoomDefault}", AutoSize = true, Margin = new Padding(3, 4, 3, 3) };
+        reset.Click += (_, _) => SetChannel(_zoom, FixtureLibrary.ZoomDefault);
+        return Ui.Flow(0, control, reset);
+    }
 
     private static ColorKind KindOf(byte color) => color switch
     {
@@ -593,8 +612,12 @@ internal sealed class LaserPanel : UserControl
         else
         {
             EnsureDmxMode();
+            if (_zoom >= 0)
+            {
+                _ctx.Engine.SetValue(_fixture.Id, _zoom, FixtureLibrary.ZoomDefault); // taille nette a l'allumage
+            }
             SetChannel(_color, _lastColor);
-            _ctx.Status($"{_fixture.Name} : faisceau allumé.");
+            _ctx.Status($"{_fixture.Name} : faisceau allumé (zoom {FixtureLibrary.ZoomDefault}).");
         }
     }
 
