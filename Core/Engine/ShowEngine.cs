@@ -171,6 +171,7 @@ public sealed class ShowEngine : IFrameSource
             _fixtureStrobe.Clear();
             _fog.Clear();
             _wingSweep.Clear();
+            _groupSweep = null;
             _beatEffect.Clear();
             _effects = ShowJson.Clone(show.LiveState.Effects);
             _moveEpoch = _chaseEpoch = _clock();
@@ -697,6 +698,138 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
+    //  Sweep tab: moving heads (+ Spider) swinging left <-> right together
+    //  Position x: -1 = left .. 0 = middle .. +1 = right, times the amplitude.
+    //  Moving head: pan = middle (32768) +/- x * a quarter of the travel.
+    //  Spider: motors = 127.5 +/- x * 127.5 (every other one mirrored with SpiderMirror).
+    //  "Crossed": left fixtures get -x, so left and right split apart and come back.
+    // =================================================================================
+
+    private WingSweepState? _groupSweep;
+
+    /// <summary>Moving head for the Sweep tab: a fixture with a pan channel.</summary>
+    public static bool IsSweepHead(FixtureProfile profile) => profile.Has(ChannelType.Pan);
+
+    /// <summary>Fixture with wings for the Sweep tab (Spider): motors but no pan.</summary>
+    public static bool IsSweepWings(FixtureProfile profile) => !profile.Has(ChannelType.Pan) && profile.Has(ChannelType.Motor);
+
+    /// <summary>Starts / stops the automatic sweep of the Sweep tab (starts on the left).</summary>
+    public void SetGroupSweep(bool on)
+    {
+        lock (_lock)
+        {
+            _groupSweep = on ? new WingSweepState { Epoch = _clock() } : null;
+        }
+    }
+
+    /// <summary>true while the automatic sweep of the Sweep tab runs.</summary>
+    public bool IsGroupSweeping
+    {
+        get { lock (_lock) { return _groupSweep is not null; } }
+    }
+
+    /// <summary>Direction factor of a fixture: -1 for a left fixture in crossed mode, flipped again by "Invert pan".</summary>
+    public static int GroupSweepSign(FixtureInstance fixture, GroupSweepSettings settings)
+    {
+        int sign = settings.Crossed && fixture.StageSide == StageSide.Left ? -1 : 1;
+        return fixture.InvertPan ? -sign : sign;
+    }
+
+    /// <summary>true when the fixture is driven by the Sweep tab (ticked, and a moving head or, on the "+ Spider" page, a fixture with wings).</summary>
+    private bool InGroupLocked(FixtureInstance fixture, FixtureProfile profile) =>
+        fixture.Enabled && fixture.InGroupSweep &&
+        (IsSweepHead(profile) || (_show.Settings.GroupSweep.IncludeSpider && IsSweepWings(profile)));
+
+    /// <summary>Length of one swing: fixed delay, or N beats at the BPM (typed or from the microphone).</summary>
+    private double GroupSweepDelayLocked()
+    {
+        var settings = _show.Settings.GroupSweep;
+        return settings.SyncToBpm ? Math.Max(0.25, settings.Beats) * 60.0 / _bpm : Math.Max(0.2, settings.DelaySeconds);
+    }
+
+    /// <summary>Writes the group position <paramref name="x"/> (-1..1) on one fixture: pan of a moving head, motors of a Spider.</summary>
+    private static void WriteGroupPosition(FixtureInstance fixture, FixtureProfile profile, byte[] values, GroupSweepSettings settings, double x)
+    {
+        double v = GroupSweepSign(fixture, settings) * Math.Clamp(x, -1, 1) * Math.Clamp(settings.AmplitudePercent, 0, 100) / 100.0;
+        if (IsSweepHead(profile))
+        {
+            SetAxis(profile, values, ChannelType.Pan, ChannelType.PanFine, Math.Clamp((int)Math.Round(32768 + v * 16384), 0, 65535));
+            return;
+        }
+        byte position = (byte)Math.Round(127.5 + v * 127.5);
+        int motor = 0;
+        foreach (int i in profile.IndicesOf(ChannelType.Motor))
+        {
+            if (i < values.Length)
+            {
+                values[i] = settings.SpiderMirror && motor % 2 == 1 ? (byte)(255 - position) : position;
+            }
+            motor++;
+        }
+    }
+
+    /// <summary>Automatic sweep: left for an even number of swings, right otherwise (replaces pan / motors of the driven fixtures).</summary>
+    private void ApplyGroupSweepLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, double t)
+    {
+        if (_groupSweep is null || !InGroupLocked(fixture, profile))
+        {
+            return;
+        }
+        bool right = (long)Math.Floor(Math.Max(0, StepsLocked(_groupSweep, GroupSweepDelayLocked(), t))) % 2 == 1;
+        WriteGroupPosition(fixture, profile, values, _show.Settings.GroupSweep, right ? 1 : -1);
+    }
+
+    /// <summary>
+    /// Sweep tab pad: writes position <paramref name="x"/> (-1 = left .. +1 = right) into the programmer
+    /// of every driven fixture, and the tilt of the moving heads when <paramref name="tilt16"/> is given.
+    /// </summary>
+    public void SetGroupPosition(double x, int? tilt16)
+    {
+        lock (_lock)
+        {
+            foreach (var fixture in _show.Fixtures)
+            {
+                var profile = _show.FindProfile(fixture.ProfileId);
+                if (profile is null || !InGroupLocked(fixture, profile) || !_programmer.TryGetValue(fixture.Id, out var values))
+                {
+                    continue;
+                }
+                WriteGroupPosition(fixture, profile, values, _show.Settings.GroupSweep, x);
+                if (tilt16 is int tilt && IsSweepHead(profile))
+                {
+                    SetAxis(profile, values, ChannelType.Tilt, ChannelType.TiltFine, Math.Clamp(tilt, 0, 65535));
+                }
+            }
+        }
+    }
+
+    /// <summary>Sweep tab dimmers: sets the Dimmer channels of the ticked moving heads and / or fixtures with wings.</summary>
+    public void SetGroupDimmer(bool heads, bool wings, byte level)
+    {
+        lock (_lock)
+        {
+            foreach (var fixture in _show.Fixtures)
+            {
+                var profile = _show.FindProfile(fixture.ProfileId);
+                if (profile is null || !fixture.Enabled || !fixture.InGroupSweep || !_programmer.TryGetValue(fixture.Id, out var values))
+                {
+                    continue;
+                }
+                if ((heads && IsSweepHead(profile)) || (wings && IsSweepWings(profile)))
+                {
+                    foreach (int i in profile.IndicesOf(ChannelType.Dimmer))
+                    {
+                        if (i < values.Length)
+                        {
+                            values[i] = level;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =================================================================================
     //  Beat effect of the fixtures (PAR): chase of the LED groups / pulse
     // =================================================================================
 
@@ -1017,6 +1150,9 @@ public sealed class ShowEngine : IFrameSource
 
                 // 2 bis: left <-> right effect of the wings (replaces the motor positions)
                 ApplyWingSweepLocked(fixture, profile, values, t);
+
+                // 2 quater: Sweep tab (moving heads + Spider together), above the Spider's own effect
+                ApplyGroupSweepLocked(fixture, profile, values, t);
 
                 // 2 ter: beat effect of the fixtures (chase / pulse)
                 ApplyBeatEffectLocked(fixture, profile, values, t);

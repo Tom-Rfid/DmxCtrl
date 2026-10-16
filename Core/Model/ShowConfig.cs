@@ -42,6 +42,12 @@ public sealed class FixtureInstance
     /// <summary>Inverts the tilt of the movement effects (laser: inverts Y).</summary>
     public bool InvertTilt { get; set; }
 
+    /// <summary>Where the fixture stands on stage (Sweep tab: "crossed" mode mirrors the left and right fixtures).</summary>
+    public StageSide StageSide { get; set; } = StageSide.Center;
+
+    /// <summary>Driven by the Sweep tab (moving heads and fixtures with motors only).</summary>
+    public bool InGroupSweep { get; set; } = true;
+
     /// <summary>
     /// Fixtures with 2 motors (Spider wings): the tab's pad moves the wings mirrored
     /// (opposite sides) instead of moving them in the same direction.
@@ -172,6 +178,53 @@ public sealed class ShowSettings
 
     /// <summary>Dimmer following the volume: time to come back up when the music returns (s).</summary>
     public double SoundDimmerRecoverySeconds { get; set; } = 2;
+
+    /// <summary>Settings of the Sweep tab (moving heads + Spider together).</summary>
+    public GroupSweepSettings GroupSweep { get; set; } = new();
+}
+
+/// <summary>Position of a fixture on stage, seen from the audience.</summary>
+public enum StageSide
+{
+    /// <summary>Middle of the stage.</summary>
+    Center,
+
+    /// <summary>Left side.</summary>
+    Left,
+
+    /// <summary>Right side.</summary>
+    Right,
+}
+
+/// <summary>
+/// Sweep tab: the moving heads (and the Spider) swing left / right together, by hand with the pad
+/// or automatically (delay, typed BPM or microphone tempo, like the Spider effect).
+/// </summary>
+public sealed class GroupSweepSettings
+{
+    /// <summary>Length of one swing in "delay" mode (s).</summary>
+    public double DelaySeconds { get; set; } = 2;
+
+    /// <summary>Swings locked to the tempo (typed BPM or microphone) rather than to the delay.</summary>
+    public bool SyncToBpm { get; set; }
+
+    /// <summary>Number of beats per swing when locked to the tempo.</summary>
+    public double Beats { get; set; } = 2;
+
+    /// <summary>Sweep width: 100 % = +/- a quarter of the pan travel of the moving heads, the whole travel of the Spider motors.</summary>
+    public int AmplitudePercent { get; set; } = 50;
+
+    /// <summary>
+    /// "Crossed" moving heads: those on the left move the opposite way to those on the right, so they
+    /// split apart and come back to the middle. Off: they all go the same way.
+    /// </summary>
+    public bool Crossed { get; set; }
+
+    /// <summary>Spider wings mirrored (they split and meet) instead of moving the same way.</summary>
+    public bool SpiderMirror { get; set; } = true;
+
+    /// <summary>"Moving heads + Spider" page selected: the Spider takes part; otherwise only the moving heads move.</summary>
+    public bool IncludeSpider { get; set; } = true;
 }
 
 /// <summary>Complete content of a configuration file.</summary>

@@ -199,6 +199,10 @@ public static class ShowStore
         s.Master = Math.Clamp(s.Master, 0, 255);
         s.FadeSeconds = Math.Clamp(s.FadeSeconds, 0, 20);
         s.SoundDimmerRecoverySeconds = Math.Clamp(s.SoundDimmerRecoverySeconds, 0.2, 30);
+        s.GroupSweep ??= new();
+        s.GroupSweep.DelaySeconds = Math.Clamp(s.GroupSweep.DelaySeconds, 0.2, 60);
+        s.GroupSweep.Beats = Math.Clamp(s.GroupSweep.Beats, 0.25, 64);
+        s.GroupSweep.AmplitudePercent = Math.Clamp(s.GroupSweep.AmplitudePercent, 5, 100);
     }
 
     /// <summary>Fills what a hand-edited profile may be missing (name, channel names, lists).</summary>

@@ -64,6 +64,7 @@ internal sealed class PatchDialog : Form
     private readonly CheckBox _flash = new() { Text = Tr.T("Flash / strobe (interrupteurs dans l'onglet Soirée)"), AutoSize = true };
     private readonly CheckBox _invertPan = new() { Text = Tr.T("Inverser pan"), AutoSize = true };
     private readonly CheckBox _invertTilt = new() { Text = Tr.T("Inverser tilt"), AutoSize = true };
+    private readonly ComboBox _side = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110 };
     private readonly Label _freeRanges = new() { AutoSize = true, MaximumSize = new Size(330, 0), ForeColor = Color.DimGray, Margin = new Padding(3, 8, 3, 3) };
     private readonly GroupBox _detail = new() { Text = Tr.T("Appareil sélectionné"), Dock = DockStyle.Top, Height = 330, Padding = new Padding(8), Font = Ui.BoldFont };
 
@@ -180,6 +181,8 @@ internal sealed class PatchDialog : Form
         Ui.Row(table, "", _enabled);
         Ui.Row(table, "", _flash);
         Ui.Row(table, "", Ui.Flow(0, _invertPan, _invertTilt));
+        _side.Items.AddRange(new object[] { Tr.T("Gauche"), Tr.T("Milieu"), Tr.T("Droite") });
+        Ui.Row(table, Tr.T("Place sur scène"), _side, Ui.Text(Tr.T("(onglet Balayage, mode croisé)"), color: Color.DimGray));
         Ui.Row(table, "", _freeRanges);
         _detail.Controls.Add(table);
         table.Dock = DockStyle.Fill;
@@ -191,6 +194,7 @@ internal sealed class PatchDialog : Form
         _flash.CheckedChanged += (_, _) => EditSelected(f => f.Flash = _flash.Checked);
         _invertPan.CheckedChanged += (_, _) => EditSelected(f => f.InvertPan = _invertPan.Checked);
         _invertTilt.CheckedChanged += (_, _) => EditSelected(f => f.InvertTilt = _invertTilt.Checked);
+        _side.SelectedIndexChanged += (_, _) => EditSelected(f => f.StageSide = _side.SelectedIndex switch { 0 => StageSide.Left, 2 => StageSide.Right, _ => StageSide.Center });
 
         // ---------------- Add / list ----------------
         var addButton = new Button { Text = Tr.T("Ajouter cet appareil"), AutoSize = true, Font = Ui.BoldFont };
@@ -357,10 +361,12 @@ internal sealed class PatchDialog : Form
             _flash.Checked = fixture.Flash;
             _invertPan.Checked = fixture.InvertPan;
             _invertTilt.Checked = fixture.InvertTilt;
+            _side.SelectedIndex = fixture.StageSide switch { StageSide.Left => 0, StageSide.Right => 2, _ => 1 };
 
             var profile = ProfileOf(fixture);
             bool canMove = profile?.CanMove == true;
             _invertPan.Enabled = _invertTilt.Enabled = canMove;
+            _side.Enabled = canMove || profile?.Has(ChannelType.Motor) == true;
             UpdateRangeLabel(fixture);
         }
         finally

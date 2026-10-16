@@ -626,6 +626,17 @@ internal sealed class MainForm : Form
         }
 
         int insertAt = 1;
+
+        // Sweep tab (moving heads + Spider together) as soon as one of them is in the patch.
+        bool hasMovers = _ctx.Show.Fixtures.Any(f => f.Enabled && _ctx.ProfileOf(f) is FixtureProfile p &&
+                                                    (ShowEngine.IsSweepHead(p) || ShowEngine.IsSweepWings(p)));
+        if (hasMovers)
+        {
+            var sweepPage = new TabPage(Tr.T("Balayage")) { Tag = "sweep" };
+            sweepPage.Controls.Add(new SweepPanel(_ctx));
+            _tabs.TabPages.Insert(insertAt++, sweepPage);
+        }
+
         foreach (var fixture in _ctx.Show.Fixtures)
         {
             var profile = _ctx.ProfileOf(fixture);

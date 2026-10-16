@@ -498,4 +498,98 @@ public class FeatureTests
         Assert.Equal(255, values[4]); // UV
         Assert.Equal(255, values[0]); // dimmer open
     }
+
+    // =================================================================================
+    //  Sweep tab: moving heads + Spider together
+    // =================================================================================
+
+    /// <summary>Coarse pan value (universe) of a default-show moving head.</summary>
+    private byte PanOf(byte[] universe, string fixtureId)
+    {
+        var fixture = _show.Fixtures.First(f => f.Id == fixtureId);
+        return universe[fixture.Address + _show.FindProfile(fixture.ProfileId)!.IndexOf(ChannelType.Pan)];
+    }
+
+    /// <summary>Universe values of the Spider motors (default show: Spider at 29).</summary>
+    private (byte Wing1, byte Wing2) WingsOf(byte[] universe)
+    {
+        var spider = _show.Fixtures.First(f => f.Id == "spider-1");
+        var motors = _show.FindProfile(spider.ProfileId)!.IndicesOf(ChannelType.Motor).ToList();
+        return (universe[spider.Address + motors[0]], universe[spider.Address + motors[1]]);
+    }
+
+    [Fact]
+    public void Sweep_pad_moves_every_head_the_same_way_or_crossed()
+    {
+        _engine.EditShow(s =>
+        {
+            s.Fixtures.First(f => f.Id == "lyre-1").StageSide = StageSide.Left;
+            s.Fixtures.First(f => f.Id == "lyre-2").StageSide = StageSide.Right;
+            s.Settings.GroupSweep.AmplitudePercent = 100;
+            s.Settings.GroupSweep.Crossed = false;
+        });
+
+        _engine.SetGroupPosition(1, null);            // right: middle + a quarter of the travel
+        var u = Render();
+        Assert.Equal(192, PanOf(u, "lyre-1"));
+        Assert.Equal(192, PanOf(u, "lyre-2"));
+
+        _engine.EditShow(s => s.Settings.GroupSweep.Crossed = true);
+        _engine.SetGroupPosition(1, null);            // crossed: the left head goes the other way
+        u = Render();
+        Assert.Equal(64, PanOf(u, "lyre-1"));
+        Assert.Equal(192, PanOf(u, "lyre-2"));
+    }
+
+    [Fact]
+    public void Automatic_sweep_alternates_left_and_right_with_the_spider_mirrored()
+    {
+        _engine.EditShow(s =>
+        {
+            var g = s.Settings.GroupSweep;
+            g.AmplitudePercent = 100;
+            g.DelaySeconds = 2;
+            g.IncludeSpider = true;
+            g.SpiderMirror = true;
+        });
+        _engine.SetGroupSweep(true);
+
+        _now = 0.5;                                    // 1st swing: left
+        var u = Render();
+        Assert.Equal(64, PanOf(u, "lyre-1"));
+        Assert.Equal((0, 255), WingsOf(u));
+
+        _now = 2.5;                                    // 2nd swing: right
+        u = Render();
+        Assert.Equal(192, PanOf(u, "lyre-2"));
+        Assert.Equal((255, 0), WingsOf(u));
+
+        _engine.EditShow(s => s.Settings.GroupSweep.IncludeSpider = false);
+        var before = WingsOf(Render());                // "Moving heads" page: the Spider keeps its own position
+        _now = 4.5;
+        Assert.Equal(before, WingsOf(Render()));
+
+        _engine.SetGroupSweep(false);
+        Assert.False(_engine.IsGroupSweeping);
+    }
+
+    [Fact]
+    public void Sweep_dimmers_drive_heads_and_spider_separately()
+    {
+        var spider = _show.Fixtures.First(f => f.Id == "spider-1");
+        int spiderDimmer = spider.Address + _show.FindProfile(spider.ProfileId)!.IndexOf(ChannelType.Dimmer);
+        var head = _show.Fixtures.First(f => f.Id == "lyre-1");
+        int headDimmer = head.Address + _show.FindProfile(head.ProfileId)!.IndexOf(ChannelType.Dimmer);
+
+        _engine.SetGroupDimmer(heads: false, wings: true, 0);
+        _engine.SetGroupDimmer(heads: true, wings: false, 100);
+        var u = Render();
+        Assert.Equal(100, u[headDimmer]);
+        Assert.Equal(0, u[spiderDimmer]);
+
+        _engine.SetGroupDimmer(heads: true, wings: true, 200);
+        u = Render();
+        Assert.Equal(200, u[headDimmer]);
+        Assert.Equal(200, u[spiderDimmer]);
+    }
 }
