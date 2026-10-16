@@ -131,6 +131,19 @@ public static class FixtureLibrary
     /// <summary>Zoom par defaut du laser Galactic : en dessous de 60 le motif se deforme (constate sur l'appareil).</summary>
     public const byte ZoomDefault = 60;
 
+    /// <summary>Description des 32 motifs du Galactic RGY-140, relevee a l'oeil sur l'appareil.</summary>
+    public static readonly string[] LaserPatternNames =
+    {
+        "cercle", "cercle pointillé", "triangle (base en bas)", "carré",
+        "carré pointillé", "double carré", "grosse croix", "étoile",
+        "L (coin en haut à gauche)", "sablier renversé", "tourbillon", "2 C inversés",
+        "courbe bizarre", "2 quarts de cercle", "double vague", "grande vague",
+        "montagne", "W", "E", "ligne",
+        "ligne pointillée", "lignes", "double ligne horizontale", "croix en ligne",
+        "ligne bas gauche → haut droite", "cercle coupé en 4 / en 8, quart de cercle", "2 petits carrés bas gauche + 1 haut droite", "4 carrés dans les coins",
+        "rond en haut à droite", "pointillé rapide", "petite courbe pointillée rapide", "croix (×) pointillée rapide",
+    };
+
     /// <summary>Valeurs par defaut corrigees dans un modele (type de canal -> valeur), appliquees aux configurations.</summary>
     private static readonly Dictionary<string, (ChannelType Type, byte Default)[]> UpdatedDefaults = new()
     {
@@ -472,7 +485,7 @@ public static class FixtureLibrary
                     new("DMX (manuel)", 240, 255),
                 }),
             Ch("Motif", ChannelType.LaserPattern, 0, notes: "32 motifs de 8 valeurs chacun (motif 1 = 0-7, motif 2 = 8-15…).",
-                ranges: Enumerable.Range(0, 32).Select(n => new ChannelRange($"Motif {n + 1}", (byte)(n * 8), (byte)(n * 8 + 7)))),
+                ranges: Enumerable.Range(0, 32).Select(n => new ChannelRange($"Motif {n + 1} : {LaserPatternNames[n]}", (byte)(n * 8), (byte)(n * 8 + 7)))),
             Ch("Couleur", ChannelType.LaserColor, 0, notes: "0-24 = laser éteint (blackout).",
                 presets: new ChannelPreset[]
                 {

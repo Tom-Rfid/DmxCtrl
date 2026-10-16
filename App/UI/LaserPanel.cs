@@ -202,19 +202,32 @@ internal sealed class LaserPanel : UserControl
         var middle = Ui.Flow(0);
         if (_pattern >= 0)
         {
-            var grid = Ui.Flow(8 * 52);
+            // 2 colonnes (1-16 | 17-32) : bouton numero + legende du motif.
+            var grid = Ui.Table(4);
+            grid.Dock = DockStyle.None;
             var ranges = profile.Channels[_pattern].Ranges;
+            int rows = (ranges.Count + 1) / 2;
             for (int n = 0; n < ranges.Count; n++)
             {
                 var range = ranges[n];
-                var button = new Button { Text = (n + 1).ToString(), Size = new Size(46, 34), Tag = range, Margin = new Padding(3) };
+                var button = new Button { Text = (n + 1).ToString(), Size = new Size(40, 26), Tag = range, Margin = new Padding(2) };
                 button.Click += (_, _) =>
                 {
                     EnsureDmxMode();
                     SetChannel(_pattern, range.At(0.5));
                 };
                 _patternButtons.Add(button);
-                grid.Controls.Add(button);
+                int colon = range.Name.IndexOf(" : ", StringComparison.Ordinal);
+                var legend = new Label
+                {
+                    Text = colon >= 0 ? range.Name[(colon + 3)..] : "",
+                    AutoSize = true,
+                    Anchor = AnchorStyles.Left,
+                    Margin = new Padding(2, 0, 14, 0),
+                };
+                int column = n < rows ? 0 : 2;
+                grid.Controls.Add(button, column, n % rows);
+                grid.Controls.Add(legend, column + 1, n % rows);
             }
             middle.Controls.Add(Ui.Group("Motif (32 motifs)", grid));
         }
