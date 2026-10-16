@@ -1,4 +1,4 @@
-// Tests de l'analyse du micro avec des signaux synthetiques (pas de vrai micro).
+// Tests of the microphone analysis with synthetic signals (no real microphone).
 
 using DmxController.Core.Audio;
 using DmxController.Core.Engine;
@@ -11,7 +11,7 @@ public class AudioTests
 {
     private const int Rate = 44100;
 
-    /// <summary>Un "coup de grosse caisse" (bruit qui decroit vite) a chaque temps, sur fond de bruit faible.</summary>
+    /// <summary>A "kick drum hit" (fast-decaying noise) on every beat, over a faint background noise.</summary>
     private static float[] Clicks(double bpm, double seconds, double amplitude = 0.8, int seed = 1, double bed = 0.02)
     {
         var rng = new Random(seed);
@@ -28,7 +28,7 @@ public class AudioTests
 
     private static void Feed(BeatDetector detector, float[] samples)
     {
-        // Par paquets de 30 ms, comme le micro.
+        // In 30 ms packets, like the microphone.
         for (int i = 0; i < samples.Length; i += 1323)
         {
             detector.AddSamples(samples.AsSpan(i, Math.Min(1323, samples.Length - i)));
@@ -67,15 +67,15 @@ public class AudioTests
     public void Dimmer_drops_when_the_music_gets_quiet_and_comes_back_progressively()
     {
         var detector = new BeatDetector(Rate) { RecoverySeconds = 2 };
-        Feed(detector, Clicks(120, 6, amplitude: 0.8, bed: 0.15));          // musique : fond + grosse caisse
+        Feed(detector, Clicks(120, 6, amplitude: 0.8, bed: 0.15));          // music: background + kick drum
         Assert.InRange(detector.DimmerFactor, 0.9, 1.0);
 
-        Feed(detector, Clicks(120, 1.5, amplitude: 0.0, seed: 2, bed: 0.005)); // break : presque silence
+        Feed(detector, Clicks(120, 1.5, amplitude: 0.0, seed: 2, bed: 0.005)); // break: almost silence
         Assert.InRange(detector.DimmerFactor, 0.0, 0.4);
 
-        Feed(detector, Clicks(120, 0.5, amplitude: 0.8, seed: 3, bed: 0.15)); // la musique revient...
+        Feed(detector, Clicks(120, 0.5, amplitude: 0.8, seed: 3, bed: 0.15)); // the music comes back...
         double half = detector.DimmerFactor;
-        Assert.InRange(half, 0.2, 0.8);                            // ... le dimmer remonte progressivement
+        Assert.InRange(half, 0.2, 0.8);                            // ... the dimmer comes back up gradually
         Feed(detector, Clicks(120, 2.5, amplitude: 0.8, seed: 4, bed: 0.15));
         Assert.True(detector.DimmerFactor > half);
         Assert.InRange(detector.DimmerFactor, 0.85, 1.0);
@@ -87,7 +87,7 @@ public class AudioTests
         double now = 0;
         var engine = new ShowEngine(() => now);
         engine.LoadShow(DefaultShow.Create());
-        engine.SetValue("lyre-1", 10, 200);             // dimmer de la lyre 1 (adresse 1)
+        engine.SetValue("lyre-1", 10, 200);             // dimmer of moving head 1 (address 1)
         engine.SoundDimmerEnabled = true;
         engine.SoundDimmerFactor = 0.5;
         var universe = DmxFrame.NewUniverse();
@@ -106,7 +106,7 @@ public class AudioTests
         engine.EditShow(_ =>
         {
             spider.WingSweepSyncToBpm = true;
-            spider.WingSweepBeats = 2;                   // 2 temps a 120 BPM = 1 s par cote
+            spider.WingSweepBeats = 2;                   // 2 beats at 120 BPM = 1 s per side
         });
         engine.Bpm = 120;
         engine.SetWingSweep("spider-1", true);
@@ -124,9 +124,9 @@ public class AudioTests
         now = 2.1;
         Assert.Equal(0, Motor1());
 
-        engine.Bpm = 60;                                 // tempo qui change : pas de saut immediat
+        engine.Bpm = 60;                                 // tempo that changes: no immediate jump
         Assert.Equal(0, Motor1());
-        now = 4.2;                                       // 2 s par cote a 60 BPM
+        now = 4.2;                                       // 2 s per side at 60 BPM
         Assert.Equal(255, Motor1());
     }
 }

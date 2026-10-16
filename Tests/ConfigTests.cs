@@ -1,4 +1,4 @@
-// Tests de la configuration : sauvegarde/rechargement JSON, validation du patch, presets.
+// Tests of the configuration: JSON save/reload, patch validation, presets.
 
 using DmxController.Core.Model;
 using DmxController.Core.Storage;
@@ -18,14 +18,14 @@ public class ConfigTests
         {
             ShowStore.SaveShow(show, path);
             string json = File.ReadAllText(path);
-            Assert.Contains("\"Soirée par défaut\"", json);  // accents lisibles
-            Assert.Contains("\"ColorWheel\"", json);         // enums en texte
+            Assert.Contains("\"Soirée par défaut\"", json);  // readable accents
+            Assert.Contains("\"ColorWheel\"", json);         // enums as text
 
             var loaded = ShowStore.LoadShow(path);
             Assert.Equal(show.Fixtures.Select(f => (f.Id, f.Name, f.Address)), loaded.Fixtures.Select(f => (f.Id, f.Name, f.Address)));
             Assert.Equal(show.Profiles[0].Channels.Select(c => c.Name), loaded.Profiles[0].Channels.Select(c => c.Name));
             Assert.Contains(loaded.Profiles[0].Channels[5].Presets, p => p.Name == "Bleu" && p.Value == 42);
-            Assert.Equal((byte?)76, loaded.Profiles[0].Channels[11].StrobeFast);            // strobe de l'obturateur 260X
+            Assert.Equal((byte?)76, loaded.Profiles[0].Channels[11].StrobeFast);            // strobe of the 260X shutter
             Assert.Equal(show.Profiles[0].Channels[5].Ranges.Count, loaded.Profiles[0].Channels[5].Ranges.Count);
             Assert.Equal(show.Fixtures[0].Fog.DelaySeconds, loaded.Fixtures[0].Fog.DelaySeconds);
             Assert.Equal(show.Scenes.Count, loaded.Scenes.Count);
@@ -65,8 +65,8 @@ public class ConfigTests
     public void Overlapping_and_out_of_range_fixtures_are_reported()
     {
         var show = DefaultShow.Create();
-        show.Fixtures[1].Address = 10;   // Lyre 2 (14 canaux) sur 10-23 : chevauche Lyre 1 (1-14)
-        show.Fixtures[2].Address = 505;  // Spider (15 canaux) jusqu'a 519 : hors univers
+        show.Fixtures[1].Address = 10;   // Lyre 2 (14 channels) on 10-23: overlaps Lyre 1 (1-14)
+        show.Fixtures[2].Address = 505;  // Spider (15 channels) up to 519: outside the universe
 
         var problems = PatchValidator.Validate(show);
         Assert.Equal(2, problems.Count);

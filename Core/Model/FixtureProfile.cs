@@ -1,43 +1,47 @@
 // =====================================================================================
 //  FixtureProfile.cs
 // -------------------------------------------------------------------------------------
-//  Un PROFIL (ou "module") decrit un TYPE d'appareil : la liste ordonnee de ses
-//  canaux DMX, avec pour chacun son role, sa valeur par defaut et ses presets.
-//  Exemple : "Intimidator Spot 260X - 14 canaux".
+//  A PROFILE (or "module") describes a KIND of fixture: the ordered list of its DMX
+//  channels, with for each one its role, its default value and its presets.
+//  Example: "Intimidator Spot 260X - 14 channels".
 //
-//  Un profil ne dit PAS ou l'appareil est branche : c'est le role du patch
-//  (FixtureInstance), qui associe un nom ("Lyre 1"), un profil et une adresse.
-//  Deux lyres identiques partagent donc le meme profil : corriger le profil une
-//  fois corrige les deux.
+//  A profile does NOT say where the fixture is connected: that is the job of the
+//  patch (FixtureInstance), which links a name ("Lyre 1"), a profile and an address.
+//  Two identical moving heads therefore share the same profile: fixing the profile
+//  once fixes both.
 // =====================================================================================
 
 using System.Text.Json.Serialization;
 
 namespace DmxController.Core.Model;
 
-/// <summary>Valeur nommee d'un canal (ex: roue de couleurs "Rouge" = 18).</summary>
+/// <summary>Named value of a channel (e.g. colour wheel "Rouge" = 18).</summary>
 public sealed class ChannelPreset
 {
+    /// <summary>Preset name (French key, e.g. "Rouge").</summary>
     public string Name { get; set; } = "";
+    /// <summary>Channel value of the preset (0..255).</summary>
     public byte Value { get; set; }
 
+    /// <summary>Empty preset (for JSON).</summary>
     public ChannelPreset()
     {
     }
 
+    /// <summary>Preset <paramref name="name"/> = <paramref name="value"/>.</summary>
     public ChannelPreset(string name, byte value)
     {
         Name = name;
         Value = value;
     }
 
-    /// <summary>Format texte utilise dans l'editeur : "Rouge=18; Vert=36".</summary>
+    /// <summary>Text format used in the editor: "Rouge=18; Vert=36".</summary>
     public static string Format(IEnumerable<ChannelPreset> presets) =>
         string.Join("; ", presets.Select(p => $"{p.Name}={p.Value}"));
 
     /// <summary>
-    /// Lit le format "Nom=valeur; Nom=valeur". Leve FormatException avec un message
-    /// lisible si une entree est invalide (affiche tel quel a l'utilisateur).
+    /// Reads the "Name=value; Name=value" format. Throws FormatException with a readable
+    /// message when an entry is invalid (shown as is to the user).
     /// </summary>
     public static List<ChannelPreset> Parse(string? text)
     {
@@ -70,20 +74,25 @@ public sealed class ChannelPreset
 }
 
 /// <summary>
-/// Plage de valeurs d'un canal qui a un sens precis, d'apres la notice
-/// (ex. laser, canal X : "Rotation horaire" = 128 a 191, de lent a rapide).
-/// Les onglets speciaux (laser) en font une liste deroulante + un curseur dans la plage.
+/// Range of values of a channel that has a precise meaning, from the manual
+/// (e.g. laser, X channel: "Clockwise rotation" = 128 to 191, slow to fast).
+/// Special tabs (laser) turn them into a drop-down list + a slider inside the range.
 /// </summary>
 public sealed class ChannelRange
 {
+    /// <summary>Range name from the manual (French key, translated when shown).</summary>
     public string Name { get; set; } = "";
+    /// <summary>First value of the range.</summary>
     public byte From { get; set; }
+    /// <summary>Last value of the range (inclusive).</summary>
     public byte To { get; set; }
 
+    /// <summary>Empty range (for JSON).</summary>
     public ChannelRange()
     {
     }
 
+    /// <summary>Range <paramref name="name"/> from <paramref name="from"/> to <paramref name="to"/>.</summary>
     public ChannelRange(string name, byte from, byte to)
     {
         Name = name;
@@ -91,52 +100,57 @@ public sealed class ChannelRange
         To = to;
     }
 
+    /// <summary>true when <paramref name="value"/> is inside the range.</summary>
     public bool Contains(byte value) => value >= From && value <= To;
 
-    /// <summary>Valeur a la position "fraction" (0 = debut de plage, 1 = fin).</summary>
+    /// <summary>Value at position "fraction" (0 = start of the range, 1 = end).</summary>
     public byte At(double fraction) => (byte)Math.Round(From + Math.Clamp(fraction, 0, 1) * (To - From));
 
-    /// <summary>Position (0..1) d'une valeur dans la plage.</summary>
+    /// <summary>Position (0..1) of a value in the range.</summary>
     public double FractionOf(byte value) => To == From ? 0 : Math.Clamp((value - From) / (double)(To - From), 0, 1);
 
+    /// <summary>Translated name and values, for the drop-down lists.</summary>
     public override string ToString() => From == To ? $"{Tr.T(Name)} ({From})" : $"{Tr.T(Name)} ({From}-{To})";
 }
 
-/// <summary>Un canal d'un profil.</summary>
+/// <summary>One channel of a profile.</summary>
 public sealed class ChannelDef
 {
+    /// <summary>Channel name (e.g. "Dimmer", "Roue de couleurs").</summary>
     public string Name { get; set; } = "Canal";
+    /// <summary>Role of the channel, used by the engine.</summary>
     public ChannelType Type { get; set; } = ChannelType.Generic;
 
-    /// <summary>Valeur au demarrage et apres "Valeurs par defaut".</summary>
+    /// <summary>Value at start-up and after "Default values".</summary>
     public byte Default { get; set; }
 
     /// <summary>
-    /// Strobe "materiel" de l'appareil sur ce canal : valeur du strobe le plus lent et du plus
-    /// rapide (ex. obturateur de la 260X : 8 et 76). Utilise par les interrupteurs de strobe
-    /// de l'onglet Soiree. Null = ce canal ne fait pas de strobe.
+    /// "Hardware" strobe of the fixture on this channel: value of the slowest and of the fastest
+    /// strobe (e.g. shutter of the 260X: 8 and 76). Used by the strobe switches of the Show tab.
+    /// Null = this channel does not strobe.
     /// </summary>
     public byte? StrobeSlow { get; set; }
 
+    /// <summary>Fastest hardware strobe value (see StrobeSlow).</summary>
     public byte? StrobeFast { get; set; }
 
-    /// <summary>Plages de valeurs de la notice (optionnel, utilise par les onglets speciaux).</summary>
+    /// <summary>Value ranges from the manual (optional, used by the special tabs).</summary>
     public List<ChannelRange> Ranges { get; set; } = new();
 
-    /// <summary>Canal qui sait faire un strobe (canal Strobe, ou obturateur avec plage de strobe).</summary>
+    /// <summary>Channel that can strobe (Strobe channel, or shutter with a strobe range).</summary>
     [JsonIgnore]
     public bool IsStrobeCapable => Type == ChannelType.Strobe || StrobeSlow is not null;
 
     /// <summary>
-    /// Valeur "fixe" (sans strobe) : 0 pour un canal Strobe ; pour un obturateur, sa valeur par defaut
-    /// (ouvert : 255 sur la 260X) car 0 y voudrait dire "noir complet".
+    /// "Fixed" value (no strobe): 0 for a Strobe channel; for a shutter, its default value
+    /// (open: 255 on the 260X) because 0 would mean "complete darkness" there.
     /// </summary>
     [JsonIgnore]
     public byte NoStrobeValue => Type == ChannelType.Strobe ? (byte)0 : (Default > 0 ? Default : (byte)255);
 
     /// <summary>
-    /// true si la valeur fait strober : plages de la notice dont le nom contient « strobe » (hors
-    /// « pas de strobe »), sinon StrobeSlow..StrobeFast, sinon (canal Strobe sans plage) toute valeur > 0.
+    /// true when the value makes it strobe: ranges of the manual whose name contains "strobe" (except
+    /// "pas de strobe"), otherwise StrobeSlow..StrobeFast, otherwise (Strobe channel without ranges) any value > 0.
     /// </summary>
     public bool IsStrobeValue(byte value)
     {
@@ -157,52 +171,59 @@ public sealed class ChannelDef
     }
 
     /// <summary>
-    /// true une fois que quelqu'un a verifie SUR L'APPAREIL que ce canal fait bien
-    /// ce que dit le profil. Les canaux non verifies sont signales "(?)" dans l'IHM.
+    /// true once someone checked ON THE FIXTURE that this channel does what the profile says.
+    /// Unchecked channels are marked "(?)" in the UI.
     /// </summary>
     public bool Verified { get; set; }
 
+    /// <summary>Free notes (shown under the channel name).</summary>
     public string Notes { get; set; } = "";
+    /// <summary>Named values of the channel.</summary>
     public List<ChannelPreset> Presets { get; set; } = new();
 }
 
-/// <summary>Un type d'appareil (module) : sa liste de canaux.</summary>
+/// <summary>A kind of fixture (module): its list of channels.</summary>
 public sealed class FixtureProfile
 {
+    /// <summary>Unique id of the profile (fixtures refer to it).</summary>
     public string Id { get; set; } = NewId();
+    /// <summary>Model name.</summary>
     public string Name { get; set; } = "Nouveau module";
+    /// <summary>Brand of the fixture.</summary>
     public string Manufacturer { get; set; } = "";
+    /// <summary>Notes shown in the fixture tab (DMX mode, sources...).</summary>
     public string Notes { get; set; } = "";
 
-    /// <summary>Debut du nom propose pour un nouvel appareil de ce modele (« Lyre » -> « Lyre 3 »).</summary>
+    /// <summary>Start of the name suggested for a new fixture of this model ("Lyre" -> "Lyre 3").</summary>
     public string DefaultFixtureName { get; set; } = "";
 
     /// <summary>
-    /// Version du modele dans la bibliotheque integree (FixtureLibrary). Permet de mettre a
-    /// jour automatiquement un profil copie dans une ancienne configuration.
+    /// Version of the model in the built-in library (FixtureLibrary). Lets a profile copied into
+    /// an old configuration be updated automatically.
     /// </summary>
     public int Revision { get; set; }
 
+    /// <summary>Channels in DMX order (index 0 = start address).</summary>
     public List<ChannelDef> Channels { get; set; } = new();
 
-    // Proprietes calculees : [JsonIgnore] sinon System.Text.Json les ecrirait dans le fichier.
+    // Computed properties: [JsonIgnore], otherwise System.Text.Json would write them to the file.
     [JsonIgnore] public int ChannelCount => Channels.Count;
     [JsonIgnore] public int UnverifiedCount => Channels.Count(c => !c.Verified);
     [JsonIgnore] public bool IsFullyVerified => UnverifiedCount == 0;
 
-    /// <summary>true si l'appareil a un pan ou un tilt (lyre) : cible des effets de mouvement.</summary>
+    /// <summary>true when the fixture has a pan or a tilt (moving head): target of the movement effects.</summary>
     [JsonIgnore] public bool CanMove => Has(ChannelType.Pan) || Has(ChannelType.Tilt);
 
-    /// <summary>Machine a fumee : onglet et bandeau "fumee".</summary>
+    /// <summary>Fog machine: "fog" tab and banner.</summary>
     [JsonIgnore] public bool IsFogMachine => Has(ChannelType.Fog);
 
-    /// <summary>Laser : onglet special laser.</summary>
+    /// <summary>Laser: special laser tab.</summary>
     [JsonIgnore] public bool IsLaser => Has(ChannelType.LaserPattern) || Has(ChannelType.LaserColor);
 
-    /// <summary>true si un canal sait faire un strobe materiel (voir ChannelDef.StrobeSlow).</summary>
+    /// <summary>true when a channel can do a hardware strobe (see ChannelDef.StrobeSlow).</summary>
     [JsonIgnore] public bool HasHardwareStrobe => Channels.Any(c => c.StrobeSlow is not null && c.StrobeFast is not null);
 
-    /// <summary>"Lyre", "Spider"... : nom propose pour un nouvel appareil de ce modele.</summary>
+    /// <summary>"Lyre", "Spider"...: name suggested for a new fixture of this model (translated).</summary>
     [JsonIgnore]
     public string FixtureNameBase => !string.IsNullOrWhiteSpace(DefaultFixtureName) ? Tr.T(DefaultFixtureName)
         : CanMove ? Tr.T("Lyre")
@@ -211,8 +232,8 @@ public sealed class FixtureProfile
         : Tr.T("Appareil");
 
     /// <summary>
-    /// Canal "Mode" a plage manuelle (ex. PAR UV, canal 6 : « Manuel » 0-10) : index du canal et plage,
-    /// ou null si l'appareil n'a pas ce genre de mode.
+    /// "Mode" channel with a manual range (e.g. UV PAR, channel 6: "Manuel" 0-10): channel index and
+    /// range, or null when the fixture has no such mode.
     /// </summary>
     public (int Index, ChannelRange Manual)? ManualModeRange()
     {
@@ -232,25 +253,28 @@ public sealed class FixtureProfile
     }
 
     /// <summary>
-    /// false si l'appareil joue un programme interne (canal Mode hors de la plage « Manuel ») :
-    /// il ignore alors dimmer, couleurs et strobe envoyes en DMX. true sinon (ou sans canal Mode).
+    /// false when the fixture plays an internal program (Mode channel outside the "Manuel" range):
+    /// it then ignores dimmer, colours and strobe sent over DMX. true otherwise (or without a Mode channel).
     /// </summary>
     public bool IsInManualMode(byte[] values) =>
         ManualModeRange() is not { } mode || mode.Index >= values.Length || mode.Manual.Contains(values[mode.Index]);
 
-    /// <summary>Indices des canaux d'un type, dans l'ordre du profil.</summary>
+    /// <summary>Indexes of the channels of a type, in profile order.</summary>
     public int[] IndicesOf(ChannelType type) =>
         Enumerable.Range(0, Channels.Count).Where(i => Channels[i].Type == type).ToArray();
 
-    /// <summary>Index (0 = premier canal du profil) du premier canal de ce type, ou -1.</summary>
+    /// <summary>Index (0 = first channel of the profile) of the first channel of this type, or -1.</summary>
     public int IndexOf(ChannelType type) => Channels.FindIndex(c => c.Type == type);
 
+    /// <summary>true when the profile has a channel of this type.</summary>
     public bool Has(ChannelType type) => IndexOf(type) >= 0;
 
-    /// <summary>Valeurs par defaut de tous les canaux, dans l'ordre du profil.</summary>
+    /// <summary>Default values of every channel, in profile order.</summary>
     public byte[] DefaultValues() => Channels.Select(c => c.Default).ToArray();
 
+    /// <summary>New random profile id (12 hex characters).</summary>
     public static string NewId() => Guid.NewGuid().ToString("N")[..12];
 
+    /// <summary>Translated name, for the lists.</summary>
     public override string ToString() => Tr.T(Name);
 }

@@ -1,12 +1,12 @@
 // =====================================================================================
 //  MicController.cs
 // -------------------------------------------------------------------------------------
-//  LE micro de l'application, partage par tous les onglets (Soiree, Spider...) :
-//    - Ecouter / couper ;
-//    - FollowBpm   : le tempo detecte remplace le BPM du moteur ;
-//    - SoundDimmer : le dimmer suit le volume.
-//  Un minuteur (10 fois/s) pousse le BPM et le facteur de dimmer au moteur, puis
-//  leve Changed pour que chaque onglet mette son affichage a jour.
+//  THE microphone of the application, shared by all tabs (Show, Spider...):
+//    - listen / stop;
+//    - FollowBpm   : the detected tempo replaces the engine BPM;
+//    - SoundDimmer : the dimmer follows the volume.
+//  A timer (10 times/s) pushes the BPM and the dimmer factor to the engine, then
+//  raises Changed so that every tab refreshes its display.
 // =====================================================================================
 
 using DmxController.Core.Engine;
@@ -14,6 +14,7 @@ using DmxController.Core.Model;
 
 namespace DmxController.Audio;
 
+/// <summary>Shared microphone of the application: listening state, tempo and volume follow-up, pushed to the engine 10 times per second.</summary>
 internal sealed class MicController : IDisposable
 {
     private readonly ShowEngine _engine;
@@ -23,6 +24,7 @@ internal sealed class MicController : IDisposable
     private bool _followBpm;
     private bool _soundDimmer;
 
+    /// <summary>Creates the controller for this engine; <paramref name="settings"/> gives the current show settings (chosen device, recovery time).</summary>
     public MicController(ShowEngine engine, Func<ShowSettings> settings)
     {
         _engine = engine;
@@ -32,22 +34,25 @@ internal sealed class MicController : IDisposable
         _timer.Start();
     }
 
-    /// <summary>Etat ou mesures changes (leve sur le thread de l'IHM).</summary>
+    /// <summary>State or measurements changed (raised on the UI thread).</summary>
     public event Action? Changed;
 
-    /// <summary>Erreur du micro (leve depuis le thread audio).</summary>
+    /// <summary>Microphone error (raised from the audio thread).</summary>
     public event Action<string>? Error;
 
+    /// <summary>true while the microphone is listening.</summary>
     public bool IsListening => _mic.IsRunning;
 
-    /// <summary>Tempo detecte (0 = pas encore / pas fiable).</summary>
+    /// <summary>Detected tempo (0 = not yet / not reliable).</summary>
     public double Bpm => _mic.Detector?.Bpm ?? 0;
 
+    /// <summary>Current volume in dB (-90 when not listening).</summary>
     public double LevelDb => _mic.Detector?.LevelDb ?? -90;
 
+    /// <summary>Dimmer factor from the volume (1 when not listening).</summary>
     public double DimmerFactor => _mic.Detector?.DimmerFactor ?? 1;
 
-    /// <summary>Le tempo detecte remplace le BPM (mouvements, chenillard, effet du Spider...).</summary>
+    /// <summary>The detected tempo replaces the BPM (movements, chase, Spider effect...).</summary>
     public bool FollowBpm
     {
         get => _followBpm;
@@ -58,7 +63,7 @@ internal sealed class MicController : IDisposable
         }
     }
 
-    /// <summary>Le dimmer baisse quand le volume baisse, puis remonte.</summary>
+    /// <summary>The dimmer drops when the volume drops, then comes back up.</summary>
     public bool SoundDimmer
     {
         get => _soundDimmer;
@@ -74,6 +79,7 @@ internal sealed class MicController : IDisposable
         }
     }
 
+    /// <summary>Names of the Windows sound inputs, in device-number order.</summary>
     public static List<string> DeviceNames()
     {
         try
@@ -86,7 +92,7 @@ internal sealed class MicController : IDisposable
         }
     }
 
-    /// <summary>Numero de l'entree choisie dans les reglages (ou la premiere).</summary>
+    /// <summary>Number of the input chosen in the settings (or the first one).</summary>
     public int PreferredDevice()
     {
         var names = DeviceNames();
@@ -94,7 +100,7 @@ internal sealed class MicController : IDisposable
         return index >= 0 ? index : (names.Count > 0 ? 0 : -1);
     }
 
-    /// <summary>Ecoute l'entree "device" (-1 = celle des reglages). Leve une exception si impossible.</summary>
+    /// <summary>Listens to input "device" (-1 = the one from the settings). Throws when that is impossible.</summary>
     public void Start(int device = -1)
     {
         if (device < 0)
@@ -114,6 +120,7 @@ internal sealed class MicController : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>Stops listening and puts the engine back to its normal BPM and dimmer.</summary>
     public void Stop()
     {
         _mic.Stop();
@@ -121,6 +128,7 @@ internal sealed class MicController : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>Timer tick (10 times/s): pushes the detected BPM and the dimmer factor to the engine, then raises Changed.</summary>
     private void Tick()
     {
         var detector = _mic.Detector;
@@ -143,6 +151,7 @@ internal sealed class MicController : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>Stops the microphone and the timer.</summary>
     public void Dispose()
     {
         _timer.Dispose();

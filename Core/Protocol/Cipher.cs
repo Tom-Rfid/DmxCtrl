@@ -1,51 +1,50 @@
 // =====================================================================================
 //  Cipher.cs
 // -------------------------------------------------------------------------------------
-//  Portage C# de la classe "com.example.rybt32.Util.Code" trouvee en decompilant
-//  (jadx) l'application Android "RY-AI" qui pilote le boitier USB-RDM-DMX Bluetooth.
+//  C# port of the class "com.example.rybt32.Util.Code" found by decompiling (jadx)
+//  the Android app "RY-AI" that drives the USB-RDM-DMX Bluetooth box.
 //
-//  CONTEXTE :
-//  Le boitier dialogue en Bluetooth classique (profil SPP, UUID standard
-//  00001101-0000-1000-8000-00805F9B34FB), ce qui cree sous Windows un port COM
-//  virtuel. Mais les 512 octets de l'univers DMX ne sont PAS envoyes en clair :
-//  l'appli applique un "brouillage" (pas un vrai chiffrement cryptographique,
-//  juste une substitution par table, type S-box) avant de les ecrire sur le port.
-//  Sans reproduire exactement cet algorithme, le boitier ignore les trames.
+//  CONTEXT:
+//  The box talks classic Bluetooth (SPP profile, standard UUID
+//  00001101-0000-1000-8000-00805F9B34FB), which creates a virtual COM port on
+//  Windows. But the 512 bytes of the DMX universe are NOT sent in clear: the app
+//  applies a "scrambling" (not real cryptographic encryption, just a table
+//  substitution, S-box style) before writing them to the port. Without
+//  reproducing this algorithm exactly, the box ignores the frames.
 //
-//  Ce fichier est une traduction fidele, ligne a ligne, du code Java original :
+//  This file is a faithful, line by line translation of the original Java code:
 //
 //      public byte[] Encryption1(byte[] bArr, int i, int i2, int i3, int i4) { ... }
 //      public byte[] Decode(byte[] bArr, int i, int i2, int i3) { ... }
 //
-//  NOTE SUR LES CONSTANTES "MASK / DRAG / SWIPE" :
-//  En decompilant, l'outil jadx remplace parfois un nombre litteral (ex: 127)
-//  par le nom d'une constante publique qui a, par coincidence, exactement la
-//  meme valeur numerique ailleurs dans le classpath Android/Kotlin (ici des
-//  constantes d'animation de RecyclerView et de kotlinx.coroutines). Ca n'a
-//  AUCUN rapport fonctionnel avec notre protocole DMX : c'est juste que
-//  127, 200 et 250 correspondent par hasard a des constantes "connues" du
-//  compilateur. On a verifie (par un script Python independant) que ces 3
-//  valeurs rendent bien chaque table ci-dessous parfaitement valide, c'est
-//  a dire une permutation complete des 256 valeurs possibles d'un octet.
+//  NOTE ON THE "MASK / DRAG / SWIPE" CONSTANTS:
+//  When decompiling, jadx sometimes replaces a literal number (e.g. 127) by the
+//  name of a public constant that happens to have exactly the same numeric value
+//  elsewhere in the Android/Kotlin classpath (here animation constants of
+//  RecyclerView and kotlinx.coroutines). It has NO functional link with our DMX
+//  protocol: 127, 200 and 250 just happen to match "known" constants of the
+//  compiler. An independent Python script checked that these 3 values make every
+//  table below fully valid, i.e. a complete permutation of the 256 possible
+//  values of a byte.
 // =====================================================================================
 
 namespace DmxController.Core.Protocol;
 
 /// <summary>
-/// Reproduit le brouillage/debrouillage proprietaire utilise par l'appli RY-AI
-/// pour encoder l'univers DMX avant de l'envoyer sur le port serie Bluetooth.
+/// Reproduces the proprietary scrambling/unscrambling used by the RY-AI app to encode
+/// the DMX universe before sending it on the Bluetooth serial port.
 /// </summary>
 public static class Cipher
 {
-    // Valeurs reconstituees (voir note ci-dessus) : 127, 200, 250.
+    // Rebuilt values (see the note above): 127, 200, 250.
     private const int MASK = 127;
     private const int DRAG = 200;
     private const int SWIPE = 250;
 
     // -----------------------------------------------------------------------------
-    // 5 tables de substitution "a l'encodage" (equivalent de Code.password[][] en Java).
-    // password[k][v] donne la valeur brouillee de l'octet "v" quand on utilise la
-    // table numero k (k est choisi via sin[codeNum] % 5, voir Encrypt() plus bas).
+    // 5 "encoding" substitution tables (equivalent of Code.password[][] in Java).
+    // password[k][v] gives the scrambled value of byte "v" when table number k is
+    // used (k is chosen with sin[codeNum] % 5, see Encrypt() below).
     // -----------------------------------------------------------------------------
     private static readonly int[][] Password =
     {
@@ -57,10 +56,10 @@ public static class Cipher
     };
 
     // -----------------------------------------------------------------------------
-    // 5 tables inverses "au decodage" (equivalent de Code.decode[][] en Java).
-    // Utilisees pour INTERPRETER ce que le boitier renvoie (ex: reponses RDM),
-    // pas strictement necessaires pour juste ENVOYER du DMX, mais on les garde
-    // completes pour pouvoir, plus tard, lire les trames recues (adressage RDM...).
+    // 5 inverse "decoding" tables (equivalent of Code.decode[][] in Java).
+    // Used to INTERPRET what the box sends back (e.g. RDM answers), not strictly
+    // needed to just SEND DMX, but they are kept complete so that received frames
+    // can be read later (RDM addressing...).
     // -----------------------------------------------------------------------------
     private static readonly int[][] Decode =
     {
@@ -72,9 +71,9 @@ public static class Cipher
     };
 
     // -----------------------------------------------------------------------------
-    // Table "sinusoide" (equivalent de Code.sin[] en Java). Sert a deux choses :
-    //   1) choisir laquelle des 5 tables Password/Decode utiliser (sin[codeNum] % 5)
-    //   2) fournir l'octet de "cle" ecrit en fin de trame (sin[codeNum] lui-meme)
+    // "Sine" table (equivalent of Code.sin[] in Java). Used for two things:
+    //   1) choosing which of the 5 Password/Decode tables to use (sin[codeNum] % 5)
+    //   2) providing the "key" byte written at the end of the frame (sin[codeNum] itself)
     // -----------------------------------------------------------------------------
     private static readonly int[] Sin =
     {
@@ -82,18 +81,18 @@ public static class Cipher
     };
 
     /// <summary>
-    /// Equivalent de Code.Encryption1(byte[] bArr, int i, int i2, int i3, int i4).
-    /// Brouille "length" octets du buffer a partir de "start", en utilisant la table
-    /// password[sin[codeNum] % 5], et ecrit les deux octets de "cle" (sin[codeNum]
-    /// et codeNum lui-meme) a la position "markerOffset" / "markerOffset + 1".
-    /// Le boitier a besoin de ces 2 octets pour savoir comment debrouiller la trame.
+    /// Equivalent of Code.Encryption1(byte[] bArr, int i, int i2, int i3, int i4).
+    /// Scrambles "length" bytes of the buffer from "start", using table
+    /// password[sin[codeNum] % 5], and writes the two "key" bytes (sin[codeNum]
+    /// and codeNum itself) at position "markerOffset" / "markerOffset + 1".
+    /// The box needs these 2 bytes to know how to unscramble the frame.
     /// </summary>
-    /// <param name="data">Trame complete, deja remplie avec les valeurs DMX en clair.</param>
-    /// <param name="start">Position du premier octet a brouiller (5 dans notre trame).</param>
-    /// <param name="length">Nombre d'octets a brouiller (512 = univers DMX complet).</param>
-    /// <param name="codeNum">Compteur 0..255, change a chaque trame envoyee.</param>
-    /// <param name="markerOffset">Position ou ecrire les 2 octets de "cle" (517 chez nous).</param>
-    /// <returns>Une copie de "data" avec la portion [start, start+length) brouillee.</returns>
+    /// <param name="data">Complete frame, already filled with the DMX values in clear.</param>
+    /// <param name="start">Position of the first byte to scramble (5 in our frame).</param>
+    /// <param name="length">Number of bytes to scramble (512 = complete DMX universe).</param>
+    /// <param name="codeNum">Counter 0..255, changes on every frame sent.</param>
+    /// <param name="markerOffset">Position where the 2 "key" bytes are written (517 here).</param>
+    /// <returns>A copy of "data" with the [start, start+length) part scrambled.</returns>
     public static byte[] Encrypt(byte[] data, int start, int length, int codeNum, int markerOffset)
     {
         int tableIndex = Sin[codeNum] % 5;
@@ -106,7 +105,7 @@ public static class Cipher
         for (int k = 0; k < length; k++)
         {
             int pos = start + k;
-            // (valeur_claire + codeNum) % 256  ->  indexe dans la table de substitution
+            // (clear_value + codeNum) % 256  ->  index into the substitution table
             result[pos] = (byte)(table[(data[pos] + codeNum) & 0xFF] & 0xFF);
         }
 
@@ -114,11 +113,11 @@ public static class Cipher
     }
 
     /// <summary>
-    /// Equivalent de Code.Decode(byte[] bArr, int i, int i2, int i3).
-    /// Operation inverse d'Encrypt() : relit les 2 octets de "cle" ecrits par
-    /// l'emetteur pour choisir la bonne table et retrouver les valeurs d'origine.
-    /// Pas indispensable pour piloter le DMX (on ne fait qu'emettre), mais utile
-    /// si on veut un jour lire les reponses du boitier (ex: scan RDM).
+    /// Equivalent of Code.Decode(byte[] bArr, int i, int i2, int i3).
+    /// Inverse of Encrypt(): reads back the 2 "key" bytes written by the sender to
+    /// pick the right table and recover the original values.
+    /// Not needed to drive DMX (we only send), but useful to read the box's answers
+    /// one day (e.g. RDM scan).
     /// </summary>
     public static byte[] DecodeFrame(byte[] data, int start, int length, int markerOffset)
     {
@@ -132,7 +131,7 @@ public static class Cipher
         {
             int pos = start + k;
             int v = table[data[pos] & 0xFF] - key;
-            result[pos] = (byte)(v & 0xFF); // & 0xFF gere le cas negatif comme en Java
+            result[pos] = (byte)(v & 0xFF); // & 0xFF handles the negative case like in Java
         }
 
         return result;

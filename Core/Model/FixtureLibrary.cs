@@ -1,25 +1,30 @@
 // =====================================================================================
 //  FixtureLibrary.cs
 // -------------------------------------------------------------------------------------
-//  BIBLIOTHEQUE DE MODELES integree : les types d'appareils connus du logiciel, avec
-//  leur table DMX. Dans le patch, on choisit un modele dans cette liste : son profil
-//  est copie dans la configuration, le nombre de canaux et une adresse libre sont
-//  proposes automatiquement.
+//  Built-in MODEL LIBRARY: the kinds of fixtures known by the software, with their
+//  DMX table. In the patch, a model is picked from this list: its profile is copied
+//  into the configuration, and the channel count and a free address are suggested
+//  automatically.
 //
-//  Sources des tables :
-//    - Chauvet Intimidator Spot 260X : guide rapide officiel (Quick Reference Guide Rev. 1)
-//    - Mindi Mini Spider : notice (15 canaux)
-//    - Ayra WSM02 MKIII  : notice Ayra WSM02/WSM03 (1 canal = debit de fumee 0-100 %)
-//    - Showtec Galactic RGY-140 MKII : manuel Highlite (code 51335), 10 canaux
-//    - PAR LED 36 RGB+UV : modele GENERIQUE (marque inconnue), canaux a verifier
+//  Sources of the tables:
+//    - Chauvet Intimidator Spot 260X: official Quick Reference Guide Rev. 1
+//    - Mindi Mini Spider: manual (15 channels)
+//    - Ayra WSM02 MKIII: Ayra WSM02/WSM03 manual (1 channel = fog output 0-100 %)
+//    - Showtec Galactic RGY-140 MKII: Highlite manual (code 51335), 10 channels
+//    - LED PAR 36 UV: U'King manual (7 channels)
+//    - LED PAR 36 RGB+UV: GENERIC model (unknown brand), channels to check
 //
-//  UpgradeProfiles() met a jour les profils d'une ancienne configuration quand un
-//  modele de la bibliotheque a ete corrige (ex. ordre des canaux de la 260X, qui
-//  etait une supposition dans les premieres versions).
+//  Texts (names, ranges, presets, notes) are written in French: they are the keys
+//  of the translation table (Localization/Tr.En.cs) and are translated when shown.
+//
+//  UpgradeProfiles() updates the profiles of an old configuration when a model of the
+//  library was fixed (e.g. channel order of the 260X, which was a guess in the first
+//  versions).
 // =====================================================================================
 
 namespace DmxController.Core.Model;
 
+/// <summary>Built-in model library and the update of old configurations.</summary>
 public static class FixtureLibrary
 {
     public const string Spot260X14Id = "chauvet-spot-260x-14ch";
@@ -27,11 +32,11 @@ public static class FixtureLibrary
     public const string SpiderId = "mindi-mini-spider-15ch";
     public const string AyraFogId = "ayra-wsm02-mkiii";
     public const string GalacticLaserId = "showtec-galactic-rgy140-mkii";
-    public const string GalacticLaserRgId = "showtec-galactic-rgy140-mkii-rg"; // meme laser, couleurs rouge / vert
-    public const string ParUvId = "par-led-36-rgb-uv-generic";   // RGB + UV (mis de cote : pas le PAR de l'utilisateur)
-    public const string ParUvOnlyId = "par-led-36-uv-generic-7ch"; // UV seul (le PAR de l'utilisateur, table a verifier)
+    public const string GalacticLaserRgId = "showtec-galactic-rgy140-mkii-rg"; // same laser, red / green colours
+    public const string ParUvId = "par-led-36-rgb-uv-generic";   // RGB + UV (set aside: not the user's PAR)
+    public const string ParUvOnlyId = "par-led-36-uv-generic-7ch"; // UV only (the user's PAR)
 
-    /// <summary>Tous les modeles (copies neuves a chaque appel : on peut les modifier sans risque).</summary>
+    /// <summary>Every model (fresh copies on each call: they can be changed safely).</summary>
     public static List<FixtureProfile> All() => new()
     {
         Spot260X14(),
@@ -44,12 +49,12 @@ public static class FixtureLibrary
         ParLed36RgbUv(),
     };
 
-    /// <summary>Copie neuve d'un modele, ou null s'il n'existe pas.</summary>
+    /// <summary>Fresh copy of a model, or null when it does not exist.</summary>
     public static FixtureProfile? Create(string? id) => All().FirstOrDefault(p => p.Id == id);
 
     /// <summary>
-    /// Retourne le profil "id" de la liste ; s'il n'y est pas et que c'est un modele de la
-    /// bibliotheque, il y est ajoute (copie). Null si inconnu.
+    /// Returns the profile "id" of the list; when it is missing and it is a model of the
+    /// library, it is added (as a copy). Null when unknown.
     /// </summary>
     public static FixtureProfile? EnsureProfile(List<FixtureProfile> profiles, string id)
     {
@@ -67,16 +72,16 @@ public static class FixtureLibrary
     }
 
     // =================================================================================
-    //  Mise a jour des profils d'une ancienne configuration
+    //  Updating the profiles of an old configuration
     // =================================================================================
 
     /// <summary>
-    /// Met a jour les profils de la configuration qui viennent d'une version plus ancienne de
-    /// la bibliotheque. Si l'ordre des canaux a change, le profil est remplace et les valeurs
-    /// des scenes sont reclassees par role (le dimmer reste le dimmer...). Sinon on garde le
-    /// profil de l'utilisateur (presets, cases verifiees) en ajoutant juste les nouvelles infos.
+    /// Updates the profiles of the configuration that come from an older version of the library.
+    /// When the channel order changed, the profile is replaced and the scene values are remapped
+    /// by role (the dimmer stays the dimmer...). Otherwise the user's profile (presets, checked
+    /// boxes) is kept and only the new information is added.
     /// </summary>
-    /// <returns>Messages a afficher (vide si rien n'a change).</returns>
+    /// <returns>Messages to show (empty when nothing changed).</returns>
     public static List<string> UpgradeProfiles(ShowConfig show)
     {
         var messages = new List<string>();
@@ -111,27 +116,27 @@ public static class FixtureLibrary
         return messages;
     }
 
-    /// <summary>Meme nombre de canaux et memes roles dans le meme ordre.</summary>
+    /// <summary>Same channel count and same roles in the same order.</summary>
     public static bool SameLayout(FixtureProfile a, FixtureProfile b) =>
         a.ChannelCount == b.ChannelCount &&
         a.Channels.Select(c => c.Type).SequenceEqual(b.Channels.Select(c => c.Type));
 
     /// <summary>
-    /// Presets retires d'un modele (bouton qui pose probleme sur l'appareil) : supprimes aussi des
-    /// profils deja copies dans les configurations, a leur mise a jour.
+    /// Presets removed from a model (a button that causes trouble on the fixture): also removed
+    /// from the profiles already copied into configurations, when they are updated.
     /// </summary>
     private static readonly Dictionary<string, string[]> RetiredPresets = new()
     {
-        // Laser Galactic : « Son rouge » (180-209) met l'appareil en mode « tst » (test) dont il ne
-        // sort plus ; « Couleurs d'origine » retire a la demande de l'utilisateur.
-        [GalacticLaserId] = new[] { "Son rouge", "Couleurs d'origine" }, // « Son rouge ⚠ tst » (avec avertissement) le remplace
+        // Galactic laser: "Son rouge" (180-209) puts the fixture into "tst" (test) mode, which it
+        // never leaves; "Couleurs d'origine" removed at the user's request.
+        [GalacticLaserId] = new[] { "Son rouge", "Couleurs d'origine" }, // replaced by "Son rouge ⚠ tst" (with a warning)
         [GalacticLaserRgId] = new[] { "Son rouge", "Couleurs d'origine" },
     };
 
-    /// <summary>Zoom par defaut du laser Galactic : en dessous de 60 le motif se deforme (constate sur l'appareil).</summary>
+    /// <summary>Default zoom of the Galactic laser: below 60 the pattern is distorted (seen on the fixture).</summary>
     public const byte ZoomDefault = 60;
 
-    /// <summary>Description des 32 motifs du Galactic RGY-140, relevee a l'oeil sur l'appareil.</summary>
+    /// <summary>Description of the 32 patterns of the Galactic RGY-140, noted by eye on the fixture.</summary>
     public static readonly string[] LaserPatternNames =
     {
         "cercle", "cercle pointillé", "triangle", "carré",
@@ -144,20 +149,21 @@ public static class FixtureLibrary
         "rond en haut à droite", "pointillé rapide", "petite courbe pointillée rapide", "X pointillé",
     };
 
-    /// <summary>Valeurs par defaut corrigees dans un modele (type de canal -> valeur), appliquees aux configurations.</summary>
+    /// <summary>Default values fixed in a model (channel type -> value), applied to the configurations.</summary>
     private static readonly Dictionary<string, (ChannelType Type, byte Default)[]> UpdatedDefaults = new()
     {
         [GalacticLaserId] = new[] { (ChannelType.LaserZoom, ZoomDefault) },
         [GalacticLaserRgId] = new[] { (ChannelType.LaserZoom, ZoomDefault) },
     };
 
-    /// <summary>Canaux renommes dans un modele (ancien nom -> nouveau), appliques aux configurations.</summary>
+    /// <summary>Channels renamed in a model (old name -> new name), applied to the configurations.</summary>
     private static readonly Dictionary<string, (string Old, string New)[]> RenamedChannels = new()
     {
         [GalacticLaserId] = new[] { ("Strobe / vitesse de changement", "Clignotement") },
         [GalacticLaserRgId] = new[] { ("Strobe / vitesse de changement", "Clignotement") },
     };
 
+    /// <summary>Brings a user profile up to date with the library model without losing what the user added (presets, checked boxes, names).</summary>
     private static void MergeDetails(FixtureProfile target, FixtureProfile model)
     {
         if (RetiredPresets.TryGetValue(model.Id, out var retired))
@@ -188,7 +194,7 @@ public static class FixtureLibrary
                 }
             }
         }
-        // Presets « a avertissement » (⚠) du modele : rajoutes s'ils manquent (ex. « Son rouge ⚠ tst »).
+        // "Warning" presets (⚠) of the model: added back when missing (e.g. "Son rouge ⚠ tst").
         for (int i = 0; i < target.ChannelCount && i < model.ChannelCount; i++)
         {
             foreach (var preset in model.Channels[i].Presets.Where(p => p.Name.Contains('⚠')))
@@ -209,8 +215,8 @@ public static class FixtureLibrary
         {
             var mine = target.Channels[i];
             var theirs = model.Channels[i];
-            // Libelle precise par la bibliotheque (« LED 1 » -> « LED 1 — rouge gauche ») : on le reprend,
-            // sauf si l'utilisateur a renomme le canal autrement.
+            // Label made more precise by the library ("LED 1" -> "LED 1 — rouge gauche"): it is taken,
+            // unless the user renamed the channel differently.
             if (theirs.Name.StartsWith(mine.Name, StringComparison.OrdinalIgnoreCase) && theirs.Name != mine.Name)
             {
                 mine.Name = theirs.Name;
@@ -222,14 +228,14 @@ public static class FixtureLibrary
             }
             mine.StrobeSlow ??= theirs.StrobeSlow;
             mine.StrobeFast ??= theirs.StrobeFast;
-            // Plages de la notice : toujours reprises du modele (pas modifiables dans l'editeur de profils).
+            // Ranges of the manual: always taken from the model (they cannot be edited in the profile editor).
             mine.Ranges = theirs.Ranges.Count > 0 ? theirs.Ranges : mine.Ranges;
         }
     }
 
     /// <summary>
-    /// Reclasse des valeurs d'un ancien profil vers un nouveau : le k-ieme canal d'un role dans
-    /// le nouveau profil prend la valeur du k-ieme canal de ce role dans l'ancien (sinon defaut).
+    /// Remaps values from an old profile to a new one: the k-th channel of a role in the new
+    /// profile takes the value of the k-th channel of that role in the old one (default otherwise).
     /// </summary>
     public static int[] RemapByType(FixtureProfile oldProfile, FixtureProfile newProfile, int[] oldValues)
     {
@@ -260,6 +266,7 @@ public static class FixtureLibrary
         new("Bleu", 38), new("CTO (blanc chaud)", 45), new("Cyan", 52), new("Magenta", 59),
     };
 
+    /// <summary>Colour wheel channel of the 260X (presets from the Chauvet guide).</summary>
     private static ChannelDef Spot260XColorWheel() => Ch("Roue de couleurs", ChannelType.ColorWheel, 3,
         presets: Spot260XColors.Concat(new ChannelPreset[] { new("Arc-en-ciel lent", 220), new("Arc-en-ciel rapide", 191) }),
         ranges: new ChannelRange[]
@@ -271,6 +278,7 @@ public static class FixtureLibrary
             new("Arc-en-ciel inversé (lent → rapide)", 224, 255),
         });
 
+    /// <summary>Gobo wheel channel of the 260X.</summary>
     private static ChannelDef Spot260XGobo() => Ch("Gobo", ChannelType.Gobo, 3,
         presets: new ChannelPreset[]
         {
@@ -287,6 +295,7 @@ public static class FixtureLibrary
             new("Arrêt", 190, 193), new("Défilement inverse (lent → rapide)", 194, 255),
         });
 
+    /// <summary>Gobo rotation channel of the 260X.</summary>
     private static ChannelDef Spot260XGoboRotation() => Ch("Rotation gobo", ChannelType.GoboRotation, 0,
         presets: new ChannelPreset[]
         {
@@ -299,10 +308,12 @@ public static class FixtureLibrary
             new("Anti-horaire (lent → rapide)", 120, 231), new("Va-et-vient (lent → rapide)", 232, 255),
         });
 
+    /// <summary>Prism channel of the 260X.</summary>
     private static ChannelDef Spot260XPrism() => Ch("Prisme", ChannelType.Prism, 0,
         presets: new ChannelPreset[] { new("Sans prisme", 0), new("Prisme 3 facettes", 255) },
         ranges: new ChannelRange[] { new("Sans prisme", 0, 15), new("Prisme 3 facettes", 16, 255) });
 
+    /// <summary>Shutter / strobe channel of the 260X (hardware strobe 8-76, open = 255).</summary>
     private static ChannelDef Spot260XShutter() => Ch("Obturateur / strobe", ChannelType.Shutter, 255,
         notes: "0-3 = fermé (pas de lumière), 216-255 = ouvert. Strobe 8-76, pulsé 77-145, aléatoire 146-215.",
         presets: new ChannelPreset[]
@@ -321,6 +332,7 @@ public static class FixtureLibrary
         "Table DMX officielle (guide rapide Chauvet Rev. 1). Mode à régler dans le menu de la lyre : Run Mode > DMX > 14CH ou 8CH. " +
         "Les couleurs de l'onglet Soirée utilisent les presets de la roue (Rouge, Vert…).";
 
+    /// <summary>Chauvet Intimidator Spot 260X, 14-channel mode.</summary>
     public static FixtureProfile Spot260X14() => new()
     {
         Id = Spot260X14Id,
@@ -360,6 +372,7 @@ public static class FixtureLibrary
         },
     };
 
+    /// <summary>Chauvet Intimidator Spot 260X, 8-channel mode (no dimmer).</summary>
     public static FixtureProfile Spot260X8() => new()
     {
         Id = Spot260X8Id,
@@ -386,8 +399,8 @@ public static class FixtureLibrary
     // =================================================================================
 
     /// <summary>
-    /// 15 canaux de la notice, lus a partir de l'adresse du Spider. (Un decalage d'un canal avait
-    /// ete observe au debut ; il a disparu : revision 2 = plus de canal vide en tete.)
+    /// 15 channels of the manual, read from the Spider's address. (A one-channel offset was
+    /// seen at first; it went away: revision 2 = no more empty channel at the start.)
     /// </summary>
     public static FixtureProfile MiniSpider() => new()
     {
@@ -419,9 +432,10 @@ public static class FixtureLibrary
     };
 
     // =================================================================================
-    //  Ayra WSM02 MKIII (machine a fumee 1200 W)
+    //  Ayra WSM02 MKIII (1200 W fog machine)
     // =================================================================================
 
+    /// <summary>Ayra WSM02 MKIII fog machine (1 channel).</summary>
     public static FixtureProfile AyraWsm02() => new()
     {
         Id = AyraFogId,
@@ -441,29 +455,32 @@ public static class FixtureLibrary
     };
 
     // =================================================================================
-    //  Showtec Galactic RGY-140 MKII Value Line (laser rouge / vert / jaune)
+    //  Showtec Galactic RGY-140 MKII Value Line (red / green / yellow laser)
     // =================================================================================
 
-    // Rotations (canaux 8 a 10) : sens d'apres le manuel V3 (le V1 inversait horaire / anti-horaire).
+    // Rotations (channels 8 to 10): direction from the V3 manual (V1 swapped clockwise / counter-clockwise).
+    /// <summary>Ranges of the rotation channels of the Galactic laser.</summary>
     private static IEnumerable<ChannelRange> RollRanges() => new ChannelRange[]
     {
         new("Angle fixe (0-359°)", 0, 127), new("Rotation anti-horaire (lent → rapide)", 128, 191),
         new("Rotation horaire (lent → rapide)", 192, 255),
     };
 
+    /// <summary>Ranges of the X / Y movement channels of the Galactic laser.</summary>
     private static IEnumerable<ChannelRange> MoveRanges() => new ChannelRange[]
     {
         new("Position fixe", 0, 127), new("Mouvement horaire (lent → rapide)", 128, 191),
         new("Mouvement anti-horaire (lent → rapide)", 192, 255),
     };
 
+    /// <summary>Showtec Galactic RGY-140 MKII laser (red / green / yellow), 10 channels.</summary>
     public static FixtureProfile GalacticRgy140() => new()
     {
         Id = GalacticLaserId,
         Name = "Galactic RGY-140 MKII Value Line (laser, 10 canaux)",
         Manufacturer = "Showtec",
         DefaultFixtureName = "Laser",
-        Revision = 5, // 2 : « Son rouge » / « Couleurs d'origine » retires ; 3 : rotations V3 ; 4 : « Son rouge ⚠ tst », Clignotement ; 5 : zoom 60 par defaut
+        Revision = 5, // 2: "Son rouge" / "Couleurs d'origine" removed; 3: V3 rotations; 4: "Son rouge ⚠ tst", Clignotement; 5: zoom 60 by default
         Notes = "Table DMX des manuels Highlite (code 51335, V1 et V3 : un seul mode DMX de 10 canaux, pas de réglage d'intensité). Le canal 1 doit être en « DMX » (240-255) pour piloter " +
                 "motifs, couleurs et mouvements ; sinon le laser joue ses programmes internes. Couleur 0-24 = laser éteint. " +
                 "SÉCURITÉ : connecteur d'interlock obligatoire ; ne jamais viser le public à hauteur des yeux.",
@@ -520,8 +537,8 @@ public static class FixtureLibrary
     };
 
     /// <summary>
-    /// Meme laser, couleurs nommees comme on les voit : il n'a que 2 diodes (rouge et verte) ; le
-    /// « jaune » de la notice est le rouge et le vert allumes ensemble.
+    /// Same laser, colours named as they are seen: it only has 2 diodes (red and green); the
+    /// "yellow" of the manual is red and green on together.
     /// </summary>
     public static FixtureProfile GalacticRgy140RedGreen()
     {
@@ -559,9 +576,10 @@ public static class FixtureLibrary
     }
 
     // =================================================================================
-    //  PAR LED 36 RGB + UV (generique)
+    //  LED PAR 36 RGB + UV (generic)
     // =================================================================================
 
+    /// <summary>Generic LED PAR 36 RGB+UV, 8 channels (to check).</summary>
     public static FixtureProfile ParLed36RgbUv() => new()
     {
         Id = ParUvId,
@@ -586,13 +604,13 @@ public static class FixtureLibrary
     };
 
     // =================================================================================
-    //  PAR LED 36 UV (UV seul) : U'King ZQ01087 et clones, mode 7CH
+    //  LED PAR 36 UV (UV only): U'King ZQ01087 and clones, 7CH mode
     // =================================================================================
 
     /// <summary>
-    /// PAR 36 LED UV avec telecommande (U'King ZQ01087 et ses clones). Table du manuel U'King
-    /// des PAR 36 LED (modele P36-5, meme carte) : les voies "rouge / vert / bleu" pilotent les
-    /// 3 groupes de 12 LED UV. Adresse au menu : D001..D512.
+    /// 36 LED UV PAR with remote (U'King ZQ01087 and its clones). Table from the U'King manual
+    /// for 36 LED PARs (model P36-5, same board): the "red / green / blue" channels drive the
+    /// 3 groups of 12 UV LEDs. Address in the menu: D001..D512.
     /// </summary>
     public static FixtureProfile ParLed36Uv() => new()
     {
@@ -631,6 +649,7 @@ public static class FixtureLibrary
 
     // =================================================================================
 
+    /// <summary>Builds a channel definition (name, role, default, presets, ranges, strobe values).</summary>
     private static ChannelDef Ch(string name, ChannelType type, byte defaultValue, bool verified = true, string notes = "",
         IEnumerable<ChannelPreset>? presets = null, IEnumerable<ChannelRange>? ranges = null,
         byte? strobeSlow = null, byte? strobeFast = null) => new()

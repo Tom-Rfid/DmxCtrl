@@ -1,59 +1,60 @@
 // =====================================================================================
 //  DmxFrame.cs
 // -------------------------------------------------------------------------------------
-//  Construction des trames binaires attendues par le boitier RY-AI (protocole
-//  reconstitue depuis ConsoleFragment.java de l'appli Android, confirme sur le
-//  vrai materiel par le test de clignotement).
+//  Builds the binary frames expected by the RY-AI box (protocol rebuilt from
+//  ConsoleFragment.java of the Android app, confirmed on the real hardware by the
+//  blink test).
 //
-//  STRUCTURE D'UNE TRAME (521 octets) :
+//  FRAME LAYOUT (521 bytes):
 //      [0]        0x00
-//      [1]        'K' (0x4B)                 )  marqueurs de debut, en clair
+//      [1]        'K' (0x4B)                 )  start markers, in clear
 //      [2]        'T' (0x54)                 )
-//      [3]        octet "scene"   (0 = pilotage manuel direct)
-//      [4]        octet "vitesse" (0 en pilotage manuel)
-//      [5..516]   512 octets = univers DMX (canal 1 -> octet 5 ... canal 512 -> 516),
-//                 brouilles par Cipher.Encrypt
-//      [517]      cle n1 = sin[codeNum]      (ecrite par Cipher.Encrypt)
-//      [518]      cle n2 = codeNum           (ecrite par Cipher.Encrypt)
-//      [519]      'T' (0x54)                 )  marqueurs de fin, en clair
+//      [3]        "scene" byte   (0 = direct manual control)
+//      [4]        "speed" byte   (0 in manual control)
+//      [5..516]   512 bytes = DMX universe (channel 1 -> byte 5 ... channel 512 -> 516),
+//                 scrambled by Cipher.Encrypt
+//      [517]      key n1 = sin[codeNum]      (written by Cipher.Encrypt)
+//      [518]      key n2 = codeNum           (written by Cipher.Encrypt)
+//      [519]      'T' (0x54)                 )  end markers, in clear
 //      [520]      'K' (0x4B)                 )
 //
-//  CONVENTION "UNIVERS" utilisee partout dans le projet : un tableau de 513 octets
-//  dont l'index 0 est inutilise, et l'index N = valeur du canal DMX N (1..512).
-//  Ca evite les decalages de 1 entre "numero de canal" et "index de tableau".
+//  "UNIVERSE" CONVENTION used everywhere in the project: an array of 513 bytes
+//  whose index 0 is unused, and index N = value of DMX channel N (1..512).
+//  It avoids off-by-one errors between "channel number" and "array index".
 // =====================================================================================
 
 namespace DmxController.Core.Protocol;
 
+/// <summary>Building and reading of the frames of the RY-AI box.</summary>
 public static class DmxFrame
 {
-    /// <summary>Taille totale d'une trame envoyee au boitier.</summary>
+    /// <summary>Total size of a frame sent to the box.</summary>
     public const int FrameLength = 521;
 
-    /// <summary>Nombre de canaux d'un univers DMX.</summary>
+    /// <summary>Number of channels of a DMX universe.</summary>
     public const int UniverseSize = 512;
 
-    /// <summary>Indice, dans la trame, de l'octet du canal DMX 1.</summary>
+    /// <summary>Index, in the frame, of the byte of DMX channel 1.</summary>
     public const int PayloadStart = 5;
 
-    /// <summary>Indice ou Cipher.Encrypt ecrit ses 2 octets de cle.</summary>
+    /// <summary>Index where Cipher.Encrypt writes its 2 key bytes.</summary>
     public const int MarkerOffset = 517;
 
-    /// <summary>Handshake envoye juste apres l'ouverture du port (SendBTConnectData).</summary>
+    /// <summary>Handshake sent right after opening the port (SendBTConnectData).</summary>
     public static byte[] HandshakeConnect() => new byte[] { 0xBB, 0x99, 0x77, 0x01, 0x77, 0x99 };
 
-    /// <summary>Handshake envoye juste avant la fermeture du port (SendBTDisConnectData).</summary>
+    /// <summary>Handshake sent right before closing the port (SendBTDisConnectData).</summary>
     public static byte[] HandshakeDisconnect() => new byte[] { 0xBB, 0x77, 0x99, 0x10, 0x99, 0x77, 0x00, 0x55 };
 
-    /// <summary>Cree un univers vide (513 octets, index 1..512 utilises).</summary>
+    /// <summary>Creates an empty universe (513 bytes, indexes 1..512 used).</summary>
     public static byte[] NewUniverse() => new byte[UniverseSize + 1];
 
     /// <summary>
-    /// Construit la trame complete (deja brouillee) a partir d'un univers DMX.
+    /// Builds the complete (already scrambled) frame from a DMX universe.
     /// </summary>
-    /// <param name="universe">513 octets, index N = canal DMX N.</param>
-    /// <param name="codeNum">Compteur 0..255 ; il est ecrit DANS la trame, donc le
-    /// boitier n'a pas besoin d'etre synchronise avec notre compteur.</param>
+    /// <param name="universe">513 bytes, index N = DMX channel N.</param>
+    /// <param name="codeNum">Counter 0..255; it is written INTO the frame, so the
+    /// box does not need to be in sync with our counter.</param>
     public static byte[] Build(byte[] universe, int codeNum)
     {
         if (universe.Length != UniverseSize + 1)
@@ -65,8 +66,8 @@ public static class DmxFrame
         frame[0] = 0x00;
         frame[1] = (byte)'K';
         frame[2] = (byte)'T';
-        frame[3] = 0; // scene : 0 = pilotage manuel direct
-        frame[4] = 0; // vitesse : 0 en pilotage manuel
+        frame[3] = 0; // scene: 0 = direct manual control
+        frame[4] = 0; // speed: 0 in manual control
         Array.Copy(universe, 1, frame, PayloadStart, UniverseSize);
         frame[519] = (byte)'T';
         frame[520] = (byte)'K';
@@ -75,8 +76,8 @@ public static class DmxFrame
     }
 
     /// <summary>
-    /// Operation inverse de <see cref="Build"/> : retrouve l'univers en clair a partir
-    /// d'une trame brouillee. Sert aux tests et a l'analyse de captures.
+    /// Inverse of <see cref="Build"/>: recovers the universe in clear from a scrambled
+    /// frame. Used by the tests and to analyse captures.
     /// </summary>
     public static byte[] DecodeUniverse(byte[] frame)
     {

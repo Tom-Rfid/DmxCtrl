@@ -1,14 +1,14 @@
 // =====================================================================================
 //  ProfileEditorDialog.cs
 // -------------------------------------------------------------------------------------
-//  Editeur de PROFILS (modules) : c'est ici qu'on cree un nouveau type d'appareil
-//  ou qu'on corrige un profil existant (ex. l'ordre suppose des canaux de la 260X).
+//  PROFILE (module) editor: this is where a new kind of fixture is created or an
+//  existing profile is fixed (e.g. the assumed channel order of the 260X).
 //
-//  Pour chaque canal : nom, role (type), valeur par defaut, verifie, presets
-//  ("Rouge=18; Vert=36"), notes. On peut importer/exporter un profil seul
-//  (*.dmxprofile.json) pour le reutiliser dans une autre configuration.
+//  For each channel: name, role (type), default value, checked, presets
+//  ("Rouge=18; Vert=36"), notes. A single profile can be imported/exported
+//  (*.dmxprofile.json) to reuse it in another configuration.
 //
-//  On travaille sur des COPIES : rien ne change tant qu'on n'a pas clique sur OK.
+//  The dialog works on COPIES: nothing changes until OK is clicked.
 // =====================================================================================
 
 using System.ComponentModel;
@@ -17,15 +17,17 @@ using DmxController.Core.Storage;
 
 namespace DmxController.UI;
 
+/// <summary>Profile (module) editor: profile list on the left, channels of the selected profile on the right.</summary>
 [DesignerCategory("Code")]
 internal sealed class ProfileEditorDialog : Form
 {
+    /// <summary>Item of the channel type list: enum value and displayed label.</summary>
     private sealed record TypeItem(string Value, string Text);
 
     private const int ColNum = 0, ColName = 1, ColType = 2, ColDefault = 3, ColVerified = 4, ColPresets = 5, ColNotes = 6;
 
     private readonly List<FixtureProfile> _profiles;
-    private readonly Dictionary<string, List<string>> _usage; // id de profil -> noms des appareils qui l'utilisent
+    private readonly Dictionary<string, List<string>> _usage; // profile id -> names of the fixtures using it
     private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false, FormattingEnabled = true };
     private readonly TextBox _name = new() { Width = 420 };
     private readonly TextBox _manufacturer = new() { Width = 420 };
@@ -46,9 +48,10 @@ internal sealed class ProfileEditorDialog : Form
     private FixtureProfile? _current;
     private bool _loading;
 
-    /// <summary>Profils modifies (valides seulement si DialogResult == OK).</summary>
+    /// <summary>Edited profiles (valid only when DialogResult == OK).</summary>
     public List<FixtureProfile> ResultProfiles => _profiles;
 
+    /// <summary>Opens the editor on copies of the profiles of <paramref name="show"/>.</summary>
     public ProfileEditorDialog(ShowConfig show)
     {
         _profiles = show.Profiles.Select(p => ShowJson.Clone(p)).ToList();
@@ -64,7 +67,7 @@ internal sealed class ProfileEditorDialog : Form
         MinimizeBox = false;
         ShowInTaskbar = false;
 
-        // ---------------- Liste des profils (gauche) ----------------
+        // ---------------- Profile list (left) ----------------
         _list.Format += (_, e) =>
         {
             if (e.ListItem is FixtureProfile p)
@@ -90,7 +93,7 @@ internal sealed class ProfileEditorDialog : Form
         left.Controls.Add(_list);
         left.Controls.Add(leftButtons);
 
-        // ---------------- Details du profil (droite) ----------------
+        // ---------------- Profile details (right) ----------------
         var fields = Ui.Table(2);
         Ui.Row(fields, Tr.T("Nom"), _name);
         Ui.Row(fields, Tr.T("Fabricant"), _manufacturer);
@@ -145,7 +148,7 @@ internal sealed class ProfileEditorDialog : Form
         right.Controls.Add(channelButtons);
         right.Controls.Add(fields);
 
-        // ---------------- OK / Annuler ----------------
+        // ---------------- OK / Cancel ----------------
         var ok = new Button { Text = Tr.T("OK"), Width = 90, Height = 30 };
         ok.Click += (_, _) => Accept();
         var cancel = new Button { Text = Tr.T("Annuler"), Width = 90, Height = 30, DialogResult = DialogResult.Cancel };
@@ -167,6 +170,7 @@ internal sealed class ProfileEditorDialog : Form
         }
     }
 
+    /// <summary>Small button running <paramref name="action"/>.</summary>
     private static Button SmallButton(string text, Action action)
     {
         var button = new Button { Text = text, AutoSize = true, Margin = new Padding(2) };
@@ -175,9 +179,10 @@ internal sealed class ProfileEditorDialog : Form
     }
 
     // =================================================================================
-    //  Selection / chargement / validation d'un profil
+    //  Selecting / loading / validating a profile
     // =================================================================================
 
+    /// <summary>Another profile selected: the current one is validated first (stays on it on error).</summary>
     private void OnProfileSelected()
     {
         if (_loading)
@@ -191,7 +196,7 @@ internal sealed class ProfileEditorDialog : Form
             return;
         }
 
-        // On valide le profil en cours avant de passer au suivant ; en cas d'erreur on reste dessus.
+        // The current profile is validated before moving to the next one; on error we stay on it.
         if (!CommitCurrent())
         {
             _loading = true;
@@ -204,6 +209,7 @@ internal sealed class ProfileEditorDialog : Form
         RefreshListText();
     }
 
+    /// <summary>Shows the fields and channels of <paramref name="profile"/> (null = nothing selected).</summary>
     private void LoadProfile(FixtureProfile? profile)
     {
         _current = profile;
@@ -231,6 +237,7 @@ internal sealed class ProfileEditorDialog : Form
         }
     }
 
+    /// <summary>Adds a grid row for <paramref name="channel"/> (at the end, or at <paramref name="insertAt"/>).</summary>
     private void AddChannelRow(ChannelDef channel, int? insertAt)
     {
         int index;
@@ -245,7 +252,7 @@ internal sealed class ProfileEditorDialog : Form
         }
 
         var row = _grid.Rows[index];
-        row.Tag = channel; // garde les reglages sans colonne (plages, strobe materiel) pour CommitCurrent
+        row.Tag = channel; // keeps the settings without a column (ranges, hardware strobe) for CommitCurrent
         row.Cells[ColName].Value = channel.Name;
         row.Cells[ColType].Value = channel.Type.ToString();
         row.Cells[ColDefault].Value = channel.Default.ToString();
@@ -254,6 +261,7 @@ internal sealed class ProfileEditorDialog : Form
         row.Cells[ColNotes].Value = channel.Notes;
     }
 
+    /// <summary>Rewrites the channel numbers of the rows.</summary>
     private void RenumberRows()
     {
         foreach (DataGridViewRow row in _grid.Rows)
@@ -262,7 +270,7 @@ internal sealed class ProfileEditorDialog : Form
         }
     }
 
-    /// <summary>Recopie le contenu de l'editeur dans le profil courant. false (+ message) si invalide.</summary>
+    /// <summary>Copies the editor content into the current profile. false (+ message) when invalid.</summary>
     private bool CommitCurrent()
     {
         if (_current is null)
@@ -301,7 +309,7 @@ internal sealed class ProfileEditorDialog : Form
                 presets = new();
             }
 
-            var original = row.Tag as ChannelDef; // null pour une ligne ajoutee dans l'editeur
+            var original = row.Tag as ChannelDef; // null for a row added in the editor
             channels.Add(new ChannelDef
             {
                 Name = name.Length > 0 ? name : Tr.F("Canal {0}", number),
@@ -335,7 +343,7 @@ internal sealed class ProfileEditorDialog : Form
         return true;
     }
 
-    /// <summary>Force la ListBox a redessiner le texte de ses elements (noms modifies).</summary>
+    /// <summary>Forces the ListBox to redraw the text of its items (names changed).</summary>
     private void RefreshListText()
     {
         _loading = true;
@@ -354,17 +362,19 @@ internal sealed class ProfileEditorDialog : Form
         }
     }
 
+    /// <summary>Adds a profile to the list and selects it.</summary>
     private void AddAndSelect(FixtureProfile profile)
     {
         _profiles.Add(profile);
         _list.Items.Add(profile);
-        _list.SelectedItem = profile; // -> OnProfileSelected (le profil courant est valide d'abord)
+        _list.SelectedItem = profile; // -> OnProfileSelected (the current profile is validated first)
     }
 
     // =================================================================================
-    //  Actions sur les profils
+    //  Profile actions
     // =================================================================================
 
+    /// <summary>New profile: asks its name and channel count, creates generic channels.</summary>
     private void NewProfile()
     {
         if (!CommitCurrent())
@@ -393,6 +403,7 @@ internal sealed class ProfileEditorDialog : Form
         AddAndSelect(profile);
     }
 
+    /// <summary>Duplicates the selected profile (new id, " (copy)" name).</summary>
     private void DuplicateProfile()
     {
         if (_current is null || !CommitCurrent())
@@ -405,6 +416,7 @@ internal sealed class ProfileEditorDialog : Form
         AddAndSelect(copy);
     }
 
+    /// <summary>Deletes the selected profile, unless fixtures of the patch use it.</summary>
     private void DeleteProfile()
     {
         if (_current is null)
@@ -424,7 +436,7 @@ internal sealed class ProfileEditorDialog : Form
         }
 
         var doomed = _current;
-        _current = null; // pas de validation du profil supprime
+        _current = null; // no validation of the deleted profile
         _profiles.Remove(doomed);
         _list.Items.Remove(doomed);
         if (_list.Items.Count > 0)
@@ -437,6 +449,7 @@ internal sealed class ProfileEditorDialog : Form
         }
     }
 
+    /// <summary>Imports a *.dmxprofile.json file as a new profile.</summary>
     private void ImportProfile()
     {
         if (!CommitCurrent())
@@ -470,6 +483,7 @@ internal sealed class ProfileEditorDialog : Form
         }
     }
 
+    /// <summary>Exports the selected profile to a *.dmxprofile.json file.</summary>
     private void ExportProfile()
     {
         if (_current is null || !CommitCurrent())
@@ -498,6 +512,7 @@ internal sealed class ProfileEditorDialog : Form
         }
     }
 
+    /// <summary>File name without the characters Windows refuses ("sans-nom" when nothing is left).</summary>
     internal static string SafeFileName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
@@ -506,9 +521,10 @@ internal sealed class ProfileEditorDialog : Form
     }
 
     // =================================================================================
-    //  Actions sur les canaux
+    //  Channel actions
     // =================================================================================
 
+    /// <summary>Adds a channel at the end or before the selected row.</summary>
     private void InsertChannel(bool atEnd)
     {
         if (_current is null)
@@ -520,6 +536,7 @@ internal sealed class ProfileEditorDialog : Form
         RenumberRows();
     }
 
+    /// <summary>Deletes the selected channel row.</summary>
     private void RemoveChannel()
     {
         if (_grid.CurrentRow is DataGridViewRow row && _grid.Rows.Count > 1)
@@ -529,6 +546,7 @@ internal sealed class ProfileEditorDialog : Form
         }
     }
 
+    /// <summary>Moves the selected channel up (-1) or down (+1).</summary>
     private void MoveChannel(int delta)
     {
         if (_grid.CurrentRow is not DataGridViewRow row)
@@ -550,6 +568,7 @@ internal sealed class ProfileEditorDialog : Form
         RenumberRows();
     }
 
+    /// <summary>Ticks "Checked" on every channel of the profile.</summary>
     private void MarkAllVerified()
     {
         foreach (DataGridViewRow row in _grid.Rows)
@@ -558,6 +577,7 @@ internal sealed class ProfileEditorDialog : Form
         }
     }
 
+    /// <summary>OK: validates the current profile, then closes with the edited profiles.</summary>
     private void Accept()
     {
         if (!CommitCurrent())

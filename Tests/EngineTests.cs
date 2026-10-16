@@ -1,4 +1,4 @@
-// Tests du moteur de spectacle, avec une horloge simulee (pas d'attente reelle).
+// Tests of the show engine, with a simulated clock (no real waiting).
 
 using DmxController.Core.Engine;
 using DmxController.Core.Model;
@@ -8,12 +8,12 @@ namespace DmxController.Tests;
 
 public class EngineTests
 {
-    // Index des canaux dans les profils par defaut (0 = premier canal du profil).
+    // Channel indexes in the default profiles (0 = first channel of the profile).
     private const int SpotPan = 0, SpotPanFine = 1, SpotColorWheel = 5, SpotDimmer = 10;
 
-    // Adresses du patch par defaut (installation reelle : Spider en 1, lyres apres).
+    // Addresses of the default patch (real installation).
     private const int Lyre1 = 1, Lyre2 = 15, Spider = 29;
-    // Spider : 15 canaux a partir de son adresse (moteur 1 = canal 0 du profil).
+    // Spider: 15 channels from its address (motor 1 = channel 0 of the profile).
     private const int SpiderDimmer = 2, SpiderLed1 = 4, SpiderLed2 = 5, SpiderLed4 = 7, SpiderLed5 = 8;
 
     private double _now;
@@ -37,18 +37,18 @@ public class EngineTests
     [Fact]
     public void Fixture_channels_land_at_their_patched_address()
     {
-        _engine.SetValue("lyre-2", SpotDimmer, 200); // Lyre 2 a l adresse 31 -> dimmer = canal 42
+        _engine.SetValue("lyre-2", SpotDimmer, 200); // Lyre 2 at address 31 -> dimmer = channel 42
         var universe = Render();
         Assert.Equal(200, universe[Lyre2 + SpotDimmer]);
-        Assert.Equal(0, universe[Lyre1 + SpotDimmer]); // Lyre 1 inchangee
+        Assert.Equal(0, universe[Lyre1 + SpotDimmer]); // Lyre 1 unchanged
     }
 
     [Fact]
     public void Spider_motor_1_is_on_the_spider_address()
     {
-        _engine.SetValue("spider-1", 0, 99); // Moteur 1 = 1er canal du profil
+        _engine.SetValue("spider-1", 0, 99); // Motor 1 = 1st channel of the profile
         var universe = Render();
-        Assert.Equal(99, universe[Spider]);  // canal de l'adresse du Spider
+        Assert.Equal(99, universe[Spider]);  // channel at the Spider's address
         Assert.Equal(15, _show.FindProfile(DefaultShow.SpiderProfileId)!.ChannelCount);
     }
 
@@ -63,7 +63,7 @@ public class EngineTests
         _engine.SetMotors("spider-1", 200, mirror: true);
         Assert.Equal(new byte[] { 200, 55 }, _engine.GetValues("spider-1")[Motor1..(Motor2 + 1)]);
 
-        _engine.SetMotors("spider-1", 128, mirror: true); // retour au milieu : les 2 ailes se rejoignent
+        _engine.SetMotors("spider-1", 128, mirror: true); // back to the middle: both wings meet
         var middle = _engine.GetValues("spider-1");
         Assert.InRange(Math.Abs(middle[Motor1] - middle[Motor2]), 0, 1);
 
@@ -87,10 +87,10 @@ public class EngineTests
     {
         var profile = _show.FindProfile(DefaultShow.SpiderProfileId)!;
         var (left, right) = LedGroups.Split(profile);
-        Assert.Equal(new[] { 4, 5, 6, 7 }, left);    // LED 1-4
-        Assert.Equal(new[] { 8, 9, 10, 11 }, right); // LED 5-8
+        Assert.Equal(new[] { 4, 5, 6, 7 }, left);    // LEDs 1-4
+        Assert.Equal(new[] { 8, 9, 10, 11 }, right); // LEDs 5-8
 
-        // Aile gauche "orange" (rouge 200, vert 100) baissee a 50 % : reste orange.
+        // Left wing "orange" (red 200, green 100) dimmed to 50 %: stays orange.
         _engine.SetValue("spider-1", 4, 200);
         _engine.SetValue("spider-1", 5, 100);
         var ratios = LedGroups.Ratios(_engine.GetValues("spider-1"), left);
@@ -98,7 +98,7 @@ public class EngineTests
         var values = _engine.GetValues("spider-1");
         Assert.Equal(new byte[] { 100, 50, 0, 0 }, left.Select(i => values[i]).ToArray());
 
-        // Aile droite eteinte : le fader monte les 4 LED ensemble.
+        // Right wing off: the fader raises the 4 LEDs together.
         _engine.SetGroupLevel("spider-1", right, 128, LedGroups.Ratios(values, right));
         values = _engine.GetValues("spider-1");
         Assert.All(right, i => Assert.Equal(128, values[i]));
@@ -115,7 +115,7 @@ public class EngineTests
         _engine.Blackout = true;
         var universe = Render();
         Assert.Equal(0, universe[Lyre1 + SpotDimmer]);
-        Assert.Equal(128, universe[Lyre1 + SpotPan]); // le blackout ne fait pas bouger les lyres
+        Assert.Equal(128, universe[Lyre1 + SpotPan]); // blackout does not move the moving heads
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public class EngineTests
         target.Values["lyre-1"][SpotColorWheel] = 60;
 
         _engine.RecallScene(target, fadeSeconds: 2);
-        _now = 1; // mi-fondu
+        _now = 1; // half-way through the fade
         var universe = Render();
         Assert.Equal(100, universe[Lyre1 + SpotDimmer]);
         Assert.Equal(60, universe[Lyre1 + SpotColorWheel]);
@@ -169,7 +169,7 @@ public class EngineTests
         int min = int.MaxValue, max = int.MinValue;
         for (int step = 0; step < 100; step++)
         {
-            _now = step / 100.0; // un cycle complet (60 cycles/min = 1 par seconde)
+            _now = step / 100.0; // a full cycle (60 cycles/min = 1 per second)
             var universe = Render();
             int pan16 = (universe[Lyre1 + SpotPan] << 8) | universe[Lyre1 + SpotPanFine];
             min = Math.Min(min, pan16);
@@ -190,14 +190,14 @@ public class EngineTests
 
         Assert.Equal(new[] { "Lyre 1", "Spider" }, result.Applied);
         Assert.Empty(result.Unsupported);
-        Assert.Equal(10, _engine.GetValues("lyre-1")[SpotColorWheel]); // rouge = 7..13 sur la roue (guide Chauvet)
+        Assert.Equal(10, _engine.GetValues("lyre-1")[SpotColorWheel]); // red = 7..13 on the wheel (Chauvet guide)
 
         var spider = _engine.GetValues("spider-1");
         Assert.Equal(255, spider[SpiderLed1]);
         Assert.Equal(255, spider[SpiderLed5]);
         Assert.Equal(0, spider[SpiderLed2]);
         Assert.Equal(0, spider[SpiderLed4]);
-        Assert.Equal(255, spider[SpiderDimmer]); // dimmer ouvert automatiquement
+        Assert.Equal(255, spider[SpiderDimmer]); // dimmer opened automatically
     }
 
     [Fact]
@@ -245,6 +245,6 @@ public class EngineTests
         tap.Tap(0.5);
         tap.Tap(1.0);
         Assert.Equal(120, tap.Tap(1.5));
-        Assert.Null(tap.Tap(10)); // longue pause : nouvelle mesure
+        Assert.Null(tap.Tap(10)); // long pause: new measure
     }
 }

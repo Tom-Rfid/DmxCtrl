@@ -1,25 +1,26 @@
 // =====================================================================================
 //  BeatDetector.cs
 // -------------------------------------------------------------------------------------
-//  Analyse du son du micro (aucune dependance : on lui donne des echantillons) :
+//  Analysis of the microphone sound (no dependency: it is fed samples):
 //
-//    1. TEMPO : le signal est decoupe en blocs (~11 ms). Pour chaque bloc on calcule
-//       l'energie ; la "force d'attaque" = hausse d'energie par rapport au bloc
-//       precedent (les coups de grosse caisse, les claquements...). Sur les ~8
-//       dernieres secondes, on cherche par AUTOCORRELATION l'ecart qui se repete le
-//       plus entre deux attaques : c'est la duree d'un temps -> BPM (ramene entre
-//       80 et 160). Le resultat est lisse (mediane des dernieres estimations).
+//    1. TEMPO: the signal is cut into blocks (~11 ms). For each block the energy is
+//       computed; the "onset strength" = rise of energy compared to the previous
+//       block (kick drums, claps...). Over the last ~8 seconds, AUTOCORRELATION
+//       finds the gap that repeats most between two onsets: that is the length of
+//       one beat -> BPM (brought back between 80 and 160). The result is smoothed
+//       (median of the last estimates).
 //
-//    2. NIVEAU : volume du moment (dB) compare au niveau "normal" de la soiree
-//       (crete qui redescend lentement). DimmerFactor() en deduit un facteur 0..1 :
-//       quand le volume baisse (pont, break), le dimmer baisse vite ; quand la musique
-//       revient, il remonte progressivement (duree reglable).
+//    2. LEVEL: current volume (dB) compared to the "normal" level of the party
+//       (a peak that slowly decays). DimmerFactor() derives a 0..1 factor from it:
+//       when the volume drops (bridge, break), the dimmer drops fast; when the music
+//       comes back, it rises gradually (adjustable time).
 //
-//  Thread : AddSamples() est appele par le thread audio, le reste par l'IHM : verrou.
+//  Threads: AddSamples() is called by the audio thread, the rest by the UI: lock.
 // =====================================================================================
 
 namespace DmxController.Core.Audio;
 
+/// <summary>Tempo and volume analysis of the microphone sound (see the file header).</summary>
 public sealed class BeatDetector
 {
     public const double MinBpm = 80, MaxBpm = 160;
@@ -30,7 +31,7 @@ public sealed class BeatDetector
     private readonly double _blocksPerSecond;
     private readonly int _historyBlocks;
 
-    private readonly double[] _onset;   // force d'attaque, tampon circulaire
+    private readonly double[] _onset;   // onset strength, ring buffer
     private int _onsetPos;
     private int _onsetCount;
     private double _previousEnergy;
@@ -47,46 +48,47 @@ public sealed class BeatDetector
     private double _referenceDb = -40;
     private double _dimmer = 1;
 
+    /// <summary>Creates a detector for samples at <paramref name="sampleRate"/> Hz.</summary>
     public BeatDetector(int sampleRate)
     {
         _sampleRate = sampleRate;
         _blockSize = Math.Max(64, sampleRate / 90);              // ~11 ms
         _blocksPerSecond = sampleRate / (double)_blockSize;
-        _historyBlocks = (int)Math.Ceiling(_blocksPerSecond * 8); // 8 s d'historique
+        _historyBlocks = (int)Math.Ceiling(_blocksPerSecond * 8); // 8 s of history
         _onset = new double[_historyBlocks];
     }
 
-    /// <summary>Tempo detecte (0 tant qu'il n'y en a pas de fiable).</summary>
+    /// <summary>Detected tempo (0 while there is no reliable one).</summary>
     public double Bpm { get { lock (_lock) { return _confidence >= MinConfidence ? _bpm : 0; } } }
 
-    /// <summary>Qualite de la detection (0..1) : force du pic d'autocorrelation.</summary>
+    /// <summary>Detection quality (0..1): strength of the autocorrelation peak.</summary>
     public double Confidence { get { lock (_lock) { return _confidence; } } }
 
-    /// <summary>En dessous, le tempo n'est pas annonce.</summary>
+    /// <summary>Below this, the tempo is not reported.</summary>
     public double MinConfidence { get; set; } = 0.15;
 
-    /// <summary>Volume du moment en dB (0 = plein signal, -90 = silence).</summary>
+    /// <summary>Current volume in dB (0 = full signal, -90 = silence).</summary>
     public double LevelDb { get { lock (_lock) { return _levelDb; } } }
 
-    /// <summary>Niveau "normal" de la soiree en dB (crete qui redescend lentement).</summary>
+    /// <summary>"Normal" level of the party in dB (a peak that slowly decays).</summary>
     public double ReferenceDb { get { lock (_lock) { return _referenceDb; } } }
 
-    /// <summary>Baisse de volume toleree sans toucher au dimmer (variations normales de la musique).</summary>
+    /// <summary>Volume drop tolerated without touching the dimmer (normal variations of the music).</summary>
     public double DeadZoneDb { get; set; } = 8;
 
-    /// <summary>Plage de dB (sous la zone morte) pour aller de 100 % au plancher.</summary>
+    /// <summary>Range in dB (below the dead zone) to go from 100 % to the floor.</summary>
     public double DimmerRangeDb { get; set; } = 18;
 
-    /// <summary>Duree pour que le dimmer remonte de 0 a 100 % quand le volume revient.</summary>
+    /// <summary>Time for the dimmer to rise from 0 to 100 % when the volume comes back.</summary>
     public double RecoverySeconds { get; set; } = 2;
 
-    /// <summary>Plancher du dimmer (jamais le noir complet a cause d'un silence).</summary>
+    /// <summary>Dimmer floor (never complete darkness because of a silence).</summary>
     public double MinDimmer { get; set; } = 0.1;
 
-    /// <summary>Facteur de dimmer (0..1) suivant le volume, lisse : baisse vite, remonte en RecoverySeconds.</summary>
+    /// <summary>Dimmer factor (0..1) following the volume, smoothed: drops fast, rises in RecoverySeconds.</summary>
     public double DimmerFactor { get { lock (_lock) { return _dimmer; } } }
 
-    /// <summary>Echantillons mono, -1..1 (appele par le thread audio).</summary>
+    /// <summary>Mono samples, -1..1 (called by the audio thread).</summary>
     public void AddSamples(ReadOnlySpan<float> samples)
     {
         lock (_lock)
@@ -104,6 +106,7 @@ public sealed class BeatDetector
         }
     }
 
+    /// <summary>Forgets the history (new song, microphone restarted).</summary>
     public void Reset()
     {
         lock (_lock)
@@ -119,25 +122,26 @@ public sealed class BeatDetector
 
     // ---------------------------------------------------------------------------------
 
+    /// <summary>End of an ~11 ms block: updates the levels and the dimmer factor, records the onset strength and estimates the tempo now and then.</summary>
     private void EndBlockLocked(double meanSquare)
     {
         double dt = 1.0 / _blocksPerSecond;
 
-        // Niveau en dB lisse sur ~0,5 s : ne suit pas chaque coup de grosse caisse, mais une vraie
-        // baisse (break) se voit en moins d'une seconde.
+        // Level in dB smoothed over ~0.5 s: it does not follow each kick drum, but a real
+        // drop (break) shows in less than a second.
         double blockDb = Math.Max(-90, 10 * Math.Log10(meanSquare + 1e-9));
         _levelDb += (blockDb - _levelDb) * Math.Min(1, dt / 0.5);
         _referenceDb = _levelDb > _referenceDb
-            ? _referenceDb + (_levelDb - _referenceDb) * 0.05      // monte assez vite vers le niveau de la soiree
-            : _referenceDb - 1.0 * dt;                               // redescend de 1 dB/s
-        // Zone morte : les variations normales de la musique (entre deux temps) ne font rien.
+            ? _referenceDb + (_levelDb - _referenceDb) * 0.05      // rises fairly fast towards the party level
+            : _referenceDb - 1.0 * dt;                               // decays by 1 dB/s
+        // Dead zone: the normal variations of the music (between two beats) do nothing.
         double floorDb = _referenceDb - DeadZoneDb - DimmerRangeDb;
         double target = Math.Clamp((_levelDb - floorDb) / DimmerRangeDb, MinDimmer, 1);
         double up = dt / Math.Max(0.1, RecoverySeconds);
-        double down = dt / 0.3;                                      // baisse en ~0,3 s
+        double down = dt / 0.3;                                      // drops in ~0.3 s
         _dimmer = target < _dimmer ? Math.Max(target, _dimmer - down) : Math.Min(target, _dimmer + up);
 
-        // Force d'attaque (hausse d'energie, compressee)
+        // Onset strength (rise of energy, compressed)
         double energy = Math.Log10(1 + 1000 * meanSquare);
         double onset = Math.Max(0, energy - _previousEnergy);
         _previousEnergy = energy;
@@ -145,7 +149,7 @@ public sealed class BeatDetector
         _onsetPos = (_onsetPos + 1) % _historyBlocks;
         _onsetCount = Math.Min(_onsetCount + 1, _historyBlocks);
 
-        // Nouvelle estimation du tempo toutes les ~0,5 s, avec au moins 4 s de son.
+        // New tempo estimate every ~0.5 s, with at least 4 s of sound.
         if (++_blocksSinceEstimate >= _blocksPerSecond / 2 && _onsetCount >= _blocksPerSecond * 4)
         {
             _blocksSinceEstimate = 0;
@@ -153,6 +157,7 @@ public sealed class BeatDetector
         }
     }
 
+    /// <summary>Estimates the tempo by autocorrelation of the onset strengths of the last ~8 seconds.</summary>
     private void EstimateLocked()
     {
         int n = _onsetCount;
@@ -177,7 +182,7 @@ public sealed class BeatDetector
             return;
         }
 
-        // Autocorrelation sur les ecarts correspondant a 60..200 BPM.
+        // Autocorrelation over the gaps matching 60..200 BPM.
         int minLag = (int)Math.Floor(_blocksPerSecond * 60 / 200);
         int maxLag = (int)Math.Ceiling(_blocksPerSecond * 60 / 60);
         double best = 0;
@@ -194,7 +199,7 @@ public sealed class BeatDetector
         }
         for (int lag = minLag + 1; lag <= maxLag && lag < n - 1; lag++)
         {
-            // Bonus aux ecarts dont le double (2 temps) correle aussi : evite les faux pics.
+            // Bonus for gaps whose double (2 beats) also correlates: avoids false peaks.
             double score = ac[lag] + 0.5 * (2 * lag < ac.Length ? ac[2 * lag] : 0);
             if (ac[lag] > ac[lag - 1] && ac[lag] >= ac[lag + 1] && score > best)
             {
@@ -208,7 +213,7 @@ public sealed class BeatDetector
             return;
         }
 
-        // Interpolation parabolique autour du pic pour un BPM plus precis.
+        // Parabolic interpolation around the peak for a more precise BPM.
         double y0 = ac[bestLag - 1], y1 = ac[bestLag], y2 = ac[bestLag + 1];
         double denominator = y0 - 2 * y1 + y2;
         double refined = bestLag + (Math.Abs(denominator) > 1e-12 ? 0.5 * (y0 - y2) / denominator : 0);

@@ -1,16 +1,17 @@
 // =====================================================================================
 //  MainForm.cs
 // -------------------------------------------------------------------------------------
-//  Fenetre principale :
-//    - menu Fichier : nouvelle config, ouvrir/importer, enregistrer, enregistrer
-//      sous/exporter, configurations recentes -> plusieurs configs possibles
-//      (une par salle, par type de soiree...) ;
-//    - menu Appareils : ajouter un appareil, patch/adressage, editeur de profils ;
-//    - barre de connexion : port COM, connecter/deconnecter, connexion auto au
-//      demarrage. Si le Bluetooth decroche pendant la soiree, le programme tente
-//      de se reconnecter tout seul toutes les quelques secondes ;
-//    - onglets : "Soiree" (console), un onglet par appareil du patch, "Debug" ;
-//    - barre d'etat : config ouverte, etat du patch, MODE DEBUG en rouge, messages.
+//  Main window:
+//    - File menu: new configuration, open/import, save, save as/export, recent
+//      configurations -> several configurations are possible (one per venue,
+//      per kind of party...);
+//    - Fixtures menu: add a fixture, patch/addressing, profile editor;
+//    - Settings menu: interface language;
+//    - connection bar: COM port, connect/disconnect, auto-connect at start-up.
+//      If Bluetooth drops during the show, the program tries to reconnect by
+//      itself every few seconds;
+//    - tabs: "Show" (console), one tab per fixture of the patch, "Debug";
+//    - status bar: open configuration, patch state, DEBUG MODE in red, messages.
 // =====================================================================================
 
 using System.ComponentModel;
@@ -22,6 +23,7 @@ using DmxController.Core.Storage;
 
 namespace DmxController.UI;
 
+/// <summary>Main window: menus, connection bar, fog banner, tabs and status bar.</summary>
 [DesignerCategory("Code")]
 internal sealed class MainForm : Form
 {
@@ -33,7 +35,7 @@ internal sealed class MainForm : Form
     private readonly AppSettings _settings;
     private string? _showPath;
 
-    // Onglets
+    // Tabs
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill, Padding = new Point(14, 5) };
     private readonly TabPage _liveTab = new(Tr.T("Soirée")) { Tag = "live" };
     private readonly TabPage _debugTab = new(Tr.T("Debug")) { Tag = "debug" };
@@ -41,16 +43,16 @@ internal sealed class MainForm : Form
     private readonly DebugPanel _debug;
     private readonly FogBanner _fogBanner;
 
-    // Messages de mise a jour des profils (bibliotheque) a afficher a l'ouverture.
+    // Profile update messages (library) to show when opening.
     private List<string> _pendingUpgradeNotes = new();
 
-    // Barre de connexion
+    // Connection bar
     private readonly ComboBox _portCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 100, Margin = new Padding(3, 7, 3, 3) };
     private readonly Button _btnConnect = new() { Text = Tr.T("Connecter"), AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
     private readonly Button _btnDisconnect = new() { Text = Tr.T("Déconnecter"), AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
     private readonly Label _lblLink = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(6, 10, 3, 3) };
 
-    // Voyant de connexion bien visible : carre vert (connecte), orange clignotant (connexion), rouge (coupe).
+    // Highly visible connection light: green square (connected), blinking orange (connecting), red (off).
     private readonly Label _linkLed = new()
     {
         AutoSize = false,
@@ -63,7 +65,7 @@ internal sealed class MainForm : Form
     };
     private readonly CheckBox _autoConnect = new() { Text = Tr.T("Connexion auto au démarrage"), AutoSize = true, Margin = new Padding(16, 9, 3, 3) };
 
-    // Menu et barre d'etat
+    // Menu and status bar
     private readonly ToolStripMenuItem _recentMenu = new(Tr.T("Configurations récentes"));
     private readonly ToolStripStatusLabel _stShow = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly ToolStripStatusLabel _stPatch = new() { BorderSides = ToolStripStatusLabelBorderSides.Left };
@@ -73,14 +75,15 @@ internal sealed class MainForm : Form
     private readonly System.Windows.Forms.Timer _uiTimer = new() { Interval = 100 };
     private readonly byte[] _preview = DmxFrame.NewUniverse();
 
-    // Connexion / reconnexion automatique
+    // Automatic connection / reconnection
     private bool _connecting;
-    private bool _wantConnected;     // l'utilisateur veut etre connecte (reconnexion si coupure)
+    private bool _wantConnected;     // the user wants to be connected (reconnect if the link drops)
     private string? _wantedPort;
     private DateTime _nextReconnect;
     private int _reconnectAttempts;
     private bool _closing;
 
+    /// <summary>Builds the window, loads the last configuration and prepares the link and the timers.</summary>
     public MainForm()
     {
         Text = Tr.T("Contrôleur DMX");
@@ -88,7 +91,7 @@ internal sealed class MainForm : Form
         Size = new Size(1540, 945);
         MinimumSize = new Size(1150, 720);
         StartPosition = FormStartPosition.CenterScreen;
-        KeyPreview = true; // la fenetre voit les touches avant les controles (raccourcis de l'onglet Soiree)
+        KeyPreview = true; // the window sees the keys before the controls (shortcuts of the Show tab)
 
         _settings = ShowStore.LoadAppSettings();
         var (show, path) = LoadInitialShow();
@@ -101,7 +104,7 @@ internal sealed class MainForm : Form
         _link.SendIntervalMs = show.Settings.SendIntervalMs;
         _link.ConnectionLost += (_, message) =>
         {
-            // Appele depuis le thread d'envoi : on repasse sur le thread de l'IHM.
+            // Called from the send thread: switch back to the UI thread.
             if (!_closing && IsHandleCreated)
             {
                 BeginInvoke(new Action(() => OnConnectionLost(message)));
@@ -125,14 +128,14 @@ internal sealed class MainForm : Form
         _tabs.TabPages.Add(_liveTab);
         _tabs.TabPages.Add(_debugTab);
 
-        // Titres d'onglets dessines a la main : ceux des appareils desactives sont grises.
+        // Hand-drawn tab titles: those of disabled fixtures are greyed out.
         _tabs.DrawMode = TabDrawMode.OwnerDrawFixed;
         _tabs.DrawItem += DrawTabTitle;
 
         var menu = BuildMenu();
         MainMenuStrip = menu;
         Controls.Add(_tabs);
-        Controls.Add(_fogBanner); // sous la barre de connexion, visible sur tous les onglets
+        Controls.Add(_fogBanner); // below the connection bar, visible on every tab
         Controls.Add(BuildConnectionBar());
         Controls.Add(BuildStatusStrip());
         Controls.Add(menu);
@@ -159,9 +162,10 @@ internal sealed class MainForm : Form
     }
 
     // =================================================================================
-    //  Construction
+    //  Building
     // =================================================================================
 
+    /// <summary>File, Fixtures, Settings and Help menus.</summary>
     private MenuStrip BuildMenu()
     {
         var menu = new MenuStrip();
@@ -228,6 +232,7 @@ internal sealed class MainForm : Form
         }
     }
 
+    /// <summary>Menu item running <paramref name="action"/>, with an optional keyboard shortcut.</summary>
     private static ToolStripMenuItem Item(string text, Keys? shortcut, Action action)
     {
         var item = new ToolStripMenuItem(text, null, (_, _) => action());
@@ -238,6 +243,7 @@ internal sealed class MainForm : Form
         return item;
     }
 
+    /// <summary>Connection bar: COM port, connect / disconnect, link light and auto-connect box.</summary>
     private Control BuildConnectionBar()
     {
         var refresh = new Button { Text = Tr.T("Actualiser"), AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
@@ -266,6 +272,7 @@ internal sealed class MainForm : Form
         return bar;
     }
 
+    /// <summary>Status bar: configuration, patch state, debug mode and last message.</summary>
     private StatusStrip BuildStatusStrip()
     {
         var strip = new StatusStrip();
@@ -274,9 +281,10 @@ internal sealed class MainForm : Form
     }
 
     // =================================================================================
-    //  Configurations : nouvelle / ouvrir / enregistrer / exporter
+    //  Configurations: new / open / save / export
     // =================================================================================
 
+    /// <summary>Configuration to open at start-up: the last one used, otherwise the default one (created on the very first start).</summary>
     private (ShowConfig Show, string? Path) LoadInitialShow()
     {
         if (_settings.LastShowPath is string last && File.Exists(last))
@@ -301,12 +309,12 @@ internal sealed class MainForm : Form
             }
             catch (Exception)
             {
-                // fichier abime : on repart d'une config neuve (sans l'ecraser)
+                // damaged file: start from a fresh configuration (without overwriting it)
                 return (DefaultShow.Create(), null);
             }
         }
 
-        // Tout premier lancement : on cree et on enregistre la configuration par defaut.
+        // Very first start: the default configuration is created and saved.
         var show = DefaultShow.Create();
         try
         {
@@ -319,7 +327,7 @@ internal sealed class MainForm : Form
         }
     }
 
-    /// <summary>Remplace la configuration ouverte par une autre et reconstruit l'interface.</summary>
+    /// <summary>Replaces the open configuration by another one and rebuilds the interface.</summary>
     private void ApplyShow(ShowConfig show, string? path)
     {
         _engine.LoadShow(show);
@@ -341,7 +349,7 @@ internal sealed class MainForm : Form
         UpdateStatusBar();
     }
 
-    /// <summary>Si des modifications ne sont pas enregistrees, demande quoi faire. false = annuler l'action.</summary>
+    /// <summary>When there are unsaved changes, asks what to do. false = cancel the action.</summary>
     private bool ConfirmDiscard()
     {
         if (!_ctx.IsDirty)
@@ -359,6 +367,7 @@ internal sealed class MainForm : Form
         };
     }
 
+    /// <summary>New configuration: default fixtures, or empty while keeping the profiles.</summary>
     private void NewShow(bool empty)
     {
         if (!ConfirmDiscard())
@@ -369,7 +378,7 @@ internal sealed class MainForm : Form
         ShowConfig show;
         if (empty)
         {
-            // Nouvelle salle avec les memes types d'appareils : on garde la bibliotheque de profils.
+            // New venue with the same kinds of fixtures: the profile library is kept.
             show = new ShowConfig
             {
                 Name = Tr.T("Nouvelle soirée"),
@@ -387,6 +396,7 @@ internal sealed class MainForm : Form
         Log(empty ? Tr.T("Nouvelle configuration vide (ajoute des appareils : Appareils > Ajouter un appareil).") : Tr.T("Nouvelle configuration par défaut."));
     }
 
+    /// <summary>Opens (imports) a configuration file; <paramref name="path"/> null shows the file picker.</summary>
     private void OpenShow(string? path)
     {
         if (!ConfirmDiscard())
@@ -425,6 +435,7 @@ internal sealed class MainForm : Form
         }
     }
 
+    /// <summary>Saves the configuration (asks for a file the first time). false when cancelled or failed.</summary>
     private bool SaveShow()
     {
         if (_showPath is null)
@@ -434,7 +445,7 @@ internal sealed class MainForm : Form
 
         try
         {
-            // On memorise l'etat de la console pour le retrouver a la prochaine ouverture.
+            // The console state is remembered to get it back at the next opening.
             _ctx.Show.LiveState = _engine.CaptureScene(Tr.T("État courant"));
             _ctx.Show.Settings.Master = _engine.Master;
             _ctx.Show.Settings.Bpm = _engine.Bpm;
@@ -454,6 +465,7 @@ internal sealed class MainForm : Form
         }
     }
 
+    /// <summary>Saves the configuration under a new file (export). false when cancelled or failed.</summary>
     private bool SaveShowAs()
     {
         Directory.CreateDirectory(ShowStore.DefaultShowsFolder);
@@ -477,7 +489,7 @@ internal sealed class MainForm : Form
             path += ShowStore.ShowExtension;
         }
 
-        // Le nom de la configuration suit le nom du fichier.
+        // The configuration name follows the file name.
         string fileName = Path.GetFileName(path);
         _ctx.Show.Name = fileName.EndsWith(ShowStore.ShowExtension, StringComparison.OrdinalIgnoreCase)
             ? fileName[..^ShowStore.ShowExtension.Length]
@@ -486,6 +498,7 @@ internal sealed class MainForm : Form
         return SaveShow();
     }
 
+    /// <summary>Renames the configuration (name shown in the title bar).</summary>
     private void RenameShow()
     {
         string? name = InputDialog.Ask(this, Tr.T("Renommer la configuration"), Tr.T("Nom de la configuration :"), _ctx.Show.Name);
@@ -497,6 +510,7 @@ internal sealed class MainForm : Form
         }
     }
 
+    /// <summary>Opens the configurations folder in Windows Explorer.</summary>
     private void OpenShowsFolder()
     {
         string folder = _showPath is not null ? Path.GetDirectoryName(_showPath)! : ShowStore.DefaultShowsFolder;
@@ -504,6 +518,7 @@ internal sealed class MainForm : Form
         Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
     }
 
+    /// <summary>Remembers the file as the last one used and at the top of the recent list.</summary>
     private void RememberShow(string path)
     {
         _settings.LastShowPath = path;
@@ -516,6 +531,7 @@ internal sealed class MainForm : Form
         SaveAppSettings();
     }
 
+    /// <summary>Fills the "Recent configurations" menu.</summary>
     private void BuildRecentMenu()
     {
         _recentMenu.DropDownItems.Clear();
@@ -532,6 +548,7 @@ internal sealed class MainForm : Form
         }
     }
 
+    /// <summary>Saves the settings of this PC (port, auto-connect, recent files, language).</summary>
     private void SaveAppSettings()
     {
         _settings.AutoConnect = _autoConnect.Checked;
@@ -546,9 +563,10 @@ internal sealed class MainForm : Form
     }
 
     // =================================================================================
-    //  Patch, profils et onglets d'appareils
+    //  Patch, profiles and fixture tabs
     // =================================================================================
 
+    /// <summary>Opens the patch window; when it is accepted, applies the new patch and rebuilds the tabs.</summary>
     private void OpenPatch(bool addNew)
     {
         using var dialog = new PatchDialog(_ctx.Show, addNew);
@@ -560,11 +578,11 @@ internal sealed class MainForm : Form
         var before = _ctx.Show.Fixtures.Select(f => f.Id).ToHashSet();
         _engine.EditShow(show =>
         {
-            show.Profiles = dialog.ResultProfiles; // + modeles ajoutes depuis la bibliotheque
+            show.Profiles = dialog.ResultProfiles; // + models added from the library
             show.Fixtures = dialog.ResultFixtures;
         });
 
-        // Les nouveaux appareils sont coches d'office dans l'onglet Soiree.
+        // New fixtures are ticked straight away in the Show tab.
         var added = dialog.ResultFixtures.Where(f => !before.Contains(f.Id)).Select(f => f.Id).ToList();
         if (added.Count > 0)
         {
@@ -578,6 +596,7 @@ internal sealed class MainForm : Form
         ReportPatchProblems(onlyIfAny: true);
     }
 
+    /// <summary>Opens the profile editor; when it is accepted, applies the edited profiles.</summary>
     private void OpenProfileEditor()
     {
         using var dialog = new ProfileEditorDialog(_ctx.Show);
@@ -594,7 +613,7 @@ internal sealed class MainForm : Form
         ReportPatchProblems(onlyIfAny: true);
     }
 
-    /// <summary>Recree un onglet par appareil du patch, entre "Soiree" et "Debug".</summary>
+    /// <summary>Rebuilds one tab per fixture of the patch, between "Show" and "Debug".</summary>
     private void RebuildFixtureTabs()
     {
         string? selectedKey = _tabs.SelectedTab?.Tag as string;
@@ -603,7 +622,7 @@ internal sealed class MainForm : Form
         foreach (var page in _tabs.TabPages.Cast<TabPage>().Where(p => p != _liveTab && p != _debugTab).ToList())
         {
             _tabs.TabPages.Remove(page);
-            page.Dispose(); // detruit aussi le FixturePanel (qui se desabonne des evenements)
+            page.Dispose(); // also destroys the FixturePanel (which unsubscribes from the events)
         }
 
         int insertAt = 1;
@@ -617,14 +636,14 @@ internal sealed class MainForm : Form
             }
             else
             {
-                // Un onglet adapte au modele : fumee, laser, ou onglet generique (lyre, Spider, PAR...).
+                // A tab suited to the model: fog, laser, or the generic tab (moving head, Spider, PAR...).
                 Control panel = profile.IsFogMachine ? new FogPanel(_ctx, fixture, profile)
                     : profile.IsLaser ? new LaserPanel(_ctx, fixture, profile)
                     : new FixturePanel(_ctx, fixture, profile);
                 page.Controls.Add(panel);
                 if (!fixture.Enabled)
                 {
-                    // Module desactive : onglet grise, commandes inactives, bouton pour le reactiver.
+                    // Disabled module: greyed-out tab, inactive controls, button to enable it again.
                     panel.Enabled = false;
                     page.Controls.Add(BuildDisabledBar(fixture));
                 }
@@ -646,9 +665,11 @@ internal sealed class MainForm : Form
         UpdateStatusBar();
     }
 
+    /// <summary>Tab title: fixture name, "(disabled)" and "(?)" for an unchecked profile.</summary>
     private static string TabTitle(FixtureInstance fixture, FixtureProfile? profile) =>
         fixture.Name + (fixture.Enabled ? "" : Tr.T(" (désactivé)")) + (profile is not null && !profile.IsFullyVerified ? " (?)" : "");
 
+    /// <summary>Banner shown on the tab of a disabled fixture, with a button to enable it.</summary>
     private Control BuildDisabledBar(FixtureInstance fixture)
     {
         var enable = new Button { Text = Tr.T("Activer ce module"), AutoSize = true, Margin = new Padding(12, 4, 3, 4) };
@@ -659,6 +680,7 @@ internal sealed class MainForm : Form
         return bar;
     }
 
+    /// <summary>Enables or disables a fixture of the patch and rebuilds its tab.</summary>
     private void SetFixtureEnabled(string fixtureId, bool enabled)
     {
         _engine.EditShow(show =>
@@ -675,7 +697,7 @@ internal sealed class MainForm : Form
         ReportPatchProblems(onlyIfAny: true);
     }
 
-    /// <summary>Titres d'onglets : gris pour un appareil desactive, gras pour l'onglet actif.</summary>
+    /// <summary>Tab titles: grey for a disabled fixture, bold for the active tab.</summary>
     private void DrawTabTitle(object? sender, DrawItemEventArgs e)
     {
         var page = _tabs.TabPages[e.Index];
@@ -689,6 +711,7 @@ internal sealed class MainForm : Form
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
     }
 
+    /// <summary>Shows the profile update messages collected when the configuration was opened.</summary>
     private void ReportUpgradeNotes()
     {
         if (_pendingUpgradeNotes.Count == 0)
@@ -706,6 +729,7 @@ internal sealed class MainForm : Form
             Tr.T("Profils mis à jour"), MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
+    /// <summary>Refreshes the tab titles (enabled state, checked profiles).</summary>
     private void UpdateTabTitles()
     {
         foreach (TabPage page in _tabs.TabPages)
@@ -718,6 +742,7 @@ internal sealed class MainForm : Form
         }
     }
 
+    /// <summary>Shows the addressing problems; with <paramref name="onlyIfAny"/>, says nothing when there is none.</summary>
     private void ReportPatchProblems(bool onlyIfAny)
     {
         var problems = PatchValidator.Validate(_ctx.Show);
@@ -737,9 +762,10 @@ internal sealed class MainForm : Form
     }
 
     // =================================================================================
-    //  Connexion au boitier
+    //  Connection to the box
     // =================================================================================
 
+    /// <summary>Refreshes the COM port list and keeps the last port used selected.</summary>
     private void RefreshPorts()
     {
         string? previous = _portCombo.SelectedItem as string ?? _settings.LastPort;
@@ -757,8 +783,8 @@ internal sealed class MainForm : Form
     }
 
     /// <summary>
-    /// Ouverture du port dans une tache de fond : l'etablissement d'une liaison
-    /// Bluetooth peut prendre plusieurs secondes, l'IHM ne doit pas geler pendant ce temps.
+    /// Opens the port in a background task: setting up a Bluetooth link can take several
+    /// seconds, and the UI must not freeze meanwhile.
     /// </summary>
     private async Task<bool> ConnectAsync(string port, bool quiet)
     {
@@ -770,8 +796,8 @@ internal sealed class MainForm : Form
         _connecting = true;
         UpdateConnectionUi();
 
-        // TryConnectAndStart ne leve jamais : un boitier eteint ou hors de portee donne juste un
-        // message (aucune exception ne traverse le await, donc plus d'"exception non geree").
+        // TryConnectAndStart never throws: a box that is off or out of range just gives a
+        // message (no exception crosses the await, so no more "unhandled exception").
         string? error = null;
         bool ok = await Task.Run(() => _link.TryConnectAndStart(port, out error));
 
@@ -799,6 +825,7 @@ internal sealed class MainForm : Form
         return ok;
     }
 
+    /// <summary>Disconnects on purpose (no automatic reconnection).</summary>
     private void Disconnect()
     {
         _wantConnected = false;
@@ -807,14 +834,16 @@ internal sealed class MainForm : Form
         UpdateConnectionUi();
     }
 
+    /// <summary>Link lost during sending: logs it and lets the timer try to reconnect.</summary>
     private void OnConnectionLost(string message)
     {
         Log(Tr.F("Liaison perdue : {0}", message));
-        _link.Disconnect(); // ne leve jamais (liaison morte comprise)
+        _link.Disconnect(); // never throws (dead link included)
         _nextReconnect = DateTime.Now.AddSeconds(2);
         UpdateConnectionUi();
     }
 
+    /// <summary>Enables the connection buttons according to the link state.</summary>
     private void UpdateConnectionUi()
     {
         bool connected = _link.IsConnected;
@@ -824,6 +853,7 @@ internal sealed class MainForm : Form
         UpdateLinkLabel();
     }
 
+    /// <summary>Text next to the link light (frames sent, reconnecting, not connected...).</summary>
     private void UpdateLinkLabel()
     {
         if (_link.IsSending)
@@ -849,10 +879,10 @@ internal sealed class MainForm : Form
         UpdateLinkLed();
     }
 
-    /// <summary>Voyant carre : vert fixe = connecte ; orange clignotant = connexion / liaison perdue ; rouge = coupe.</summary>
+    /// <summary>Square light: steady green = connected; blinking orange = connecting / link lost; red = off.</summary>
     private void UpdateLinkLed()
     {
-        bool blinkOn = DateTime.Now.Millisecond < 500; // 1 clignotement par seconde (minuteur de 100 ms)
+        bool blinkOn = DateTime.Now.Millisecond < 500; // 1 blink per second (100 ms timer)
         (string text, Color color) = _link.IsSending ? (Tr.T("● CONNECTÉ"), Color.FromArgb(0, 170, 70))
             : _connecting ? (Tr.T("● CONNEXION"), blinkOn ? Color.FromArgb(240, 150, 0) : Color.FromArgb(120, 80, 20))
             : _wantConnected ? (Tr.T("● PERDUE"), blinkOn ? Color.FromArgb(240, 150, 0) : Color.FromArgb(200, 40, 40))
@@ -868,12 +898,13 @@ internal sealed class MainForm : Form
     }
 
     // =================================================================================
-    //  Minuteur de l'IHM (10 fois par seconde)
+    //  UI timer (10 times per second)
     // =================================================================================
 
+    /// <summary>UI timer (10 times/s): monitor, preview without a link, link light and automatic reconnection.</summary>
     private void OnUiTick()
     {
-        // Sans liaison, on calcule quand meme la sortie pour que le moniteur Debug reste vivant.
+        // Without a link, the output is still computed so that the Debug monitor stays alive.
         if (!_link.IsSending)
         {
             Array.Clear(_preview);
@@ -885,7 +916,7 @@ internal sealed class MainForm : Form
             _debug.UpdateMonitor(_engine.GetLastOutput());
         }
 
-        // Reconnexion automatique si le Bluetooth a decroche.
+        // Automatic reconnection when Bluetooth dropped.
         if (_wantConnected && !_link.IsConnected && !_connecting && _wantedPort is not null && DateTime.Now >= _nextReconnect)
         {
             _reconnectAttempts++;
@@ -897,15 +928,17 @@ internal sealed class MainForm : Form
     }
 
     // =================================================================================
-    //  Barre de titre / barre d'etat / journal
+    //  Title bar / status bar / log
     // =================================================================================
 
+    /// <summary>Window title: configuration name, "*" when modified.</summary>
     private void UpdateTitle()
     {
         Text = Tr.F("Contrôleur DMX — {0}{1}", _ctx.Show.Name, (_ctx.IsDirty ? " *" : ""));
         UpdateStatusBar();
     }
 
+    /// <summary>Status bar texts: configuration and file, patch problems, debug mode.</summary>
     private void UpdateStatusBar()
     {
         _stShow.Text = Tr.F("Configuration : {0}{1}  —  {2}", _ctx.Show.Name, (_ctx.IsDirty ? Tr.T(" (modifiée)") : ""), (_showPath ?? Tr.T("pas encore enregistrée")));
@@ -920,12 +953,14 @@ internal sealed class MainForm : Form
         _stDebug.ForeColor = Color.White;
     }
 
+    /// <summary>Message in the status bar and in the Debug tab log.</summary>
     private void Log(string message)
     {
         _stMessage.Text = message.Length > 140 ? message[..140] + "…" : message;
         _debug?.AppendLog(message);
     }
 
+    /// <summary>"Keyboard shortcuts" box.</summary>
     private void ShowShortcuts() => MessageBox.Show(this,
         Tr.T("Onglet Soirée :\n") +
         Tr.T("   Espace : blackout (bascule)\n") +
@@ -940,6 +975,7 @@ internal sealed class MainForm : Form
         Tr.T("   Ctrl+M : éditeur de profils"),
         Tr.T("Raccourcis clavier"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 
+    /// <summary>"About" box.</summary>
     private void ShowAbout() => MessageBox.Show(this,
         Tr.T("Contrôleur DMX pour le boîtier Bluetooth « USB-RDM-DMX » (appli Android RY-AI).\n\n") +
         Tr.T("Protocole reconstitué par rétro-ingénierie de l'appli et confirmé sur le matériel :\n") +
@@ -949,9 +985,10 @@ internal sealed class MainForm : Form
         Tr.T("À propos"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 
     // =================================================================================
-    //  Clavier et fermeture
+    //  Keyboard and closing
     // =================================================================================
 
+    /// <summary>Keys of the Show tab (blackout, flash, tap, scenes) when no text field has the focus.</summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (_tabs.SelectedTab == _liveTab && e.Modifiers == Keys.None && !IsTypingInText() && _live.HandleKey(e.KeyCode, down: true))
@@ -962,6 +999,7 @@ internal sealed class MainForm : Form
         base.OnKeyDown(e);
     }
 
+    /// <summary>Releasing F ends the flash.</summary>
     protected override void OnKeyUp(KeyEventArgs e)
     {
         if (_tabs.SelectedTab == _liveTab && e.Modifiers == Keys.None && !IsTypingInText() && _live.HandleKey(e.KeyCode, down: false))
@@ -971,7 +1009,7 @@ internal sealed class MainForm : Form
         base.OnKeyUp(e);
     }
 
-    /// <summary>true si le focus est dans une zone de saisie (on ne vole pas les touches).</summary>
+    /// <summary>true when the focus is in a text field (keys are not stolen).</summary>
     private bool IsTypingInText()
     {
         Control? control = ActiveControl;
@@ -982,6 +1020,7 @@ internal sealed class MainForm : Form
         return control is TextBoxBase or UpDownBase || (control is ComboBox combo && combo.DropDownStyle != ComboBoxStyle.DropDownList);
     }
 
+    /// <summary>Closing: offers to save, remembers the console state, disconnects the box.</summary>
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         if (!ConfirmDiscard())

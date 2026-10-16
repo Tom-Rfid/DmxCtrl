@@ -1,9 +1,9 @@
 // =====================================================================================
 //  MicInput.cs
 // -------------------------------------------------------------------------------------
-//  Capture du micro (ou de toute entree son Windows) avec NAudio, en mono 44,1 kHz,
-//  et envoi des echantillons au BeatDetector (Core) qui calcule tempo et niveau.
-//  Les evenements NAudio arrivent sur un thread audio : le BeatDetector est thread-safe.
+//  Captures the microphone (or any Windows sound input) with NAudio, mono 44.1 kHz,
+//  and feeds the samples to the BeatDetector (Core), which computes tempo and level.
+//  NAudio events arrive on an audio thread: the BeatDetector is thread-safe.
 // =====================================================================================
 
 using DmxController.Core.Audio;
@@ -11,6 +11,7 @@ using NAudio.Wave;
 
 namespace DmxController.Audio;
 
+/// <summary>Capture of one Windows sound input with NAudio, feeding a BeatDetector.</summary>
 internal sealed class MicInput : IDisposable
 {
     private const int SampleRate = 44100;
@@ -18,15 +19,16 @@ internal sealed class MicInput : IDisposable
     private WaveInEvent? _wave;
     private float[] _buffer = Array.Empty<float>();
 
-    /// <summary>Analyseur du son en cours (null quand le micro est coupe).</summary>
+    /// <summary>Analyser of the current sound (null when the microphone is off).</summary>
     public BeatDetector? Detector { get; private set; }
 
+    /// <summary>true while recording.</summary>
     public bool IsRunning => _wave is not null;
 
-    /// <summary>Leve (depuis le thread audio) si l'enregistrement s'arrete sur une erreur.</summary>
+    /// <summary>Raised (from the audio thread) when recording stops on an error.</summary>
     public event Action<string>? Error;
 
-    /// <summary>Noms des entrees son Windows, dans l'ordre des numeros de peripherique.</summary>
+    /// <summary>Names of the Windows sound inputs, in device-number order.</summary>
     public static List<string> DeviceNames()
     {
         var names = new List<string>();
@@ -37,6 +39,7 @@ internal sealed class MicInput : IDisposable
         return names;
     }
 
+    /// <summary>Starts recording device <paramref name="deviceNumber"/> (mono 44.1 kHz) with a fresh BeatDetector.</summary>
     public void Start(int deviceNumber)
     {
         Stop();
@@ -60,7 +63,7 @@ internal sealed class MicInput : IDisposable
         Detector = detector;
     }
 
-    /// <summary>Echantillons 16 bits -> flottants -1..1, puis analyse.</summary>
+    /// <summary>16-bit samples -> floats -1..1, then analysis.</summary>
     private void OnData(BeatDetector detector, byte[] data, int bytes)
     {
         int count = bytes / 2;
@@ -75,6 +78,7 @@ internal sealed class MicInput : IDisposable
         detector.AddSamples(_buffer.AsSpan(0, count));
     }
 
+    /// <summary>Stops recording and releases the device (ignores an already unplugged device).</summary>
     public void Stop()
     {
         var wave = _wave;
@@ -88,11 +92,12 @@ internal sealed class MicInput : IDisposable
             }
             catch (Exception)
             {
-                // peripherique deja debranche
+                // device already unplugged
             }
             wave.Dispose();
         }
     }
 
+    /// <summary>Stops recording.</summary>
     public void Dispose() => Stop();
 }

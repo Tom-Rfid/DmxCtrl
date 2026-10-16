@@ -1,18 +1,18 @@
 // =====================================================================================
 //  LaserPanel.cs
 // -------------------------------------------------------------------------------------
-//  Onglet special LASER (ex. Showtec Galactic RGY-140 MKII, 10 canaux) :
+//  Special LASER tab (e.g. Showtec Galactic RGY-140 MKII, 10 channels):
 //
-//    - ALLUMER / ETEINDRE le faisceau (couleur 0 = laser eteint) + avertissement ;
-//    - mode : programmes auto / au son internes, ou DMX (manuel) ;
-//    - 32 boutons de motifs ; boutons de couleurs ;
-//    - pad X/Y pour la position du motif ;
-//    - pour les autres canaux (strobe, zoom, X, Y, rotations) : une liste deroulante
-//      des plages de la notice (« Position fixe », « Rotation horaire »...) et un
-//      curseur dans la plage choisie (de lent a rapide, d'un angle a l'autre...).
+//    - SWITCH ON / OFF the beam (colour 0 = laser off) + warning;
+//    - mode: internal auto / sound programs, or DMX (manual);
+//    - 32 pattern buttons with drawings; colour type + colour + speed;
+//    - X/Y pad for the pattern position; zoom shortcut with a "60" button;
+//    - for the other channels (zoom, X, Y, rotations): a drop-down list of the
+//      ranges of the manual ("Fixed position", "Clockwise rotation"...) and a
+//      slider inside the chosen range (slow to fast, from one angle to another...).
 //
-//  Securite : au BLACKOUT de l'onglet Soiree (ou master a 0), le moteur force le
-//  laser en mode DMX et couleur 0 (eteint).
+//  Safety: on BLACKOUT in the Show tab (or master at 0), the engine forces the
+//  laser into DMX mode with colour 0 (off).
 // =====================================================================================
 
 using System.ComponentModel;
@@ -20,7 +20,7 @@ using DmxController.Core.Model;
 
 namespace DmxController.UI;
 
-/// <summary>Liste des plages d'un canal + curseur dans la plage choisie.</summary>
+/// <summary>List of the ranges of a channel + slider inside the chosen range.</summary>
 [DesignerCategory("Code")]
 internal sealed class RangeControl : FlowLayoutPanel
 {
@@ -30,9 +30,10 @@ internal sealed class RangeControl : FlowLayoutPanel
     private readonly Label _value = Ui.ValueLabel(40);
     private bool _updating;
 
-    /// <summary>Leve quand l'utilisateur change la valeur.</summary>
+    /// <summary>Raised when the user changes the value.</summary>
     public event Action<byte>? ValueChanged;
 
+    /// <summary>Creates the control for <paramref name="channel"/> (its ranges in the list).</summary>
     public RangeControl(ChannelDef channel, int listWidth = 300)
     {
         _channel = channel;
@@ -60,6 +61,7 @@ internal sealed class RangeControl : FlowLayoutPanel
 
     private ChannelRange? Current => _ranges.SelectedItem as ChannelRange;
 
+    /// <summary>Computes the value from the chosen range and the slider position, then raises ValueChanged.</summary>
     private void Emit()
     {
         if (Current is not ChannelRange range)
@@ -72,7 +74,7 @@ internal sealed class RangeControl : FlowLayoutPanel
         ValueChanged?.Invoke(value);
     }
 
-    /// <summary>Affiche une valeur venant du moteur (sans lever ValueChanged).</summary>
+    /// <summary>Shows a value coming from the engine (without raising ValueChanged).</summary>
     public void Show(byte value)
     {
         _updating = true;
@@ -94,7 +96,7 @@ internal sealed class RangeControl : FlowLayoutPanel
     }
 }
 
-/// <summary>Onglet d'un laser.</summary>
+/// <summary>Tab of a laser.</summary>
 [DesignerCategory("Code")]
 internal sealed class LaserPanel : UserControl
 {
@@ -102,7 +104,7 @@ internal sealed class LaserPanel : UserControl
     private readonly FixtureInstance _fixture;
     private readonly FixtureProfile _profile;
 
-    private readonly int _mode;     // index des canaux dans le profil (-1 si absent)
+    private readonly int _mode;     // channel indexes in the profile (-1 when missing)
     private readonly int _pattern;
     private readonly int _color;
     private readonly int _x;
@@ -115,10 +117,11 @@ internal sealed class LaserPanel : UserControl
     private readonly List<Button> _patternButtons = new();
     private readonly List<Button> _riskyButtons = new();
 
-    // ----- Section Couleur : type (eteint / fixe / alternance / defilement) + choix + un curseur -----
+    // ----- Colour section: type (off / fixed / alternate / scroll) + choice + one slider -----
+    /// <summary>Colour types of channel 3 of the laser (see the Colour section below).</summary>
     private enum ColorKind { Off, Fixed, Alternate, Continuous, Other }
 
-    private readonly int _blink; // canal "Clignotement" (strobe en couleur fixe, vitesse de changement sinon)
+    private readonly int _blink; // "Blinking" channel (strobe for a fixed colour, change speed otherwise)
     private readonly Dictionary<ColorKind, CheckBox> _kindButtons = new();
     private readonly FlowLayoutPanel _colorChoices = Ui.Flow(440);
     private readonly Label _speedLabel = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 8, 3, 3) };
@@ -127,9 +130,10 @@ internal sealed class LaserPanel : UserControl
     private ColorKind _shownKind = (ColorKind)(-1);
     private readonly XYPad _pad = new() { Size = new Size(240, 240), XLabel = "X →", YLabel = "Y ↓" };
     private readonly List<(int Index, RangeControl Control)> _rangeControls = new();
-    private byte _lastColor = 62; // couleur rendue a l'allumage (rouge) si aucune autre n'a ete choisie
+    private byte _lastColor = 62; // colour restored when switching on (red) if no other one was chosen
     private bool _updating;
 
+    /// <summary>Builds the laser tab for <paramref name="fixture"/>.</summary>
     public LaserPanel(ShowContext ctx, FixtureInstance fixture, FixtureProfile profile)
     {
         _ctx = ctx;
@@ -145,8 +149,8 @@ internal sealed class LaserPanel : UserControl
         _blink = profile.IndexOf(ChannelType.Strobe);
         _zoom = profile.IndexOf(ChannelType.LaserZoom);
 
-        // Page = une colonne de sections (TableLayoutPanel) dans une zone qui defile : plus fiable
-        // qu'un FlowLayoutPanel avec des sauts de ligne autour de GroupBox a taille automatique.
+        // Page = a column of sections (TableLayoutPanel) in a scrolling area: more reliable than
+        // a FlowLayoutPanel with line breaks around auto-sized GroupBoxes.
         var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
         var page = new TableLayoutPanel
         {
@@ -159,7 +163,7 @@ internal sealed class LaserPanel : UserControl
         };
         scroll.Controls.Add(page);
 
-        // ---------------- En-tete + securite : bouton marche / arret a gauche, textes a droite ----------------
+        // ---------------- Header + safety: on / off button on the left, texts on the right ----------------
         var header = Ui.Table(1);
         header.Margin = new Padding(0);
         header.Dock = DockStyle.None;
@@ -182,15 +186,15 @@ internal sealed class LaserPanel : UserControl
         // ---------------- Mode ----------------
         if (_mode >= 0)
         {
-            var modes = Ui.Flow(0); // une seule ligne (avec retour a la ligne, la hauteur calculee serait fausse)
+            var modes = Ui.Flow(0); // a single row (with wrapping, the computed height would be wrong)
             foreach (var preset in profile.Channels[_mode].Presets)
             {
                 var button = new Button { Text = Tr.T(preset.Name), AutoSize = true, Tag = preset.Value, Margin = new Padding(2, 0, 2, 0) };
                 _modeButtons.Add(button);
                 if (preset.Name.Contains('⚠'))
                 {
-                    // Bouton a risque (« Son rouge » met ce laser en mode test) : confirmation, et
-                    // range a part, en bas a droite de la page.
+                    // Risky button ("Son rouge" puts this laser into test mode): confirmation, and
+                    // placed apart, bottom right of the page.
                     button.ForeColor = Ui.WarningColor;
                     button.Font = Ui.BoldFont;
                     button.Click += (_, _) => ConfirmRiskyMode(preset);
@@ -201,15 +205,15 @@ internal sealed class LaserPanel : UserControl
                 modes.Controls.Add(button);
             }
             var group = Ui.Group(Tr.T("Mode (programmes internes ou DMX manuel)"), modes);
-            group.Padding = new Padding(6, 4, 6, 3); // boite compacte : une seule ligne de boutons
+            group.Padding = new Padding(6, 4, 6, 3); // compact box: a single row of buttons
             page.Controls.Add(group);
         }
 
-        // ---------------- Motifs | couleurs + position (cote a cote) ----------------
+        // ---------------- Patterns | colours + position (side by side) ----------------
         var middle = Ui.Flow(0);
         if (_pattern >= 0)
         {
-            // 2 colonnes (1-16 | 17-32) : bouton numero + mini dessin + legende du motif.
+            // 2 columns (1-16 | 17-32): number button + small drawing + pattern caption.
             var grid = Ui.Table(6);
             grid.Dock = DockStyle.None;
             var ranges = profile.Channels[_pattern].Ranges;
@@ -242,11 +246,11 @@ internal sealed class LaserPanel : UserControl
             middle.Controls.Add(Ui.Group(Tr.T("Motif (32 motifs)"), grid));
         }
 
-        // ---------------- Zoom, puis couleurs | position ----------------
+        // ---------------- Zoom, then colours | position ----------------
         var right = Ui.Table(1);
         if (_zoom >= 0)
         {
-            // Copie du curseur Zoom (aussi dans « Effets ») : sous la main, en haut.
+            // Copy of the Zoom slider (also in "Effects"): at hand, at the top.
             right.Controls.Add(Ui.Group(Tr.T("Zoom"), BuildZoomControl(listWidth: 190)));
         }
         var colorAndPad = Ui.Flow(0);
@@ -264,7 +268,7 @@ internal sealed class LaserPanel : UserControl
                 SetChannel(_x, 64);
                 SetChannel(_y, 64);
             };
-            // Laser retourne / accroche a l'envers : le moteur inverse X et / ou Y en sortie DMX.
+            // Laser turned over / hung upside down: the engine inverts X and / or Y on the DMX output.
             var invertX = new CheckBox { Text = Tr.T("Inverser X (gauche ↔ droite)"), AutoSize = true, Checked = fixture.InvertPan };
             var invertY = new CheckBox { Text = Tr.T("Inverser Y (haut ↔ bas)"), AutoSize = true, Checked = fixture.InvertTilt };
             invertX.CheckedChanged += (_, _) => SetInvert(x: invertX.Checked, y: invertY.Checked);
@@ -281,14 +285,14 @@ internal sealed class LaserPanel : UserControl
         middle.Controls.Add(right);
         page.Controls.Add(middle);
 
-        // ---------------- Autres canaux : plage + curseur ----------------
+        // ---------------- Other channels: range + slider ----------------
         var others = Ui.Table(3);
         for (int i = 0; i < profile.ChannelCount; i++)
         {
             var channel = profile.Channels[i];
             if (i == _mode || i == _pattern || i == _color || i == _blink || channel.Ranges.Count == 0)
             {
-                continue; // le clignotement est dans la section Couleur
+                continue; // the blinking is in the Colour section
             }
             if (i == _zoom)
             {
@@ -316,7 +320,7 @@ internal sealed class LaserPanel : UserControl
             page.Controls.Add(notes);
         }
 
-        // Boutons a risque (mode test) : en bas a droite, a l'ecart.
+        // Risky buttons (test mode): bottom right, set apart.
         if (_riskyButtons.Count > 0)
         {
             var risky = Ui.Flow(0, _riskyButtons.Cast<Control>().Prepend(Ui.Text(Tr.T("Coupe le DMX du laser (mode test) :"), color: Ui.WarningColor)).ToArray());
@@ -331,14 +335,14 @@ internal sealed class LaserPanel : UserControl
     }
 
     // =================================================================================
-    //  Section Couleur
-    //  Notice, canal 3 : 0-24 eteint, 25-49 couleurs d'origine, 50-124 couleur FIXE,
-    //  125-224 ALTERNANCES, 225-255 DEFILEMENT continu. Le canal 4 depend du canal 3 :
-    //  couleur fixe -> vitesse du CLIGNOTEMENT ; alternance / defilement -> VITESSE DU
-    //  CHANGEMENT de couleur (0-24 = arret : sans lui, une alternance reste figee).
+    //  Colour section
+    //  Manual, channel 3: 0-24 off, 25-49 original colours, 50-124 FIXED colour,
+    //  125-224 ALTERNATIONS, 225-255 continuous SCROLL. Channel 4 depends on channel 3:
+    //  fixed colour -> BLINKING speed; alternate / scroll -> colour CHANGE SPEED
+    //  (0-24 = stopped: without it, an alternation stays frozen).
     // =================================================================================
 
-    /// <summary>Curseur du zoom + bouton de retour a 60 (sous 60 le motif se deforme sur ce laser).</summary>
+    /// <summary>Zoom slider + button back to 60 (below 60 the pattern is distorted on this laser).</summary>
     private Control BuildZoomControl(int listWidth)
     {
         var control = new RangeControl(_profile.Channels[_zoom], listWidth);
@@ -349,6 +353,7 @@ internal sealed class LaserPanel : UserControl
         return Ui.Flow(0, control, reset);
     }
 
+    /// <summary>Colour type of a value of channel 3.</summary>
     private static ColorKind KindOf(byte color) => color switch
     {
         <= 24 => ColorKind.Off,
@@ -358,6 +363,7 @@ internal sealed class LaserPanel : UserControl
         _ => ColorKind.Continuous,
     };
 
+    /// <summary>Colour section: type buttons, colour buttons of the type and the blinking / speed slider.</summary>
     private Control BuildColorSection()
     {
         var kinds = Ui.Flow(0);
@@ -399,8 +405,8 @@ internal sealed class LaserPanel : UserControl
     }
 
     /// <summary>
-    /// Choix du type : premiere couleur du type ; en alternance / defilement, le canal 4 est mis a
-    /// une vitesse moyenne s'il etait a l'arret ; en fixe, le clignotement est coupe.
+    /// Type choice: first colour of the type; in alternate / scroll, channel 4 is set to a
+    /// medium speed if it was stopped; in fixed, the blinking is switched off.
     /// </summary>
     private void SelectKind(ColorKind kind)
     {
@@ -427,21 +433,21 @@ internal sealed class LaserPanel : UserControl
             byte blink = values.ElementAtOrDefault(_blink);
             if (kind == ColorKind.Fixed && KindOf(current) != ColorKind.Fixed)
             {
-                _ctx.Engine.SetValue(_fixture.Id, _blink, 0);   // pas de clignotement
+                _ctx.Engine.SetValue(_fixture.Id, _blink, 0);   // no blinking
             }
             else if (kind != ColorKind.Fixed && blink < 25)
             {
-                _ctx.Engine.SetValue(_fixture.Id, _blink, 140); // sinon l'alternance reste figee
+                _ctx.Engine.SetValue(_fixture.Id, _blink, 140); // otherwise the alternation stays frozen
             }
         }
         RefreshFromEngine();
     }
 
-    /// <summary>Plages de la notice pour un type de couleur (noms du profil : « Rouge + vert ensemble »...).</summary>
+    /// <summary>Ranges of the manual for a colour type (profile names: "Rouge + vert ensemble"...).</summary>
     private IEnumerable<ChannelRange> RangesOf(ColorKind kind) =>
         _profile.Channels[_color].Ranges.Where(r => KindOf(r.From) == kind && kind is ColorKind.Fixed or ColorKind.Alternate);
 
-    /// <summary>Boutons des couleurs du type affiche (recrees seulement quand le type change).</summary>
+    /// <summary>Colour buttons of the shown type (rebuilt only when the type changes).</summary>
     private void RebuildColorChoices(ColorKind kind)
     {
         _shownKind = kind;
@@ -476,6 +482,7 @@ internal sealed class LaserPanel : UserControl
         _colorChoices.ResumeLayout();
     }
 
+    /// <summary>Shows the colour type, the active colour and the slider (named after the type) from the channel values.</summary>
     private void RefreshColorSection(byte color, byte blink)
     {
         if (_color < 0)
@@ -503,14 +510,14 @@ internal sealed class LaserPanel : UserControl
             }
         }
 
-        // Un seul curseur pour le canal 4, nomme selon le type de couleur.
+        // A single slider for channel 4, named after the colour type.
         _speedLabel.Text = kind == ColorKind.Fixed ? Tr.T("Clignotement") : Tr.T("Vitesse de changement");
         _speed.Enabled = _blink >= 0 && kind != ColorKind.Off;
         _speed.Value = blink < 25 ? 0 : Math.Clamp((int)Math.Round((blink - 25) * 99.0 / 230) + 1, 1, 100);
         _speedValue.Text = blink < 25 ? (kind == ColorKind.Fixed ? Tr.T("aucun") : Tr.T("arrêt")) : Tr.F("{0} %", _speed.Value);
     }
 
-    /// <summary>Curseur 0..100 % -> canal 4 : 0 = arret (0), 1..100 % = 25..255 (lent -> rapide).</summary>
+    /// <summary>Slider 0..100 % -> channel 4: 0 = stopped (0), 1..100 % = 25..255 (slow -> fast).</summary>
     private void OnSpeedMoved()
     {
         if (_updating || _blink < 0)
@@ -521,7 +528,7 @@ internal sealed class LaserPanel : UserControl
         SetChannel(_blink, v == 0 ? (byte)0 : (byte)Math.Round(25 + (v - 1) * 230.0 / 99));
     }
 
-    /// <summary>Couleur d'affichage d'un bouton de couleur laser, d'apres son nom.</summary>
+    /// <summary>Display colour of a laser colour button, from its name.</summary>
     private static Color LaserColorFor(string name)
     {
         string key = TextKey.Normalize(name);
@@ -545,7 +552,7 @@ internal sealed class LaserPanel : UserControl
         };
     }
 
-    /// <summary>Cases « Inverser X / Y » : enregistrees avec l'appareil (InvertPan / InvertTilt).</summary>
+    /// <summary>"Invert X / Y" boxes: saved with the fixture (InvertPan / InvertTilt).</summary>
     private void SetInvert(bool x, bool y)
     {
         _ctx.Engine.EditShow(_ =>
@@ -558,8 +565,8 @@ internal sealed class LaserPanel : UserControl
     }
 
     /// <summary>
-    /// Mode a risque (⚠) : sur ce laser, « Son rouge » le met en mode test (« tst ») ; il n'ecoute
-    /// alors plus le DMX et rien ne permet d'en sortir a distance. Confirmation obligatoire.
+    /// Risky mode (⚠): on this laser, "Son rouge" puts it into test mode ("tst"); it then no longer
+    /// listens to DMX and nothing can bring it back remotely. Confirmation required.
     /// </summary>
     private void ConfirmRiskyMode(ChannelPreset preset)
     {
@@ -577,6 +584,7 @@ internal sealed class LaserPanel : UserControl
         }
     }
 
+    /// <summary>Sends one channel value to the engine and refreshes the tab.</summary>
     private void SetChannel(int index, byte value)
     {
         if (index < 0)
@@ -587,7 +595,7 @@ internal sealed class LaserPanel : UserControl
         RefreshFromEngine();
     }
 
-    /// <summary>Motifs, couleurs et mouvements ne marchent qu'en mode DMX (canal 1 = 240-255).</summary>
+    /// <summary>Patterns, colours and movements only work in DMX mode (channel 1 = 240-255).</summary>
     private void EnsureDmxMode()
     {
         if (_mode < 0)
@@ -602,6 +610,7 @@ internal sealed class LaserPanel : UserControl
         }
     }
 
+    /// <summary>On / off button: off stores the colour and sets colour 0; on restores it in DMX mode with the zoom at 60.</summary>
     private void ToggleBeam()
     {
         if (_color < 0)
@@ -620,13 +629,14 @@ internal sealed class LaserPanel : UserControl
             EnsureDmxMode();
             if (_zoom >= 0)
             {
-                _ctx.Engine.SetValue(_fixture.Id, _zoom, FixtureLibrary.ZoomDefault); // taille nette a l'allumage
+                _ctx.Engine.SetValue(_fixture.Id, _zoom, FixtureLibrary.ZoomDefault); // sharp size when switching on
             }
             SetChannel(_color, _lastColor);
             _ctx.Status(Tr.F("{0} : faisceau allumé (zoom {1}).", _fixture.Name, FixtureLibrary.ZoomDefault));
         }
     }
 
+    /// <summary>Position pad moved: fixed X/Y positions (0..127) in DMX mode.</summary>
     private void OnPad()
     {
         if (_updating)
@@ -634,12 +644,13 @@ internal sealed class LaserPanel : UserControl
             return;
         }
         EnsureDmxMode();
-        // Positions fixes : 0..127 sur chaque axe.
+        // Fixed positions: 0..127 on each axis.
         _ctx.Engine.SetValue(_fixture.Id, _x, (byte)Math.Round(_pad.ValueX / 65535.0 * 127));
         _ctx.Engine.SetValue(_fixture.Id, _y, (byte)Math.Round(_pad.ValueY / 65535.0 * 127));
         RefreshFromEngine();
     }
 
+    /// <summary>Copies the engine values into every control of the tab.</summary>
     public void RefreshFromEngine()
     {
         if (IsDisposed)
@@ -685,6 +696,7 @@ internal sealed class LaserPanel : UserControl
         }
     }
 
+    /// <summary>Highlights in blue the buttons for which <paramref name="isActive"/> is true.</summary>
     private static void Highlight(IEnumerable<Button> buttons, Func<Button, bool> isActive)
     {
         foreach (var button in buttons)
@@ -695,6 +707,7 @@ internal sealed class LaserPanel : UserControl
         }
     }
 
+    /// <summary>Unsubscribes from the context before the tab is destroyed.</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)

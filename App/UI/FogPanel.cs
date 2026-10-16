@@ -1,20 +1,20 @@
 // =====================================================================================
 //  FogPanel.cs
 // -------------------------------------------------------------------------------------
-//  Machine a fumee (ex. Ayra WSM02 MKIII, 1 canal DMX = debit) :
+//  Fog machine (e.g. Ayra WSM02 MKIII, 1 DMX channel = output):
 //
-//    - FogStrip  : une ligne d'etat + commandes pour UNE machine :
-//        [PRETE / CHAUFFE]  [FUMEE 100 % / PAS DE FUMEE]  [auto : prochain jet dans..]
-//        [Fumee (maintenir)] [Coup de X s] [curseur 0,5-5 s] [Manuel | Auto] [Stop]
-//    - FogBanner : le bandeau en haut de la fenetre (visible sur tous les onglets),
-//      une FogStrip par machine active du patch, et avec 2 machines ou plus une ligne
-//      « Toutes les machines » (maintenir / coup de chacune) ;
-//    - FogPanel  : l'onglet de la machine : la meme FogStrip + les reglages
-//      (debit, duree d'un jet, delai entre deux jets en auto, temps de chauffe).
+//    - FogStrip  : one row of status + controls for ONE machine:
+//        [READY / WARMING]  [FOG 100 % / NO FOG]  [auto: next burst in..]
+//        [Fog (hold)] [Burst X s] [0.5-5 s slider] [Manual | Auto] [every N min] [Stop]
+//    - FogBanner : the banner at the top of the window (visible on every tab),
+//      one FogStrip per enabled machine of the patch, and with 2 machines or more
+//      an "All machines" row (hold / burst of each one);
+//    - FogPanel  : the machine tab: the same FogStrip + the settings
+//      (output, burst length, warm-up time).
 //
-//  IMPORTANT : le DMX ne va que dans un sens. La machine ne renvoie ni son etat
-//  « prete » ni sa temperature : l'etat « prete » est une ESTIMATION a partir de
-//  l'heure d'allumage (bouton « Je viens d'allumer la machine ») et du temps de chauffe.
+//  IMPORTANT: DMX only goes one way. The machine sends back neither its "ready"
+//  state nor its temperature: the "ready" state is an ESTIMATE from the time it was
+//  switched on ("I just switched the machine on" button) and the warm-up time.
 // =====================================================================================
 
 using System.ComponentModel;
@@ -23,7 +23,7 @@ using DmxController.Core.Model;
 
 namespace DmxController.UI;
 
-/// <summary>Etat + commandes d'une machine a fumee, sur une ligne.</summary>
+/// <summary>Status + controls of one fog machine, on one row.</summary>
 [DesignerCategory("Code")]
 internal sealed class FogStrip : FlowLayoutPanel
 {
@@ -33,14 +33,15 @@ internal sealed class FogStrip : FlowLayoutPanel
     private readonly Label _output = Chip();
     private readonly Label _info = new() { AutoSize = true, Margin = new Padding(6, 9, 3, 3), ForeColor = Color.DimGray };
     private readonly Button _hold = new() { Text = Tr.T("FUMÉE (maintenir)"), AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(8, 3, 3, 3) };
-    private readonly Button _shot = new() { Margin = new Padding(3) }; // largeur fixe : ne bouge pas avec la duree
-    private readonly TrackBar _shotLength = Ui.Slider(1, (int)(FogSettings.MaxShotSeconds * 2), 110); // demi-secondes
+    private readonly Button _shot = new() { Margin = new Padding(3) }; // fixed width: does not move with the length
+    private readonly TrackBar _shotLength = Ui.Slider(1, (int)(FogSettings.MaxShotSeconds * 2), 110); // half seconds
     private readonly NumericUpDown _interval = new() { Minimum = 1, Maximum = 30, Width = 48, Margin = new Padding(0, 6, 0, 3) };
     private readonly CheckBox _auto = new() { Text = Tr.T("Auto"), Appearance = Appearance.Button, AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3), TextAlign = ContentAlignment.MiddleCenter };
     private readonly Button _stop = new() { Text = Tr.T("Stop"), AutoSize = true, Margin = new Padding(3) };
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 250 };
     private bool _updating;
 
+    /// <summary>Builds the row for <paramref name="fixture"/>; <paramref name="showName"/> adds its name first (banner).</summary>
     public FogStrip(ShowContext ctx, FixtureInstance fixture, bool showName)
     {
         _ctx = ctx;
@@ -57,7 +58,7 @@ internal sealed class FogStrip : FlowLayoutPanel
         var every = new Label { Text = Tr.T("un jet toutes les"), AutoSize = true, Margin = new Padding(3, 9, 2, 3) };
         var minutes = new Label { Text = Tr.T("min"), AutoSize = true, Margin = new Padding(2, 9, 3, 3) };
         Controls.AddRange(new Control[] { _ready, _output, _hold, _shot, _shotLength, _auto, every, _interval, minutes, _stop, _info });
-        // Largeur du texte le plus long (« Coup de 2,5 s ») : le bouton garde la meme taille quelle que soit la duree.
+        // Width of the longest text ("Burst 2.5 s"): the button keeps the same size whatever the length.
         _shot.Size = new Size(TextRenderer.MeasureText(Tr.T("Coup de 2,5 s"), _shot.Font).Width + 20, 26);
         _interval.Value = fixture.Fog.IntervalMinutes;
         _interval.ValueChanged += (_, _) =>
@@ -130,6 +131,7 @@ internal sealed class FogStrip : FlowLayoutPanel
         UpdateStatus();
     }
 
+    /// <summary>Coloured status label ("READY", "FOG 100 %"...).</summary>
     private static Label Chip() => new()
     {
         AutoSize = true,
@@ -139,12 +141,14 @@ internal sealed class FogStrip : FlowLayoutPanel
         ForeColor = Color.White,
     };
 
+    /// <summary>"Fog (hold)" button released: stops fogging.</summary>
     private void ReleaseHold()
     {
         _ctx.Engine.SetFogHold(_fixture.Id, false);
         UpdateStatus();
     }
 
+    /// <summary>Refreshes the status chips, the buttons and the info text from the engine (4 times/s).</summary>
     public void UpdateStatus()
     {
         if (IsDisposed)
@@ -154,7 +158,7 @@ internal sealed class FogStrip : FlowLayoutPanel
 
         FogStatus s = _ctx.Engine.GetFogStatus(_fixture.Id);
 
-        // Prete / chauffe (estimation)
+        // Ready / warming (estimate)
         if (s.WarmupRemaining is null)
         {
             _ready.Text = Tr.T("PRÊTE ?");
@@ -172,7 +176,7 @@ internal sealed class FogStrip : FlowLayoutPanel
             _ready.BackColor = Ui.OkColor;
         }
 
-        // Fumee ou pas
+        // Fog or not
         _output.Text = !_fixture.Enabled ? Tr.T("DÉSACTIVÉE") : s.Fogging ? Tr.F("FUMÉE {0} %", s.OutputPercent) : Tr.T("PAS DE FUMÉE");
         _output.BackColor = !_fixture.Enabled ? Color.Gray : s.Fogging ? Color.FromArgb(30, 110, 200) : Color.FromArgb(70, 74, 86);
 
@@ -181,7 +185,7 @@ internal sealed class FogStrip : FlowLayoutPanel
         _auto.Checked = s.Auto;
         if (!_interval.Focused && (int)_interval.Value != _fixture.Fog.IntervalMinutes)
         {
-            _interval.Value = _fixture.Fog.IntervalMinutes; // change ailleurs (bandeau / onglet)
+            _interval.Value = _fixture.Fog.IntervalMinutes; // changed elsewhere (banner / tab)
         }
         _updating = false;
         _auto.Text = s.Auto ? Tr.T("AUTO (actif)") : Tr.T("Manuel → Auto");
@@ -194,6 +198,7 @@ internal sealed class FogStrip : FlowLayoutPanel
             : s.JetRemaining > 0 ? Tr.F("coup en cours : {0:0.0} s", s.JetRemaining) : Tr.T("Température : non transmise en DMX");
     }
 
+    /// <summary>Stops the refresh timer.</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -204,12 +209,13 @@ internal sealed class FogStrip : FlowLayoutPanel
     }
 }
 
-/// <summary>Bandeau en haut de la fenetre : une ligne par machine a fumee active.</summary>
+/// <summary>Banner at the top of the window: one row per enabled fog machine.</summary>
 [DesignerCategory("Code")]
 internal sealed class FogBanner : FlowLayoutPanel
 {
     private readonly ShowContext _ctx;
 
+    /// <summary>Creates the empty banner (filled by Rebuild).</summary>
     public FogBanner(ShowContext ctx)
     {
         _ctx = ctx;
@@ -222,7 +228,7 @@ internal sealed class FogBanner : FlowLayoutPanel
         BackColor = Color.FromArgb(226, 234, 244);
     }
 
-    /// <summary>Recree les lignes d'apres le patch (apres une modification du patch).</summary>
+    /// <summary>Rebuilds the rows from the patch (after the patch changed).</summary>
     public void Rebuild()
     {
         SuspendLayout();
@@ -245,7 +251,7 @@ internal sealed class FogBanner : FlowLayoutPanel
         ResumeLayout();
     }
 
-    /// <summary>Commandes groupees : toutes les machines fument (maintenir), ou un coup chacune avec SA duree.</summary>
+    /// <summary>Group controls: all machines fog (hold), or one burst each with ITS OWN length.</summary>
     private Control BuildAllMachinesRow(List<FixtureInstance> machines)
     {
         var hold = new Button { Text = Tr.T("FUMÉE TOUTES (maintenir)"), AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(8, 3, 3, 3) };
@@ -280,7 +286,7 @@ internal sealed class FogBanner : FlowLayoutPanel
     }
 }
 
-/// <summary>Onglet d'une machine a fumee : etat, commandes et reglages.</summary>
+/// <summary>Tab of a fog machine: status, controls and settings.</summary>
 [DesignerCategory("Code")]
 internal sealed class FogPanel : UserControl
 {
@@ -292,6 +298,7 @@ internal sealed class FogPanel : UserControl
     private readonly Label _cycle = new() { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(3, 6, 3, 3) };
     private bool _loading;
 
+    /// <summary>Builds the tab of <paramref name="fixture"/>: status row, warm-up button and settings.</summary>
     public FogPanel(ShowContext ctx, FixtureInstance fixture, FixtureProfile profile)
     {
         _ctx = ctx;
@@ -314,7 +321,7 @@ internal sealed class FogPanel : UserControl
         page.Controls.Add(new Label { Text = $"{fixture.Name}  —  {model}", AutoSize = true, Font = Ui.TitleFont });
         page.Controls.Add(Ui.Text(Tr.F("Adresse DMX {0} : canaux {1} à {2}", fixture.Address, fixture.Address, fixture.EndAddress(profile)), color: Color.DimGray));
 
-        // ---------------- Etat et commandes ----------------
+        // ---------------- Status and controls ----------------
         var strip = new FogStrip(ctx, fixture, showName: false);
         var powered = new Button { Text = Tr.T("Je viens d'allumer la machine (décompte de chauffe)"), AutoSize = true, Margin = new Padding(3, 8, 3, 3) };
         powered.Click += (_, _) =>
@@ -337,7 +344,7 @@ internal sealed class FogPanel : UserControl
         });
         page.Controls.Add(Ui.Group(Tr.T("État et commandes"), commands));
 
-        // ---------------- Reglages ----------------
+        // ---------------- Settings ----------------
         var settings = Ui.Table(3);
         Ui.Row(settings, Tr.T("Débit de fumée"), _level, Ui.Text(Tr.T("%")));
         Ui.Row(settings, Tr.T("Durée d'un jet (auto)"), _duration, Ui.Text(Tr.T("s  (mode auto ; le bouton « Coup » a son propre curseur, 0,5 à 5 s)")));
@@ -366,6 +373,7 @@ internal sealed class FogPanel : UserControl
         }
     }
 
+    /// <summary>Copies the settings boxes into the fixture (saved with the configuration).</summary>
     private void SaveSettings()
     {
         if (_loading)
@@ -378,7 +386,7 @@ internal sealed class FogPanel : UserControl
         _ctx.Engine.EditShow(_ =>
         {
             _fixture.Fog.LevelPercent = level;
-            int interval = _fixture.Fog.IntervalMinutes; // la frequence (curseur « toutes les N min ») reste la meme
+            int interval = _fixture.Fog.IntervalMinutes; // the frequency ("every N min" box) stays the same
             _fixture.Fog.DurationSeconds = duration;
             _fixture.Fog.SetIntervalMinutes(interval);
             _fixture.Fog.WarmupMinutes = warmup;
@@ -387,6 +395,7 @@ internal sealed class FogPanel : UserControl
         UpdateCycleText();
     }
 
+    /// <summary>Sentence describing the auto cycle.</summary>
     private void UpdateCycleText()
     {
         var fog = _fixture.Fog;

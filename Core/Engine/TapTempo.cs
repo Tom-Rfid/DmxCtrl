@@ -1,20 +1,21 @@
 // =====================================================================================
 //  TapTempo.cs
 // -------------------------------------------------------------------------------------
-//  Calcul du BPM a partir de tapes successives (bouton TAP / touche T) : moyenne
-//  des intervalles entre les 6 derniers taps. Une pause de plus de 2,5 s remet le
-//  compteur a zero (on recommence une nouvelle mesure).
+//  BPM computed from successive taps (TAP button / T key): average of the intervals
+//  between the last 6 taps. A pause longer than 2.5 s resets the counter (a new
+//  measure starts).
 // =====================================================================================
 
 namespace DmxController.Core.Engine;
 
+/// <summary>BPM from taps (TAP button / T key).</summary>
 public sealed class TapTempo
 {
     private const double ResetAfterSeconds = 2.5;
     private const int MaxTaps = 6;
     private readonly List<double> _taps = new();
 
-    /// <summary>Enregistre un tap a l'instant donne (en secondes). Retourne le BPM ou null s'il faut encore taper.</summary>
+    /// <summary>Records a tap at the given time (in seconds). Returns the BPM, or null while more taps are needed.</summary>
     public double? Tap(double nowSeconds)
     {
         if (_taps.Count > 0 && nowSeconds - _taps[^1] > ResetAfterSeconds)

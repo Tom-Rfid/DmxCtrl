@@ -1,5 +1,5 @@
-// Tests des nouveautes : bibliotheque de modeles, patch (adresses libres, appareils
-// desactives), machine a fumee, flash / strobe par appareil, laser, couleur UV.
+// Tests of the newer features: model library, patch (free addresses, disabled
+// fixtures), fog machine, flash / strobe per fixture, laser, UV colour.
 
 using DmxController.Core.Engine;
 using DmxController.Core.Model;
@@ -13,7 +13,7 @@ public class FeatureTests
     private readonly ShowEngine _engine;
     private readonly ShowConfig _show;
 
-    // Index dans le profil 260X 14 canaux (guide Chauvet).
+    // Indexes in the 260X 14-channel profile (Chauvet guide).
     private const int SpotDimmer = 10, SpotShutter = 11;
 
     public FeatureTests()
@@ -30,7 +30,7 @@ public class FeatureTests
         return universe;
     }
 
-    /// <summary>Ajoute au patch un appareil d'un modele de la bibliotheque.</summary>
+    /// <summary>Adds a fixture of a library model to the patch.</summary>
     private FixtureInstance Add(string modelId, string id, int address)
     {
         var fixture = new FixtureInstance { Id = id, Name = id, ProfileId = modelId, Address = address };
@@ -43,7 +43,7 @@ public class FeatureTests
     }
 
     // =================================================================================
-    //  Bibliotheque
+    //  Library
     // =================================================================================
 
     [Fact]
@@ -59,14 +59,14 @@ public class FeatureTests
         Assert.Equal(8, models[FixtureLibrary.ParUvId].ChannelCount);
         Assert.Equal(7, models[FixtureLibrary.ParUvOnlyId].ChannelCount);
         var rg = models[FixtureLibrary.GalacticLaserRgId];
-        Assert.True(FixtureLibrary.SameLayout(rg, models[FixtureLibrary.GalacticLaserId])); // meme table DMX
+        Assert.True(FixtureLibrary.SameLayout(rg, models[FixtureLibrary.GalacticLaserId])); // same DMX table
         Assert.DoesNotContain(rg.Channels.SelectMany(c => c.Presets.Select(p => p.Name).Concat(c.Ranges.Select(r => r.Name))),
             name => name.Contains("jaune", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(3, models[FixtureLibrary.ParUvOnlyId].IndicesOf(ChannelType.UV).Length);
 
         var spot = models[FixtureLibrary.Spot260X14Id];
-        Assert.Equal(ChannelType.Dimmer, spot.Channels[SpotDimmer].Type);   // canal 11 du guide
-        Assert.Equal(ChannelType.Shutter, spot.Channels[SpotShutter].Type); // canal 12 du guide
+        Assert.Equal(ChannelType.Dimmer, spot.Channels[SpotDimmer].Type);   // channel 11 of the guide
+        Assert.Equal(ChannelType.Shutter, spot.Channels[SpotShutter].Type); // channel 12 of the guide
         Assert.False(models[FixtureLibrary.Spot260X8Id].Has(ChannelType.Dimmer));
 
         Assert.True(models[FixtureLibrary.AyraFogId].IsFogMachine);
@@ -88,7 +88,7 @@ public class FeatureTests
     [Fact]
     public void Old_guessed_260x_profile_is_replaced_and_scene_values_follow_their_role()
     {
-        // Profil "suppose" des premieres versions : un canal generique en trop avant le focus.
+        // "Guessed" profile of the first versions: one extra generic channel before the focus.
         var old = FixtureLibrary.Spot260X14();
         old.Revision = 0;
         old.Channels.Insert(9, new ChannelDef { Name = "Rotation prisme", Type = ChannelType.Generic });
@@ -110,14 +110,14 @@ public class FeatureTests
     [Fact]
     public void Old_16_channel_spider_with_an_empty_first_channel_becomes_15_channels()
     {
-        // Profil des versions precedentes : un canal vide en tete (decalage d'adresse disparu depuis).
+        // Profile of the previous versions: an empty channel at the start (the address offset has gone since).
         var old = FixtureLibrary.MiniSpider();
         old.Revision = 1;
         old.Channels.Insert(0, new ChannelDef { Name = "(vide : décalage du Spider)", Type = ChannelType.Generic });
         var show = DefaultShow.Create();
         show.Profiles[show.Profiles.FindIndex(p => p.Id == old.Id)] = old;
         var values = old.DefaultValues().Select(v => (int)v).ToArray();
-        values[1] = 200;                                  // moteur 1
+        values[1] = 200;                                  // motor 1
         values[old.IndexOf(ChannelType.Dimmer)] = 180;    // dimmer
         show.LiveState.Values["spider-1"] = values;
 
@@ -147,10 +147,10 @@ public class FeatureTests
         Assert.DoesNotContain("Son rouge", names);
         Assert.DoesNotContain("Couleurs d'origine", names);
         Assert.Contains("Son vert", names);
-        Assert.Contains("Son rouge ⚠ tst", names); // remis, avec avertissement
+        Assert.Contains("Son rouge ⚠ tst", names); // added back, with a warning
         Assert.Equal(5, old.Revision);
         Assert.Equal(FixtureLibrary.ZoomDefault, old.Channels[old.IndexOf(ChannelType.LaserZoom)].Default); // zoom 60
-        Assert.Contains(old.Channels[^1].Ranges, r => r.From == 192 && r.Name.StartsWith("Rotation horaire")); // manuel V3
+        Assert.Contains(old.Channels[^1].Ranges, r => r.From == 192 && r.Name.StartsWith("Rotation horaire")); // V3 manual
     }
 
     [Fact]
@@ -189,27 +189,27 @@ public class FeatureTests
     [Fact]
     public void Suggested_address_fits_in_a_gap_or_goes_after_the_last_fixture()
     {
-        // Patch par defaut : lyres 1-14 et 15-28, Spider 29-43.
+        // Default patch: moving heads 1-14 and 15-28, Spider 29-43.
         var profiles = _show.Profiles.ToList();
         FixtureLibrary.EnsureProfile(profiles, FixtureLibrary.AyraFogId);
         var fixtures = _show.Fixtures.ToList();
         Assert.Equal(44, PatchValidator.NextFreeAddress(fixtures, profiles, 1));
 
-        // On libere 1-14 (lyre 1 desactivee) : la fumee (1 canal) va dans le trou.
+        // 1-14 is freed (moving head 1 disabled): the fog machine (1 channel) goes into the gap.
         fixtures.First(f => f.Id == "lyre-1").Enabled = false;
         Assert.Equal(1, PatchValidator.NextFreeAddress(fixtures, profiles, 1));
-        // 16 canaux ne rentrent pas dans 1-14 (14 libres) : apres le Spider.
+        // 16 channels do not fit in 1-14 (14 free): after the Spider.
         Assert.Equal(44, PatchValidator.NextFreeAddress(fixtures, profiles, 16));
 
-        // Changement de modele : l'adresse actuelle est gardee si elle tient encore.
+        // Model change: the current address is kept when it still fits.
         var spider = fixtures.First(f => f.Id == "spider-1");
         Assert.Equal(29, PatchValidator.SuggestAddress(fixtures, profiles, 14, spider.Address, spider.Id));
-        Assert.Equal(-1, PatchValidator.SuggestAddress(fixtures, profiles, 600, 1, null)); // ne rentre nulle part
+        Assert.Equal(-1, PatchValidator.SuggestAddress(fixtures, profiles, 600, 1, null)); // fits nowhere
         Assert.Contains(PatchValidator.FreeRanges(fixtures, profiles), r => r.Start == 1 && r.End == 14);
     }
 
     // =================================================================================
-    //  Machine a fumee
+    //  Fog machine
     // =================================================================================
 
     [Fact]
@@ -231,14 +231,14 @@ public class FeatureTests
         _engine.SetFogHold("fumee", false);
         Assert.Equal(0, Render()[45]);
 
-        _engine.FogShot("fumee");           // coup : 3 s de fumee (pas la duree du mode auto)
+        _engine.FogShot("fumee");           // burst: 3 s of fog (not the auto mode length)
         _now = 2.9;
         Assert.Equal(128, Render()[45]);
         _now = 3.1;
         Assert.Equal(0, Render()[45]);
 
         _now = 100;
-        _engine.SetFogAuto("fumee", true);  // jet tout de suite, puis toutes les 15 s
+        _engine.SetFogAuto("fumee", true);  // burst right away, then every 15 s
         Assert.Equal(128, Render()[45]);
         _now = 106;
         Assert.Equal(0, Render()[45]);
@@ -256,7 +256,7 @@ public class FeatureTests
     public void Fog_warmup_is_estimated_from_the_power_on_time()
     {
         Add(FixtureLibrary.AyraFogId, "fumee", 45);
-        Assert.Null(_engine.GetFogStatus("fumee").WarmupRemaining); // inconnu
+        Assert.Null(_engine.GetFogStatus("fumee").WarmupRemaining); // unknown
 
         _engine.MarkFogPoweredOn("fumee");
         _now = 60;
@@ -276,7 +276,7 @@ public class FeatureTests
     }
 
     // =================================================================================
-    //  Flash / strobe par appareil
+    //  Flash / strobe per fixture
     // =================================================================================
 
     [Fact]
@@ -288,11 +288,11 @@ public class FeatureTests
 
         var universe = Render();
         Assert.Equal(255, universe[1 + SpotDimmer]);
-        Assert.Equal(76, universe[1 + SpotShutter]);      // strobe le plus rapide de l'obturateur
-        Assert.Equal(0, universe[15 + SpotDimmer]);       // lyre 2 : toujours en blackout
+        Assert.Equal(76, universe[1 + SpotShutter]);      // fastest strobe of the shutter
+        Assert.Equal(0, universe[15 + SpotDimmer]);       // moving head 2: still in blackout
 
         _engine.StrobeSpeed = 0;
-        Assert.Equal(8, Render()[1 + SpotShutter]);      // strobe le plus lent
+        Assert.Equal(8, Render()[1 + SpotShutter]);      // slowest strobe
     }
 
     [Fact]
@@ -300,7 +300,7 @@ public class FeatureTests
     {
         _engine.EditShow(s => s.Fixtures.First(f => f.Id == "spider-1").NoStrobe = true);
         _engine.SetFixtureStrobe("spider-1", true);
-        Assert.Equal(0, Render()[29 + 3]); // canal strobe du Spider
+        Assert.Equal(0, Render()[29 + 3]); // strobe channel of the Spider
     }
 
     [Fact]
@@ -310,36 +310,36 @@ public class FeatureTests
         _engine.SetFixtureFlash("lyre-2", true);
         var universe = Render();
         Assert.Equal(255, universe[15 + SpotDimmer]);
-        Assert.Equal(255, universe[15 + SpotShutter]); // obturateur ouvert
+        Assert.Equal(255, universe[15 + SpotShutter]); // open shutter
         Assert.Equal(0, universe[1 + SpotDimmer]);
     }
 
     // =================================================================================
-    //  Effet gauche <-> droite du Spider
+    //  Left <-> right effect of the Spider
     // =================================================================================
 
     [Fact]
     public void Wing_sweep_goes_left_then_right_with_the_delay_and_follows_the_mirror_box()
     {
-        const int Motor1 = 29, Motor2 = 30; // Spider en adresse 29 (config par defaut)
+        const int Motor1 = 29, Motor2 = 30; // Spider at address 29 (default configuration)
         var spider = _show.Fixtures.First(f => f.Id == "spider-1");
         _engine.EditShow(_ => spider.WingSweepDelaySeconds = 3);
 
         _engine.SetWingSweep("spider-1", true);
         var universe = Render();
-        Assert.Equal(0, universe[Motor1]);    // gauche
-        Assert.Equal(255, universe[Motor2]);  // miroir : aile 2 du cote oppose
+        Assert.Equal(0, universe[Motor1]);    // left
+        Assert.Equal(255, universe[Motor2]);  // mirror: wing 2 on the opposite side
 
         _now = 3.1;
         universe = Render();
-        Assert.Equal(255, universe[Motor1]);  // droite apres le delai
+        Assert.Equal(255, universe[Motor1]);  // right after the delay
         Assert.Equal(0, universe[Motor2]);
 
         _engine.EditShow(_ => spider.MirrorMotors = false);
-        Assert.Equal(255, Render()[Motor2]);  // sans "Inverser" : les 2 ailes ensemble
+        Assert.Equal(255, Render()[Motor2]);  // without "Invert": both wings together
 
         _engine.SetWingSweep("spider-1", false);
-        Assert.Equal(0, Render()[Motor1]);    // retour a la position reglee (programmeur)
+        Assert.Equal(0, Render()[Motor1]);    // back to the set position (programmer)
     }
 
     [Fact]
@@ -354,21 +354,21 @@ public class FeatureTests
         _engine.SetBeatEffect("par", true);
 
         var u = Render();
-        Assert.Equal(255, u[60]);                                   // dimmer ouvert pour que l'effet se voie
-        Assert.Equal(new byte[] { 255, 0, 0 }, u[61..64]);          // groupe 1
+        Assert.Equal(255, u[60]);                                   // dimmer opened so that the effect shows
+        Assert.Equal(new byte[] { 255, 0, 0 }, u[61..64]);          // group 1
         _now = 1.1;
-        Assert.Equal(new byte[] { 0, 255, 0 }, Render()[61..64]);   // groupe 2
+        Assert.Equal(new byte[] { 0, 255, 0 }, Render()[61..64]);   // group 2
         _now = 2.1;
-        Assert.Equal(new byte[] { 0, 0, 255 }, Render()[61..64]);   // groupe 3
+        Assert.Equal(new byte[] { 0, 0, 255 }, Render()[61..64]);   // group 3
 
         _engine.EditShow(_ => par.BeatEffect = BeatEffectKind.Pulse);
-        _now = 4.1;                                                 // pas pair : allume
+        _now = 4.1;                                                 // even step: on
         Assert.Equal(new byte[] { 255, 255, 255 }, Render()[61..64]);
-        _now = 5.1;                                                 // pas impair : eteint
+        _now = 5.1;                                                 // odd step: off
         Assert.Equal(new byte[] { 0, 0, 0 }, Render()[61..64]);
 
         _engine.SetBeatEffect("par", false);
-        Assert.Equal(0, Render()[60]);                              // retour aux valeurs reglees
+        Assert.Equal(0, Render()[60]);                              // back to the set values
     }
 
     [Fact]
@@ -378,12 +378,12 @@ public class FeatureTests
         _engine.SetBeatEffect("par", true);
         _engine.SetFixtureStrobe("par", true);
         _engine.StrobeSpeed = 255;
-        Assert.Equal(255, Render()[64]);                    // manuel : strobe materiel actif
+        Assert.Equal(255, Render()[64]);                    // manual: hardware strobe active
 
-        _engine.SetValue("par", 5, 135);                    // mode "Pulsation" (programme interne)
+        _engine.SetValue("par", 5, 135);                    // "Pulsation" mode (internal program)
         var u = Render();
-        Assert.Equal(0, u[64]);                             // plus de strobe
-        Assert.Equal(new byte[] { 0, 0, 0 }, u[61..64]);    // plus d'effet au tempo : valeurs reglees (0)
+        Assert.Equal(0, u[64]);                             // no more strobe
+        Assert.Equal(new byte[] { 0, 0, 0 }, u[61..64]);    // no more beat effect: set values (0)
         Assert.Equal(135, u[65]);
         Assert.False(FixtureLibrary.ParLed36Uv().IsInManualMode(new byte[] { 0, 0, 0, 0, 0, 135, 0 }));
         Assert.True(FixtureLibrary.ParLed36Uv().IsInManualMode(new byte[] { 0, 0, 0, 0, 0, 5, 0 }));
@@ -392,15 +392,15 @@ public class FeatureTests
     [Fact]
     public void Disabled_strobe_puts_the_260x_shutter_back_to_open_not_to_black()
     {
-        _engine.SetValue("lyre-1", SpotShutter, 40);                      // strobe sur l'obturateur
+        _engine.SetValue("lyre-1", SpotShutter, 40);                      // strobe on the shutter
         _engine.EditShow(s => s.Fixtures.First(f => f.Id == "lyre-1").NoStrobe = true);
-        Assert.Equal(255, Render()[1 + SpotShutter]);                     // fixe = ouvert (0 serait le noir)
-        _engine.SetValue("lyre-1", SpotShutter, 0);                       // "fermé" n'est pas un strobe
+        Assert.Equal(255, Render()[1 + SpotShutter]);                     // fixed = open (0 would be darkness)
+        _engine.SetValue("lyre-1", SpotShutter, 0);                       // "fermé" (closed) is not a strobe
         Assert.Equal(0, Render()[1 + SpotShutter]);
 
         var shutter = FixtureLibrary.Spot260X14().Channels[SpotShutter];
-        Assert.True(shutter.IsStrobeValue(150));                          // strobe aleatoire
-        Assert.False(shutter.IsStrobeValue(255));                         // ouvert
+        Assert.True(shutter.IsStrobeValue(150));                          // random strobe
+        Assert.False(shutter.IsStrobeValue(255));                         // open
         Assert.Equal(255, shutter.NoStrobeValue);
     }
 
@@ -408,24 +408,24 @@ public class FeatureTests
     public void Failed_connection_returns_a_message_instead_of_throwing()
     {
         using var link = new DmxLink();
-        bool ok = link.TryConnectAndStart("COM255", out string? error); // port qui n'existe pas
+        bool ok = link.TryConnectAndStart("COM255", out string? error); // port that does not exist
         Assert.False(ok);
         Assert.False(string.IsNullOrWhiteSpace(error));
         Assert.False(link.IsConnected);
-        link.Disconnect(); // ne leve jamais, meme sans port
+        link.Disconnect(); // never throws, even without a port
     }
 
     [Fact]
     public void Laser_upside_down_mirrors_x_positions_and_swaps_the_moving_direction()
     {
-        var laser = Add(FixtureLibrary.GalacticLaserRgId, "laser", 50); // X = canal 55, Y = 56
-        _engine.SetValue("laser", 5, 20);   // X position fixe 20
-        _engine.SetValue("laser", 6, 150);  // Y mouvement 128-191
+        var laser = Add(FixtureLibrary.GalacticLaserRgId, "laser", 50); // X = channel 55, Y = 56
+        _engine.SetValue("laser", 5, 20);   // X fixed position 20
+        _engine.SetValue("laser", 6, 150);  // Y movement 128-191
         _engine.EditShow(_ => laser.InvertPan = true);
 
         var u = Render();
         Assert.Equal(107, u[55]);           // 127 - 20
-        Assert.Equal(150, u[56]);           // Y non inverse
+        Assert.Equal(150, u[56]);           // Y not inverted
         Assert.Equal(214, ShowEngine.InvertLaserAxis(150)); // 128-191 -> 192-255
         Assert.Equal(150, ShowEngine.InvertLaserAxis(214));
     }
@@ -449,28 +449,28 @@ public class FeatureTests
     [Fact]
     public void Muted_colors_are_forced_to_zero_even_during_a_flash()
     {
-        // Spider en 29 : LED 1 rouge gauche = canal 29 + 4, LED 2 vert gauche = 29 + 5.
+        // Spider at 29: LED 1 red left = channel 29 + 4, LED 2 green left = 29 + 5.
         _engine.SetValue("spider-1", 4, 200);
         _engine.SetValue("spider-1", 5, 150);
         _engine.EditShow(s => s.Fixtures.First(f => f.Id == "spider-1").MutedColors.Add(ChannelType.Red));
         _engine.Flash = true;
 
         var universe = Render();
-        Assert.Equal(0, universe[29 + 4]);   // rouge masque
-        Assert.Equal(150, universe[29 + 5]); // vert intact
-        Assert.Equal(200, _engine.GetValues("spider-1")[4]); // la valeur reste memorisee : on la retrouve en demasquant
+        Assert.Equal(0, universe[29 + 4]);   // red masked
+        Assert.Equal(150, universe[29 + 5]); // green untouched
+        Assert.Equal(200, _engine.GetValues("spider-1")[4]); // the value stays remembered: it comes back when unmasked
     }
 
     // =================================================================================
-    //  Laser et UV
+    //  Laser and UV
     // =================================================================================
 
     [Fact]
     public void Blackout_turns_the_laser_off_and_back_to_dmx_mode()
     {
         Add(FixtureLibrary.GalacticLaserId, "laser", 50);
-        _engine.SetValue("laser", 0, 15); // programme auto
-        _engine.SetValue("laser", 2, 87); // vert
+        _engine.SetValue("laser", 0, 15); // auto program
+        _engine.SetValue("laser", 2, 87); // green
 
         var universe = Render();
         Assert.Equal(15, universe[50]);
@@ -478,15 +478,15 @@ public class FeatureTests
 
         _engine.Blackout = true;
         universe = Render();
-        Assert.InRange(universe[50], 240, 255); // mode DMX
-        Assert.Equal(0, universe[52]);           // couleur 0 = laser eteint
+        Assert.InRange(universe[50], 240, 255); // DMX mode
+        Assert.Equal(0, universe[52]);           // colour 0 = laser off
     }
 
     [Fact]
     public void Uv_color_lights_the_uv_led_only_on_fixtures_that_have_one()
     {
         Add(FixtureLibrary.ParUvId, "par", 60);
-        _engine.SetValue("par", 1, 200); // rouge
+        _engine.SetValue("par", 1, 200); // red
         _engine.SetSelection(new[] { "par", "spider-1" });
 
         var result = _engine.ApplyColor(ColorPalette.Find("UV")!, openDimmer: true);
@@ -494,8 +494,8 @@ public class FeatureTests
         Assert.Equal(new[] { "par" }, result.Applied);
         Assert.Equal(new[] { "Spider" }, result.Unsupported);
         var values = _engine.GetValues("par");
-        Assert.Equal(0, values[1]);   // rouge
+        Assert.Equal(0, values[1]);   // red
         Assert.Equal(255, values[4]); // UV
-        Assert.Equal(255, values[0]); // dimmer ouvert
+        Assert.Equal(255, values[0]); // dimmer open
     }
 }

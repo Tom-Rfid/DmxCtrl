@@ -1,19 +1,19 @@
 // =====================================================================================
 //  DebugPanel.cs
 // -------------------------------------------------------------------------------------
-//  Onglet "Debug" : la page de test d'origine, enrichie.
-//    - curseurs BRUTS sur 48 canaux DMX consecutifs (choix du premier canal),
-//      chacun etiquete avec l'appareil et la fonction qu'il est cense piloter ;
-//    - "Mode debug prioritaire" : quand il est actif, ces valeurs brutes remplacent
-//      TOUTE la sortie (la console Soiree est ignoree). Il s'active tout seul des
-//      qu'on touche un curseur ici, et la barre d'etat le signale en rouge ;
-//    - test de clignotement (celui qui a valide le protocole) ;
-//    - moniteur de ce qui part REELLEMENT vers le boitier ;
-//    - cadence d'envoi (100 ms par defaut, comme l'appli d'origine) ;
-//    - journal des evenements (connexion, erreurs, presets...).
+//  "Debug" tab: the original test page, extended.
+//    - RAW sliders on 48 consecutive DMX channels (first channel selectable),
+//      each labelled with the fixture and the function it is supposed to drive;
+//    - "Priority debug mode": while it is on, these raw values replace the WHOLE
+//      output (the Show console is ignored). It switches on by itself as soon as
+//      a slider is touched here, and the status bar shows it in red;
+//    - blink test (the one that validated the protocol);
+//    - monitor of what is REALLY sent to the box;
+//    - send rate (100 ms by default, like the original app);
+//    - event log (connection, errors, presets...).
 //
-//  Usage typique : verifier un profil canal par canal (bouger le curseur, regarder
-//  la lyre, cocher "OK" dans l'onglet de l'appareil).
+//  Typical use: check a profile channel by channel (move the slider, watch the
+//  fixture, tick "OK" in the fixture's tab).
 // =====================================================================================
 
 using System.ComponentModel;
@@ -22,6 +22,7 @@ using DmxController.Core.Protocol;
 
 namespace DmxController.UI;
 
+/// <summary>"Debug" tab: raw channel sliders, priority debug mode, blink test, output monitor and log.</summary>
 [DesignerCategory("Code")]
 internal sealed class DebugPanel : UserControl
 {
@@ -57,12 +58,13 @@ internal sealed class DebugPanel : UserControl
     private bool _blinkOn;
     private bool _updating;
 
+    /// <summary>Builds the tab: toolbar, raw sliders, monitor and event log.</summary>
     public DebugPanel(ShowContext ctx)
     {
         _ctx = ctx;
         Dock = DockStyle.Fill;
 
-        // ---------------- Barre d'outils ----------------
+        // ---------------- Toolbar ----------------
         var zero = new Button { Text = Tr.T("Tout à 0"), AutoSize = true };
         zero.Click += (_, _) =>
         {
@@ -97,7 +99,7 @@ internal sealed class DebugPanel : UserControl
                    Tr.T("« (?) » = pas encore vérifié. Pense à décocher le mode debug avant la soirée."),
         };
 
-        // ---------------- Curseurs bruts ----------------
+        // ---------------- Raw sliders ----------------
         var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(4) };
         for (int i = 0; i < VisibleChannels; i++)
         {
@@ -121,7 +123,7 @@ internal sealed class DebugPanel : UserControl
             Text = Tr.T("Moniteur : valeurs réellement envoyées au boîtier (ou qui le seraient si on était connecté)"),
         };
 
-        // Ordre d'ajout : Fill d'abord ; le dernier ajoute est docke en premier.
+        // Order of adding: Fill first; the last control added is docked first.
         Controls.Add(flow);
         Controls.Add(monitorTitle);
         Controls.Add(_monitor);
@@ -129,7 +131,7 @@ internal sealed class DebugPanel : UserControl
         Controls.Add(help);
         Controls.Add(toolbar);
 
-        // ---------------- Evenements ----------------
+        // ---------------- Events ----------------
         _active.CheckedChanged += (_, _) =>
         {
             _ctx.Engine.DebugActive = _active.Checked;
@@ -156,7 +158,7 @@ internal sealed class DebugPanel : UserControl
         RebuildLabels();
     }
 
-    /// <summary>Relit les reglages de la configuration (apres ouverture d'un fichier).</summary>
+    /// <summary>Reads the configuration settings again (after a file was opened).</summary>
     public void ReloadSettings()
     {
         _updating = true;
@@ -164,7 +166,7 @@ internal sealed class DebugPanel : UserControl
         _updating = false;
     }
 
-    /// <summary>Re-etiquette les curseurs d'apres le patch (apres modification du patch ou d'un profil).</summary>
+    /// <summary>Relabels the sliders from the patch (after the patch or a profile changed).</summary>
     public void RebuildLabels()
     {
         int first = (int)_start.Value;
@@ -177,17 +179,20 @@ internal sealed class DebugPanel : UserControl
         RefreshSliders();
     }
 
+    /// <summary>Shows the last universe sent (called by the main window timer).</summary>
     public void UpdateMonitor(byte[] output) => _monitor.SetValues(output);
 
+    /// <summary>Adds a time-stamped line to the event log (keeps the end of the log).</summary>
     public void AppendLog(string message)
     {
         if (_log.TextLength > 30000)
         {
-            _log.Text = _log.Text[^15000..]; // on garde la fin du journal
+            _log.Text = _log.Text[^15000..]; // keep the end of the log
         }
         _log.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
     }
 
+    /// <summary>Label of a DMX channel: fixture and channel function, or "(free)".</summary>
     private string Describe(int channel)
     {
         foreach (var fixture in _ctx.Show.Fixtures)
@@ -203,6 +208,7 @@ internal sealed class DebugPanel : UserControl
         return Tr.T("(libre)");
     }
 
+    /// <summary>Highest DMX channel used by an enabled fixture (for the blink test).</summary>
     private int LastPatchedChannel()
     {
         int last = 0;
@@ -217,6 +223,7 @@ internal sealed class DebugPanel : UserControl
         return last;
     }
 
+    /// <summary>A raw slider moved: copies its value into the debug universe and turns debug mode on.</summary>
     private void OnSlider(int slot)
     {
         if (_updating)
@@ -229,15 +236,17 @@ internal sealed class DebugPanel : UserControl
         _values[slot].Text = _buffer[channel].ToString();
         PushBuffer();
 
-        // Toucher un curseur ici active le mode debug, sinon il n'aurait aucun effet visible.
+        // Touching a slider here turns debug mode on, otherwise it would have no visible effect.
         if (!_active.Checked)
         {
             _active.Checked = true;
         }
     }
 
+    /// <summary>Sends the raw debug universe to the engine.</summary>
     private void PushBuffer() => _ctx.Engine.SetDebugUniverse(_buffer);
 
+    /// <summary>Labels and values of the sliders for the channels currently shown.</summary>
     private void RefreshSliders()
     {
         _updating = true;
@@ -257,8 +266,8 @@ internal sealed class DebugPanel : UserControl
     }
 
     /// <summary>
-    /// Test de clignotement : tous les canaux patches alternent entre 255 et 0 chaque
-    /// seconde. Sert a verifier la liaison sans rien connaitre des profils.
+    /// Blink test: every patched channel alternates between 255 and 0 every second.
+    /// Checks the link without knowing anything about the profiles.
     /// </summary>
     private void ToggleBlink()
     {
@@ -287,6 +296,7 @@ internal sealed class DebugPanel : UserControl
         _ctx.Status(Tr.F("Test clignotement : canaux 1 à {0}, une fois par seconde.", last));
     }
 
+    /// <summary>Stops the blink test and puts the channels back to 0.</summary>
     private void StopBlink()
     {
         if (_blinkTimer is null)
@@ -299,6 +309,7 @@ internal sealed class DebugPanel : UserControl
         _blink.Text = Tr.T("Démarrer le test clignotement");
     }
 
+    /// <summary>Stops the timers and unsubscribes before the tab is destroyed.</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)

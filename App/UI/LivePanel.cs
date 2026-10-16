@@ -1,22 +1,23 @@
 // =====================================================================================
 //  LivePanel.cs
 // -------------------------------------------------------------------------------------
-//  Onglet "Soiree" : la console de jeu pendant la fete.
+//  "Show" tab: the console played during the party.
 //
 //   +-------------+------------------------------------------+----------------+
-//   | Appareils   |  Couleurs        Mouvements              |  Master        |
-//   | pilotes     |  Chenillard      Strobe                  |  BLACKOUT      |
-//   | (coches)    |                                          |  FLASH         |
+//   | Controlled  |  Colours         Movements               |  Master        |
+//   | fixtures    |  Chase           Strobe                  |  BLACKOUT      |
+//   | (ticked)    |  Flash / strobe per fixture              |  FLASH         |
 //   |             |                                          |  Tempo / TAP   |
+//   |             |                                          |  Microphone    |
 //   +-------------+------------------------------------------+----------------+
-//   | Scenes : boutons de rappel, enregistrement, mode auto                     |
+//   | Scenes: recall buttons, save, auto mode                                   |
 //   +---------------------------------------------------------------------------+
 //
-//  Couleurs, mouvements, chenillard et strobe s'appliquent aux appareils COCHES
-//  a gauche. Master, blackout et flash s'appliquent a tout.
+//  Colours, movements, chase and strobe apply to the fixtures TICKED on the left.
+//  Master, blackout and flash apply to everything.
 //
-//  Raccourcis clavier (geres par MainForm quand cet onglet est actif) :
-//    Espace = blackout, F maintenu = flash, T = tap tempo, 1..9 = scenes.
+//  Keyboard shortcuts (handled by MainForm while this tab is active):
+//    Space = blackout, hold F = flash, T = tap tempo, 1..9 = scenes.
 // =====================================================================================
 
 using System.ComponentModel;
@@ -26,16 +27,21 @@ using DmxController.Core.Model;
 
 namespace DmxController.UI;
 
+/// <summary>"Show" tab: the console used during the party.</summary>
 [DesignerCategory("Code")]
 internal sealed class LivePanel : UserControl
 {
+    /// <summary>Item of the fixture list: id and displayed name.</summary>
     private sealed record FixtureItem(string Id, string Name)
     {
+        /// <summary>Text shown in the list.</summary>
         public override string ToString() => Name;
     }
 
+    /// <summary>Item of the movement shape list.</summary>
     private sealed record ShapeItem(MovementShape Shape)
     {
+        /// <summary>Translated shape name.</summary>
         public override string ToString() => MovementShapeInfo.DisplayName(Shape);
     }
 
@@ -43,13 +49,13 @@ internal sealed class LivePanel : UserControl
     private bool _updating;
     private readonly HashSet<Keys> _heldKeys = new();
 
-    // --- Appareils ---
+    // --- Fixtures ---
     private readonly CheckedListBox _fixtureList = new() { CheckOnClick = true, IntegralHeight = false, Dock = DockStyle.Fill };
 
-    // --- Couleurs ---
+    // --- Colours ---
     private readonly CheckBox _openDimmer = new() { Text = Tr.T("Allumer le dimmer (s'il est à 0) en choisissant une couleur"), AutoSize = true };
 
-    // --- Mouvements ---
+    // --- Movements ---
     private readonly ComboBox _shape = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200, Margin = new Padding(3, 4, 3, 3) };
     private readonly TrackBar _speed = Ui.Slider(1, 120, 200);
     private readonly Label _speedValue = Ui.ValueLabel(90);
@@ -61,7 +67,7 @@ internal sealed class LivePanel : UserControl
     private readonly CheckBox _moveSync = new() { Text = Tr.T("Caler sur le BPM, 1 cycle ="), AutoSize = true, Margin = new Padding(3, 6, 0, 3) };
     private readonly NumericUpDown _beatsPerCycle = new() { Minimum = 1, Maximum = 64, Value = 8, Width = 52, Margin = new Padding(3, 4, 3, 3) };
 
-    // --- Chenillard ---
+    // --- Chase ---
     private readonly CheckBox _chaseOn = new() { Text = Tr.T("Actif"), AutoSize = true, Font = Ui.BoldFont };
     private readonly CheckBox _chaseAlternate = new() { Text = Tr.T("Une couleur différente par appareil"), AutoSize = true };
     private readonly NumericUpDown _chaseSeconds = new() { Minimum = 0.1m, Maximum = 60, DecimalPlaces = 1, Increment = 0.1m, Value = 1, Width = 56, Margin = new Padding(3, 4, 3, 3) };
@@ -74,7 +80,7 @@ internal sealed class LivePanel : UserControl
     private readonly TrackBar _strobeHz = Ui.Slider(1, 10, 200);
     private readonly Label _strobeValue = Ui.ValueLabel(90);
 
-    // --- Interrupteurs flash / strobe par appareil (case "Flash / strobe" du patch) ---
+    // --- Flash / strobe switches per fixture ("Flash / strobe" box of the patch) ---
     private readonly TableLayoutPanel _flashRows = new()
     {
         ColumnCount = 3,
@@ -88,7 +94,7 @@ internal sealed class LivePanel : UserControl
     private readonly List<(string FixtureId, CheckBox Toggle)> _strobeToggles = new();
     private readonly ToolTip _tips = new();
 
-    // --- Micro : tempo detecte et dimmer qui suit le volume ---
+    // --- Microphone: detected tempo and dimmer following the volume ---
     private readonly ComboBox _micDevice = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 205, DropDownWidth = 320, Margin = new Padding(3, 4, 3, 3) };
     private readonly CheckBox _micOn = new() { Text = Tr.T("Écouter le micro"), Appearance = Appearance.Button, TextAlign = ContentAlignment.MiddleCenter, Size = new Size(205, 30), Font = Ui.BoldFont };
     private readonly ProgressBar _micLevel = new() { Width = 205, Height = 12, Maximum = 100, Margin = new Padding(3, 4, 3, 2) };
@@ -109,7 +115,7 @@ internal sealed class LivePanel : UserControl
     private readonly TapTempo _tapTempo = new();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
 
-    // --- Scenes / mode auto ---
+    // --- Scenes / auto mode ---
     private readonly FlowLayoutPanel _sceneFlow = new() { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(4) };
     private readonly CheckBox _autoOn = new() { Text = Tr.T("Mode auto : enchaîner les scènes toutes les"), AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(24, 8, 0, 3) };
     private readonly NumericUpDown _autoSeconds = new() { Minimum = 1, Maximum = 600, Value = 8, Width = 56, Margin = new Padding(3, 5, 3, 3) };
@@ -121,6 +127,7 @@ internal sealed class LivePanel : UserControl
     private double _autoLastSwitch;
     private string? _activeSceneId;
 
+    /// <summary>Builds the console: fixtures, effects, master/tempo/microphone and scenes.</summary>
     public LivePanel(ShowContext ctx)
     {
         _ctx = ctx;
@@ -133,7 +140,7 @@ internal sealed class LivePanel : UserControl
         center.Controls.Add(BuildChaseGroup());
         center.Controls.Add(BuildStrobeGroup());
 
-        // Dernier ajoute = docke en premier : les scenes prennent toute la largeur en bas.
+        // Last added = docked first: the scenes take the whole width at the bottom.
         Controls.Add(center);
         Controls.Add(BuildRightPanel());
         Controls.Add(BuildFixturePanel());
@@ -152,9 +159,10 @@ internal sealed class LivePanel : UserControl
     }
 
     // =================================================================================
-    //  Construction de l'interface
+    //  Building the interface
     // =================================================================================
 
+    /// <summary>Left column: list of controlled fixtures and quick selection buttons.</summary>
     private Control BuildFixturePanel()
     {
         var group = new GroupBox { Text = Tr.T("Appareils pilotés"), Dock = DockStyle.Left, Width = 220, Padding = new Padding(8), Font = Ui.BoldFont };
@@ -192,6 +200,7 @@ internal sealed class LivePanel : UserControl
         return group;
     }
 
+    /// <summary>Colour buttons + full on / off / centre buttons.</summary>
     private Control BuildColorGroup()
     {
         var swatches = Ui.Flow(430);
@@ -217,9 +226,9 @@ internal sealed class LivePanel : UserControl
     }
 
     /// <summary>
-    /// Une ligne par appareil coche "Flash / strobe" dans le patch : FLASH (maintenu, plein feu
-    /// par-dessus master et blackout) et STROBE (interrupteur : strobe de l'appareil lui-meme
-    /// si son profil en a un, sinon strobe logiciel).
+    /// One row per fixture ticked "Flash / strobe" in the patch: FLASH (held, full on above master
+    /// and blackout) and STROBE (switch: the fixture's own strobe when its profile has one,
+    /// software strobe otherwise).
     /// </summary>
     private Control BuildFlashGroup()
     {
@@ -247,6 +256,7 @@ internal sealed class LivePanel : UserControl
         return Ui.Group(Tr.T("Flash / strobe par appareil"), table);
     }
 
+    /// <summary>Rebuilds the FLASH / STROBE rows of the fixtures ticked "Flash / strobe" in the patch.</summary>
     private void RebuildFlashRows()
     {
         _flashRows.SuspendLayout();
@@ -325,6 +335,7 @@ internal sealed class LivePanel : UserControl
         _flashRows.ResumeLayout();
     }
 
+    /// <summary>Movement effect group (shape, speed, size, offset, BPM lock, mirror).</summary>
     private Control BuildMovementGroup()
     {
         foreach (var shape in MovementShapeInfo.All)
@@ -351,6 +362,7 @@ internal sealed class LivePanel : UserControl
         return Ui.Group(Tr.T("Mouvements (lyres)"), table);
     }
 
+    /// <summary>Colour chase group (on, step, BPM lock, colours).</summary>
     private Control BuildChaseGroup()
     {
         var palette = Ui.Flow(400);
@@ -376,6 +388,7 @@ internal sealed class LivePanel : UserControl
         return Ui.Group(Tr.T("Chenillard de couleurs"), table);
     }
 
+    /// <summary>Software strobe group (on, frequency).</summary>
     private Control BuildStrobeGroup()
     {
         var table = Ui.Table(3);
@@ -392,6 +405,7 @@ internal sealed class LivePanel : UserControl
         return Ui.Group(Tr.T("Strobe"), table);
     }
 
+    /// <summary>Right column: master, blackout, flash, tempo / tap and microphone.</summary>
     private Control BuildRightPanel()
     {
         var panel = new FlowLayoutPanel
@@ -431,8 +445,8 @@ internal sealed class LivePanel : UserControl
     }
 
     /// <summary>
-    /// Micro (partage avec les autres onglets via _ctx.Mic) : choix de l'entree son, tempo detecte,
-    /// « Caler le BPM sur le micro », et dimmer qui baisse avec le volume puis remonte.
+    /// Microphone (shared with the other tabs through _ctx.Mic): sound input choice, detected tempo,
+    /// "Lock the BPM to the mic", and a dimmer that drops with the volume and comes back up.
     /// </summary>
     private Control BuildMicGroup()
     {
@@ -456,7 +470,7 @@ internal sealed class LivePanel : UserControl
             _ctx.Show.Settings.MicrophoneName = _micDevice.SelectedItem as string;
             if (_ctx.Mic.IsListening)
             {
-                ToggleMic(true); // relance sur la nouvelle entree
+                ToggleMic(true); // restart on the new input
             }
         };
         _micFollow.CheckedChanged += (_, _) =>
@@ -498,6 +512,7 @@ internal sealed class LivePanel : UserControl
         return Ui.Group(Tr.T("Micro (tempo / volume)"), table);
     }
 
+    /// <summary>Starts or stops listening to the chosen microphone.</summary>
     private void ToggleMic(bool on)
     {
         _ctx.Mic.Stop();
@@ -517,7 +532,7 @@ internal sealed class LivePanel : UserControl
         }
     }
 
-    /// <summary>Etat du micro -> controles (appele 10 fois/s par _ctx.Mic, et a chaque changement).</summary>
+    /// <summary>Microphone state -> controls (called 10 times/s by _ctx.Mic, and on every change).</summary>
     private void UpdateMicUi()
     {
         if (IsDisposed)
@@ -534,7 +549,7 @@ internal sealed class LivePanel : UserControl
             _soundDimmer.Checked = mic.SoundDimmer;
             if (mic.FollowBpm && Math.Abs((double)_bpm.Value - _ctx.Engine.Bpm) >= 0.05)
             {
-                Ui.SetValue(_bpm, _ctx.Engine.Bpm); // BPM pousse par le micro
+                Ui.SetValue(_bpm, _ctx.Engine.Bpm); // BPM pushed by the microphone
                 UpdateValueLabels();
             }
         }
@@ -563,6 +578,7 @@ internal sealed class LivePanel : UserControl
         _soundInfo.Text = mic.SoundDimmer ? Tr.F("Dimmer son : {0:0} %", (mic.DimmerFactor * 100)) : Tr.F("Volume : {0:0} dB", mic.LevelDb);
     }
 
+    /// <summary>Bottom panel: scene buttons, save button and auto mode.</summary>
     private Control BuildScenePanel()
     {
         var group = new GroupBox { Text = Tr.T("Scènes"), Dock = DockStyle.Bottom, Height = 196, Padding = new Padding(6), Font = Ui.BoldFont };
@@ -580,9 +596,10 @@ internal sealed class LivePanel : UserControl
         return group;
     }
 
+    /// <summary>Connects the controls to the engine (selection, effects, master, tempo...).</summary>
     private void WireEvents()
     {
-        // Selection d'appareils : ItemCheck est leve AVANT le changement, on calcule le nouvel etat.
+        // Fixture selection: ItemCheck is raised BEFORE the change, so the new state is computed here.
         _fixtureList.ItemCheck += (_, e) =>
         {
             if (_updating)
@@ -601,7 +618,7 @@ internal sealed class LivePanel : UserControl
             _ctx.Engine.SetSelection(ids);
         };
 
-        // Tous les reglages d'effets passent par PushEffects().
+        // All effect settings go through PushEffects().
         _shape.SelectedIndexChanged += (_, _) => PushEffects();
         foreach (var slider in new[] { _speed, _size, _spread, _strobeHz })
         {
@@ -650,7 +667,7 @@ internal sealed class LivePanel : UserControl
         };
         _tap.Click += (_, _) => Tap();
 
-        // Reglages sauvegardes avec la configuration (sans la marquer "modifiee").
+        // Settings saved with the configuration (without marking it "modified").
         _fade.ValueChanged += (_, _) => _ctx.Show.Settings.FadeSeconds = (double)_fade.Value;
         _openDimmer.CheckedChanged += (_, _) => _ctx.Show.Settings.OpenDimmerOnColor = _openDimmer.Checked;
         _autoSeconds.ValueChanged += (_, _) => _ctx.Show.Settings.AutoIntervalSeconds = (double)_autoSeconds.Value;
@@ -667,10 +684,10 @@ internal sealed class LivePanel : UserControl
     }
 
     // =================================================================================
-    //  Rafraichissement depuis le moteur / la configuration
+    //  Refresh from the engine / the configuration
     // =================================================================================
 
-    /// <summary>Tout recharger (apres ouverture d'une configuration ou modification du patch).</summary>
+    /// <summary>Reloads everything (after a configuration was opened or the patch changed).</summary>
     public void ReloadAll()
     {
         _updating = true;
@@ -683,7 +700,7 @@ internal sealed class LivePanel : UserControl
             _autoSync.Checked = s.AutoSyncToBpm;
             _openDimmer.Checked = s.OpenDimmerOnColor;
             Ui.SetValue(_soundRecovery, s.SoundDimmerRecoverySeconds);
-            _autoOn.Checked = false; // jamais d'enchainement automatique a l'ouverture
+            _autoOn.Checked = false; // never an automatic sequence when opening
         }
         finally
         {
@@ -696,6 +713,7 @@ internal sealed class LivePanel : UserControl
         RefreshFromEngine();
     }
 
+    /// <summary>Rebuilds the fixture list after the patch changed (keeps the selection).</summary>
     public void RebuildFixtures()
     {
         _updating = true;
@@ -717,7 +735,7 @@ internal sealed class LivePanel : UserControl
         RebuildFlashRows();
     }
 
-    /// <summary>Recopie l'etat du moteur dans les controles (selection, effets, master, BPM...).</summary>
+    /// <summary>Copies the engine state into the controls (selection, effects, master, BPM...).</summary>
     public void RefreshFromEngine()
     {
         if (IsDisposed)
@@ -734,7 +752,7 @@ internal sealed class LivePanel : UserControl
                 _fixtureList.SetItemChecked(i, selected.Contains(((FixtureItem)_fixtureList.Items[i]).Id));
             }
 
-            // Interrupteurs STROBE : grises si "Pas de strobe" est coche dans l'onglet de l'appareil.
+            // STROBE switches: greyed out when "No strobe" is ticked in the fixture's tab.
             foreach (var (fixtureId, toggle) in _strobeToggles)
             {
                 bool noStrobe = _ctx.Show.Fixtures.FirstOrDefault(f => f.Id == fixtureId)?.NoStrobe == true;
@@ -779,6 +797,7 @@ internal sealed class LivePanel : UserControl
         HighlightActiveScene();
     }
 
+    /// <summary>Refreshes the value labels next to the sliders (%, cycles/min, flashes/s).</summary>
     private void UpdateValueLabels()
     {
         double bpm = (double)_bpm.Value;
@@ -792,7 +811,7 @@ internal sealed class LivePanel : UserControl
         _speed.Enabled = !_moveSync.Checked;
     }
 
-    /// <summary>Envoie au moteur l'etat de tous les controles d'effets.</summary>
+    /// <summary>Sends the state of every effect control to the engine.</summary>
     private void PushEffects()
     {
         if (_updating)
@@ -826,6 +845,7 @@ internal sealed class LivePanel : UserControl
     //  Actions
     // =================================================================================
 
+    /// <summary>Ticks the fixtures that match <paramref name="predicate"/> and unticks the others.</summary>
     private void CheckFixtures(Func<FixtureInstance, bool> predicate)
     {
         var ids = _ctx.Show.Fixtures.Where(predicate).Select(f => f.Id).ToList();
@@ -833,6 +853,7 @@ internal sealed class LivePanel : UserControl
         RefreshFromEngine();
     }
 
+    /// <summary>Colour button: applies the colour to the ticked fixtures and reports those that cannot show it.</summary>
     private void ApplyColor(NamedColor color)
     {
         var result = _ctx.Engine.ApplyColor(color, _openDimmer.Checked);
@@ -853,8 +874,10 @@ internal sealed class LivePanel : UserControl
         }
     }
 
+    /// <summary>Comma-separated names, or "none".</summary>
     private static string Join(IReadOnlyList<string> names) => names.Count == 0 ? Tr.T("aucun") : string.Join(", ", names);
 
+    /// <summary>Runs an engine action on the selection, refreshes the tabs and shows <paramref name="message"/>.</summary>
     private void ApplyToSelection(Action action, string message)
     {
         action();
@@ -862,12 +885,14 @@ internal sealed class LivePanel : UserControl
         _ctx.Status(message + Tr.T(" (appareils cochés)."));
     }
 
+    /// <summary>Blackout on / off (Space key or button).</summary>
     private void ToggleBlackout()
     {
         _ctx.Engine.Blackout = !_ctx.Engine.Blackout;
         UpdateBlackoutButton();
     }
 
+    /// <summary>Colours the blackout button according to its state.</summary>
     private void UpdateBlackoutButton()
     {
         bool on = _ctx.Engine.Blackout;
@@ -877,6 +902,7 @@ internal sealed class LivePanel : UserControl
         _blackout.UseVisualStyleBackColor = !on;
     }
 
+    /// <summary>Global flash while the button or the F key is held.</summary>
     private void SetFlash(bool on)
     {
         if (_ctx.Engine.Flash == on)
@@ -887,6 +913,7 @@ internal sealed class LivePanel : UserControl
         UpdateFlashButton();
     }
 
+    /// <summary>Colours the flash button according to its state.</summary>
     private void UpdateFlashButton()
     {
         bool on = _ctx.Engine.Flash;
@@ -894,20 +921,22 @@ internal sealed class LivePanel : UserControl
         _flash.UseVisualStyleBackColor = !on;
     }
 
+    /// <summary>TAP button / T key: records a tap and sets the BPM once enough taps are in.</summary>
     private void Tap()
     {
         double? bpm = _tapTempo.Tap(_clock.Elapsed.TotalSeconds);
         if (bpm is double value)
         {
-            Ui.SetValue(_bpm, value); // declenche ValueChanged -> moteur
+            Ui.SetValue(_bpm, value); // triggers ValueChanged -> engine
             _ctx.Status(Tr.F("Tempo : {0:0.#} BPM", value));
         }
     }
 
     // =================================================================================
-    //  Scenes et mode auto
+    //  Scenes and auto mode
     // =================================================================================
 
+    /// <summary>Rebuilds the scene buttons (numbered 1, 2, 3... for the keyboard).</summary>
     public void RebuildScenes()
     {
         _sceneFlow.SuspendLayout();
@@ -948,6 +977,7 @@ internal sealed class LivePanel : UserControl
         HighlightActiveScene();
     }
 
+    /// <summary>Right-click menu of a scene: recall, update, rename, auto, move, delete.</summary>
     private ContextMenuStrip BuildSceneMenu(Scene scene)
     {
         var menu = new ContextMenuStrip();
@@ -976,7 +1006,7 @@ internal sealed class LivePanel : UserControl
         {
             scene.IncludeInAuto = inAuto.Checked;
             _ctx.MarkDirty();
-            BeginInvoke(new Action(RebuildScenes)); // apres fermeture du menu
+            BeginInvoke(new Action(RebuildScenes)); // after the menu is closed
         };
         menu.Items.Add(inAuto);
         menu.Items.Add(new ToolStripSeparator());
@@ -995,6 +1025,7 @@ internal sealed class LivePanel : UserControl
         return menu;
     }
 
+    /// <summary>Moves a scene left (-1) or right (+1) in the list.</summary>
     private void MoveScene(Scene scene, int delta)
     {
         var scenes = _ctx.Show.Scenes;
@@ -1010,6 +1041,7 @@ internal sealed class LivePanel : UserControl
         BeginInvoke(new Action(RebuildScenes));
     }
 
+    /// <summary>Asks a name and saves the current state as a new scene.</summary>
     private void SaveCurrentScene()
     {
         string? name = InputDialog.Ask(FindForm(), Tr.T("Nouvelle scène"),
@@ -1028,28 +1060,30 @@ internal sealed class LivePanel : UserControl
         _ctx.Status(Tr.F("Scène « {0} » enregistrée (pense à enregistrer la configuration : Ctrl+S).", name));
     }
 
+    /// <summary>Recalls a scene with the fade time (shorter in auto mode); a manual recall restarts the auto sequence from it.</summary>
     private void Recall(Scene scene, bool manual)
     {
         double fade = (double)_fade.Value;
         if (!manual)
         {
-            // En mode auto, le fondu ne doit pas durer plus longtemps que la scene elle-meme.
+            // In auto mode, the fade must not last longer than the scene itself.
             fade = Math.Min(fade, AutoIntervalSeconds() * 0.8);
         }
 
         _ctx.Engine.RecallScene(scene, fade);
         _activeSceneId = scene.Id;
-        _ctx.NotifyLiveStateChanged(); // -> RefreshFromEngine ici et dans les onglets d'appareils
+        _ctx.NotifyLiveStateChanged(); // -> RefreshFromEngine here and in the fixture tabs
 
         if (manual && _autoOn.Checked)
         {
-            // Un rappel manuel pendant l'auto : l'enchainement repart de cette scene.
+            // A manual recall during auto: the sequence restarts from this scene.
             var autoScenes = _ctx.Show.Scenes.Where(s => s.IncludeInAuto).ToList();
             _autoIndex = autoScenes.IndexOf(scene);
             _autoLastSwitch = _clock.Elapsed.TotalSeconds;
         }
     }
 
+    /// <summary>Highlights the button of the last recalled scene.</summary>
     private void HighlightActiveScene()
     {
         foreach (Control control in _sceneFlow.Controls)
@@ -1063,10 +1097,12 @@ internal sealed class LivePanel : UserControl
         }
     }
 
+    /// <summary>Time between two scenes in auto mode: fixed seconds or N beats at the BPM.</summary>
     private double AutoIntervalSeconds() => _autoSync.Checked
         ? 60.0 / Math.Max(30, _ctx.Engine.Bpm) * (double)_autoBeats.Value
         : (double)_autoSeconds.Value;
 
+    /// <summary>Auto mode timer: recalls the next included scene when its time is up.</summary>
     private void OnAutoTick()
     {
         if (!_autoOn.Checked)
@@ -1095,10 +1131,10 @@ internal sealed class LivePanel : UserControl
     }
 
     // =================================================================================
-    //  Clavier (appele par MainForm quand cet onglet est affiche)
+    //  Keyboard (called by MainForm while this tab is shown)
     // =================================================================================
 
-    /// <returns>true si la touche a ete utilisee (elle ne doit alors pas aller au controle qui a le focus).</returns>
+    /// <returns>true when the key was used (it must then not go to the focused control).</returns>
     public bool HandleKey(Keys key, bool down)
     {
         bool known = key is Keys.Space or Keys.F or Keys.T
@@ -1119,7 +1155,7 @@ internal sealed class LivePanel : UserControl
             return true;
         }
 
-        // L'auto-repetition du clavier envoie des KeyDown en rafale : on n'agit qu'au premier.
+        // Keyboard auto-repeat sends bursts of KeyDown: only the first one acts.
         if (!_heldKeys.Add(key))
         {
             return true;
@@ -1147,6 +1183,7 @@ internal sealed class LivePanel : UserControl
         return true;
     }
 
+    /// <summary>Unsubscribes from the context and the microphone, stops the timers.</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)

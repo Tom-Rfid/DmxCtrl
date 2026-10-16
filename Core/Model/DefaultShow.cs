@@ -1,22 +1,24 @@
 // =====================================================================================
 //  DefaultShow.cs
 // -------------------------------------------------------------------------------------
-//  Configuration de depart = installation reelle (config « Soirée par défaut.dmxshow_3 ») :
-//  2 Intimidator Spot 260X en 14 canaux (adresses 1 et 15) et le Mini Spider (adresse 29,
-//  canaux 29-43, ailes en miroir), avec quelques scenes.
-//  Les profils viennent de la bibliotheque integree (FixtureLibrary).
+//  Starting configuration = the real installation (configuration "Soirée par défaut.dmxshow_3"):
+//  2 Intimidator Spot 260X in 14 channels (addresses 1 and 15) and the Mini Spider (address 29,
+//  channels 29-43, mirrored wings), with a few scenes.
+//  The profiles come from the built-in library (FixtureLibrary).
 //
-//  Pour ajouter la fumee, le laser ou le PAR UV : Appareils > Ajouter un appareil,
-//  puis choisir le modele (l'adresse libre est proposee toute seule).
+//  To add the fog machine, the laser or the UV PAR: Fixtures > Add a fixture,
+//  then pick the model (the free address is suggested automatically).
 // =====================================================================================
 
 namespace DmxController.Core.Model;
 
+/// <summary>Starting configuration (the real installation).</summary>
 public static class DefaultShow
 {
     public const string Spot260XProfileId = FixtureLibrary.Spot260X14Id;
     public const string SpiderProfileId = FixtureLibrary.SpiderId;
 
+    /// <summary>Builds the default configuration: profiles, patch, starting state and a few scenes.</summary>
     public static ShowConfig Create()
     {
         var spot = FixtureLibrary.Spot260X14();
@@ -28,8 +30,8 @@ public static class DefaultShow
             Profiles = { spot, spider },
             Fixtures =
             {
-                // Installation reelle : lyres en 1-14 et 15-28, Spider en 29-43 (PAR UV en 44, a ajouter
-                // dans le patch). Les adresses doivent correspondre au menu de chaque appareil.
+                // Real installation: moving heads on 1-14 and 15-28, Spider on 29-43 (UV PAR on 44, to add
+                // in the patch). The addresses must match the menu of each fixture.
                 new FixtureInstance { Id = "lyre-1", Name = Tr.T("Lyre 1"), ProfileId = spot.Id, Address = 1 },
                 new FixtureInstance { Id = "lyre-2", Name = Tr.T("Lyre 2"), ProfileId = spot.Id, Address = 15 },
                 new FixtureInstance { Id = "spider-1", Name = Tr.T("Spider"), ProfileId = spider.Id, Address = 29, MirrorMotors = true },
@@ -38,7 +40,7 @@ public static class DefaultShow
 
         var allIds = show.Fixtures.Select(f => f.Id).ToList();
 
-        // Etat de depart : valeurs par defaut, tous les appareils selectionnes, aucun effet.
+        // Starting state: default values, every fixture selected, no effect.
         show.LiveState = new Scene { Name = Tr.T("État courant"), Selection = allIds.ToList() };
         foreach (var f in show.Fixtures)
         {
@@ -74,6 +76,7 @@ public static class DefaultShow
         return show;
     }
 
+    /// <summary>Builds a scene from default values changed by <paramref name="edit"/>, with the given effects.</summary>
     private static Scene BuildScene(ShowConfig show, string name, bool includeInAuto,
         Action<FixtureProfile, byte[]>? edit, LiveEffects effects)
     {
@@ -96,6 +99,7 @@ public static class DefaultShow
         return scene;
     }
 
+    /// <summary>Sets every channel of type <paramref name="type"/> to <paramref name="value"/>.</summary>
     private static void SetType(FixtureProfile profile, byte[] values, ChannelType type, byte value)
     {
         for (int i = 0; i < profile.Channels.Count; i++)
@@ -107,5 +111,6 @@ public static class DefaultShow
         }
     }
 
+    /// <summary>Byte values as integers (scene storage format).</summary>
     private static int[] ToInts(byte[] values) => values.Select(v => (int)v).ToArray();
 }

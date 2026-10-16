@@ -1,20 +1,21 @@
 // =====================================================================================
 //  LedGroups.cs
 // -------------------------------------------------------------------------------------
-//  Faders "LED gauche" / "LED droite" d'un appareil a ailes (Spider) :
-//    - les canaux de couleur (rouge, vert, bleu, blanc...) sont repartis en 2 groupes :
-//      1re moitie = aile 1 (gauche), 2e moitie = aile 2 (droite). Pour le Spider :
-//      LED 1-4 a gauche, LED 5-8 a droite (SUPPOSE : a verifier sur l'appareil) ;
-//    - le niveau d'un groupe = la LED la plus forte du groupe ;
-//    - regler le niveau garde les PROPORTIONS entre les LED (une aile rouge reste
-//      rouge en baissant) ; si tout etait a 0, les 4 LED montent ensemble.
+//  "Left LED" / "Right LED" faders of a fixture with wings (Spider):
+//    - the colour channels (red, green, blue, white...) are split into 2 groups:
+//      1st half = wing 1 (left), 2nd half = wing 2 (right). For the Spider:
+//      LEDs 1-4 on the left, LEDs 5-8 on the right (checked on the fixture);
+//    - the level of a group = its brightest LED;
+//    - setting the level keeps the RATIOS between the LEDs (a red wing stays
+//      red when dimmed); when everything was at 0, the 4 LEDs rise together.
 // =====================================================================================
 
 namespace DmxController.Core.Model;
 
+/// <summary>Left / right LED groups of a fixture with wings.</summary>
 public static class LedGroups
 {
-    /// <summary>Canaux de couleur (index dans le profil), coupes en deux moities.</summary>
+    /// <summary>Colour channels (profile indexes), cut into two halves.</summary>
     public static (int[] Left, int[] Right) Split(FixtureProfile profile)
     {
         var colors = Enumerable.Range(0, profile.ChannelCount)
@@ -24,11 +25,11 @@ public static class LedGroups
         return (colors[..half], colors[half..]);
     }
 
-    /// <summary>Niveau du groupe (0..255) = valeur de sa LED la plus forte.</summary>
+    /// <summary>Group level (0..255) = value of its brightest LED.</summary>
     public static byte Level(byte[] values, int[] group) =>
         group.Length == 0 ? (byte)0 : group.Max(i => values[i]);
 
-    /// <summary>Proportions actuelles des LED du groupe (la plus forte = 1), ou null si tout est eteint.</summary>
+    /// <summary>Current ratios of the LEDs of the group (brightest = 1), or null when everything is off.</summary>
     public static double[]? Ratios(byte[] values, int[] group)
     {
         byte max = Level(values, group);
@@ -36,8 +37,8 @@ public static class LedGroups
     }
 
     /// <summary>
-    /// Regle le niveau du groupe en respectant les proportions donnees (null = toutes les LED au
-    /// meme niveau).
+    /// Sets the level of the group while keeping the given ratios (null = every LED at the
+    /// same level).
     /// </summary>
     public static void SetLevel(byte[] values, int[] group, byte level, double[]? ratios)
     {

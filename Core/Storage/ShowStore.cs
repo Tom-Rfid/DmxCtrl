@@ -1,15 +1,15 @@
 // =====================================================================================
 //  ShowStore.cs
 // -------------------------------------------------------------------------------------
-//  Lecture / ecriture des fichiers JSON :
-//    - *.dmxshow.json     : une configuration complete (profils + patch + scenes...)
-//    - *.dmxprofile.json  : un profil seul, pour partager un "module" entre configs
-//    - settings.json      : reglages propres a ce PC (%APPDATA%\DmxController)
+//  Reading / writing of the JSON files:
+//    - *.dmxshow.json     : a complete configuration (profiles + patch + scenes...)
+//    - *.dmxprofile.json  : a single profile, to share a "module" between configurations
+//    - settings.json      : settings of this PC (%APPDATA%\DmxController)
 //
-//  Les fichiers sont lisibles et modifiables a la main (indentes, accents en clair,
-//  enums ecrits en texte, commentaires et virgules finales toleres a la lecture).
-//  L'ecriture passe par un fichier temporaire pour ne jamais laisser une config a
-//  moitie ecrite si le PC s'eteint pendant l'enregistrement.
+//  The files can be read and edited by hand (indented, accents in clear, enums written
+//  as text, comments and trailing commas tolerated when reading).
+//  Writing goes through a temporary file so that a configuration is never left half
+//  written if the PC shuts down while saving.
 // =====================================================================================
 
 using System.Text;
@@ -20,10 +20,13 @@ using DmxController.Core.Model;
 
 namespace DmxController.Core.Storage;
 
+/// <summary>JSON options shared by every file of the application.</summary>
 public static class ShowJson
 {
+    /// <summary>Options used to read and write every JSON file.</summary>
     public static JsonSerializerOptions Options { get; } = CreateOptions();
 
+    /// <summary>Indented JSON, enums as text, accents in clear, comments and trailing commas allowed.</summary>
     private static JsonSerializerOptions CreateOptions()
     {
         var options = new JsonSerializerOptions
@@ -32,31 +35,35 @@ public static class ShowJson
             ReadCommentHandling = JsonCommentHandling.Skip,
             AllowTrailingCommas = true,
             PropertyNameCaseInsensitive = true,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, // "Soirée" et non "Soirée"
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, // writes "Soirée", not an escaped "Soirée"
         };
         options.Converters.Add(new JsonStringEnumConverter());
         return options;
     }
 
-    /// <summary>Copie profonde d'un objet du modele (via JSON : simple et sans oubli de champ).</summary>
+    /// <summary>Deep copy of a model object (through JSON: simple and no field forgotten).</summary>
     public static T Clone<T>(T value) =>
         JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value, Options), Options)!;
 }
 
+/// <summary>Reading and writing of configurations, profiles and settings.</summary>
 public static class ShowStore
 {
     public const string ShowExtension = ".dmxshow.json";
     public const string ProfileExtension = ".dmxprofile.json";
     public const int CurrentFormatVersion = 1;
 
+    /// <summary>%APPDATA%\DmxController folder (settings and configurations).</summary>
     public static string AppDataFolder =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DmxController");
 
-    /// <summary>Dossier propose par defaut pour les configurations.</summary>
+    /// <summary>Folder suggested by default for the configurations.</summary>
     public static string DefaultShowsFolder => Path.Combine(AppDataFolder, "Configurations");
 
+    /// <summary>Path of settings.json (settings of this PC).</summary>
     public static string AppSettingsPath => Path.Combine(AppDataFolder, "settings.json");
 
+    /// <summary>Reads a configuration file and repairs what may be missing. Throws on an unreadable file.</summary>
     public static ShowConfig LoadShow(string path)
     {
         string json = File.ReadAllText(path);
@@ -71,12 +78,14 @@ public static class ShowStore
         return show;
     }
 
+    /// <summary>Saves a configuration (atomic write).</summary>
     public static void SaveShow(ShowConfig show, string path)
     {
         show.FormatVersion = CurrentFormatVersion;
         WriteAtomic(path, JsonSerializer.Serialize(show, ShowJson.Options));
     }
 
+    /// <summary>Reads a single profile file. Throws on an unreadable file.</summary>
     public static FixtureProfile LoadProfile(string path)
     {
         var profile = JsonSerializer.Deserialize<FixtureProfile>(File.ReadAllText(path), ShowJson.Options)
@@ -85,9 +94,11 @@ public static class ShowStore
         return profile;
     }
 
+    /// <summary>Saves a single profile (atomic write).</summary>
     public static void SaveProfile(FixtureProfile profile, string path) =>
         WriteAtomic(path, JsonSerializer.Serialize(profile, ShowJson.Options));
 
+    /// <summary>Reads the settings of this PC (defaults when the file is missing or unreadable).</summary>
     public static AppSettings LoadAppSettings()
     {
         try
@@ -111,14 +122,16 @@ public static class ShowStore
         }
         catch (Exception)
         {
-            // Reglages illisibles : on repart des valeurs par defaut, ce n'est pas grave.
+            // Unreadable settings: start again from the default values, no big deal.
         }
         return new AppSettings();
     }
 
+    /// <summary>Saves the settings of this PC.</summary>
     public static void SaveAppSettings(AppSettings settings) =>
         WriteAtomic(AppSettingsPath, JsonSerializer.Serialize(settings, ShowJson.Options));
 
+    /// <summary>Writes to a temporary file, then replaces the target: a file is never left half written.</summary>
     private static void WriteAtomic(string path, string content)
     {
         string fullPath = Path.GetFullPath(path);
@@ -134,8 +147,8 @@ public static class ShowStore
     }
 
     /// <summary>
-    /// Repare ce qu'un fichier edite a la main pourrait laisser manquant (listes
-    /// absentes, Id vides...) pour que le reste du programme n'ait jamais de null.
+    /// Repairs what a hand-edited file could leave missing (missing lists, empty Ids...)
+    /// so that the rest of the program never gets a null.
     /// </summary>
     public static void Normalize(ShowConfig show)
     {
@@ -188,6 +201,7 @@ public static class ShowStore
         s.SoundDimmerRecoverySeconds = Math.Clamp(s.SoundDimmerRecoverySeconds, 0.2, 30);
     }
 
+    /// <summary>Fills what a hand-edited profile may be missing (name, channel names, lists).</summary>
     private static void NormalizeProfile(FixtureProfile profile)
     {
         profile.Id = string.IsNullOrWhiteSpace(profile.Id) ? FixtureProfile.NewId() : profile.Id;

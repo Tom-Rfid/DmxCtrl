@@ -1,25 +1,25 @@
 // =====================================================================================
 //  ShowEngine.cs
 // -------------------------------------------------------------------------------------
-//  Le MOTEUR DE SPECTACLE : il garde l'etat de la console et calcule, a chaque
-//  trame, l'univers DMX a envoyer. C'est lui que DmxLink interroge (IFrameSource)
-//  10 fois par seconde depuis son thread d'envoi.
+//  The SHOW ENGINE: it keeps the console state and computes, for each frame, the
+//  DMX universe to send. DmxLink queries it (IFrameSource) 10 times per second
+//  from its send thread.
 //
-//  ORDRE DES "COUCHES" pour chaque appareil, a chaque trame :
-//    1. valeurs du "programmeur" (curseurs des onglets d'appareil, couleurs, scenes)
-//    2. fondu entre l'ancienne et la nouvelle scene (canaux continus uniquement)
-//    3. effet de mouvement (cercle, huit...) autour de la position reglee
-//    4. chenillard de couleurs
-//    5. intensite : strobe logiciel -> master -> blackout ; le FLASH passe par-dessus tout,
-//       ainsi que les interrupteurs FLASH / STROBE de chaque appareil (onglet Soiree)
-//    5 bis. canal Fumee calcule par le moteur (manuel / coup / auto) ; laser eteint au blackout
-//    6. ecriture aux adresses du patch
-//  Si le MODE DEBUG est actif, tout ca est ignore et l'univers brut de l'onglet
-//  Debug est envoye tel quel.
+//  ORDER OF THE "LAYERS" for each fixture, on each frame:
+//    1. "programmer" values (sliders of the fixture tabs, colours, scenes)
+//    2. fade between the old and the new scene (continuous channels only)
+//    3. movement effect (circle, figure eight...) around the set position
+//    4. colour chase
+//    5. intensity: software strobe -> master -> blackout; FLASH goes above everything,
+//       as do the FLASH / STROBE switches of each fixture (Show tab)
+//    5 bis. Fog channel computed by the engine (manual / burst / auto); laser off on blackout
+//    6. writing at the patch addresses
+//  When DEBUG MODE is on, all this is ignored and the raw universe of the Debug tab
+//  is sent as is.
 //
-//  THREADS : l'IHM modifie l'etat, le thread d'envoi le lit. Tout passe par un
-//  verrou (_lock). Render() ne modifie quasiment rien (calculs fonction du temps),
-//  il peut donc aussi etre appele par l'IHM pour l'apercu quand on n'est pas connecte.
+//  THREADS: the UI changes the state, the send thread reads it. Everything goes
+//  through a lock (_lock). Render() changes almost nothing (computations depend on
+//  time), so the UI can also call it for the preview when not connected.
 // =====================================================================================
 
 using System.Diagnostics;
@@ -29,25 +29,26 @@ using DmxController.Core.Storage;
 
 namespace DmxController.Core.Engine;
 
-/// <summary>Resultat d'un clic sur une couleur : quels appareils ont pu l'afficher.</summary>
+/// <summary>Result of a click on a colour: which fixtures could show it.</summary>
 public sealed record ColorResult(IReadOnlyList<string> Applied, IReadOnlyList<string> Unsupported);
 
 /// <summary>
-/// Etat d'une machine a fumee vu par le logiciel. ATTENTION : le DMX ne va que dans un sens,
-/// la machine ne renvoie rien. "Prete" est une ESTIMATION a partir du temps de chauffe.
+/// State of a fog machine as seen by the software. WARNING: DMX only goes one way,
+/// the machine sends nothing back. "Ready" is an ESTIMATE from the warm-up time.
 /// </summary>
-/// <param name="Fogging">true si de la fumee est demandee en ce moment.</param>
-/// <param name="OutputPercent">Debit envoye en ce moment (0 = pas de fumee).</param>
-/// <param name="Auto">Mode auto actif.</param>
-/// <param name="Hold">Bouton "fumee" maintenu.</param>
-/// <param name="JetRemaining">Secondes restantes du jet en cours (coup ou cycle auto), 0 sinon.</param>
-/// <param name="NextJetIn">Mode auto, en pause : secondes avant le prochain jet. 0 sinon.</param>
-/// <param name="WarmupRemaining">null = heure d'allumage inconnue ; 0 = chauffe terminee (estimation) ; sinon secondes restantes.</param>
+/// <param name="Fogging">true when fog is requested right now.</param>
+/// <param name="OutputPercent">Output sent right now (0 = no fog).</param>
+/// <param name="Auto">Auto mode on.</param>
+/// <param name="Hold">"Fog" button held down.</param>
+/// <param name="JetRemaining">Seconds left of the current burst (manual burst or auto cycle), 0 otherwise.</param>
+/// <param name="NextJetIn">Auto mode, paused: seconds before the next burst. 0 otherwise.</param>
+/// <param name="WarmupRemaining">null = switch-on time unknown; 0 = warm-up done (estimate); otherwise seconds left.</param>
 public sealed record FogStatus(bool Fogging, int OutputPercent, bool Auto, bool Hold, double JetRemaining, double NextJetIn, double? WarmupRemaining);
 
+/// <summary>Show engine: console state and DMX universe computation for each frame (see the file header).</summary>
 public sealed class ShowEngine : IFrameSource
 {
-    /// <summary>Amplitude max des mouvements, en unites 16 bits : +/- 25 % de la course a 100 %.</summary>
+    /// <summary>Maximum amplitude of the movements, in 16-bit units: +/- 25 % of the travel at 100 %.</summary>
     public const double MaxMovementAmplitude16 = 16384;
 
     private readonly object _lock = new();
@@ -55,10 +56,10 @@ public sealed class ShowEngine : IFrameSource
 
     private ShowConfig _show = new();
 
-    // Programmeur : Id d'appareil -> valeurs de ses canaux (dans l'ordre du profil).
+    // Programmer: fixture Id -> values of its channels (in profile order).
     private readonly Dictionary<string, byte[]> _programmer = new();
 
-    // Fondu de scene en cours : valeurs de depart, instant de debut, duree.
+    // Scene fade in progress: start values, start time, length.
     private Dictionary<string, byte[]>? _fadeFrom;
     private double _fadeStart;
     private double _fadeDuration;
@@ -70,12 +71,13 @@ public sealed class ShowEngine : IFrameSource
     private bool _flash;
     private double _bpm = 120;
 
-    // Interrupteurs FLASH (maintenu) et STROBE (bascule) par appareil, onglet Soiree.
+    // FLASH (held) and STROBE (toggle) switches per fixture, Show tab.
     private readonly HashSet<string> _fixtureFlash = new();
     private readonly HashSet<string> _fixtureStrobe = new();
-    private int _strobeSpeed = 160; // 0 = lent .. 255 = rapide
+    private int _strobeSpeed = 160; // 0 = slow .. 255 = fast
 
-    // Machines a fumee : etat par Id d'appareil (non sauvegarde : tout repart a l'arret).
+    // Fog machines: state per fixture Id (not saved: everything starts stopped).
+    /// <summary>Runtime state of a fog machine (hold, burst end, auto start, switch-on time).</summary>
     private sealed class FogState
     {
         public bool Hold;
@@ -87,7 +89,8 @@ public sealed class ShowEngine : IFrameSource
 
     private readonly Dictionary<string, FogState> _fog = new();
 
-    // Effet gauche <-> droite des ailes (Spider) : nombre d'allers compte depuis Epoch.
+    // Left <-> right effect of the wings (Spider): number of swings counted since Epoch.
+    /// <summary>Runtime state of the left/right wing effect of one fixture.</summary>
     private sealed class WingSweepState
     {
         public double Epoch;
@@ -97,10 +100,10 @@ public sealed class ShowEngine : IFrameSource
 
     private readonly Dictionary<string, WingSweepState> _wingSweep = new();
 
-    // Effet au tempo des projecteurs (chenillard / pulsation) : meme compteur de pas.
+    // Beat effect of the fixtures (chase / pulse): same step counter.
     private readonly Dictionary<string, WingSweepState> _beatEffect = new();
 
-    // Dimmer qui suit le volume du micro.
+    // Dimmer following the microphone volume.
     private bool _soundDimmerEnabled;
     private double _soundDimmerFactor = 1;
 
@@ -108,14 +111,14 @@ public sealed class ShowEngine : IFrameSource
     private readonly byte[] _debugUniverse = DmxFrame.NewUniverse();
     private readonly byte[] _lastOutput = DmxFrame.NewUniverse();
 
-    // Pour que changer la vitesse ne fasse pas "sauter" les lyres, la phase des effets
-    // est recalee (rebase) a chaque modification : phase(t) = phaseAuRecalage + (t - instantDuRecalage) * vitesse.
+    // So that changing the speed does not make the moving heads "jump", the phase of the effects
+    // is rebased on every change: phase(t) = phaseAtRebase + (t - rebaseTime) * speed.
     private double _moveEpoch;
     private double _movePhaseAtEpoch;
     private double _chaseEpoch;
     private double _chaseStepAtEpoch;
 
-    /// <param name="clock">Horloge en secondes (injectable pour les tests). Par defaut : chronometre interne.</param>
+    /// <param name="clock">Clock in seconds (injectable for the tests). Default: internal stopwatch.</param>
     public ShowEngine(Func<double>? clock = null)
     {
         if (clock is null)
@@ -130,10 +133,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Chargement / structure
+    //  Loading / structure
     // =================================================================================
 
-    /// <summary>Charge une configuration et restaure son etat courant (LiveState).</summary>
+    /// <summary>Loads a configuration and restores its current state (LiveState).</summary>
     public void LoadShow(ShowConfig show)
     {
         lock (_lock)
@@ -176,9 +179,9 @@ public sealed class ShowEngine : IFrameSource
     }
 
     /// <summary>
-    /// Seul moyen sur de modifier la structure (patch, profils, presets...) pendant que
-    /// le thread d'envoi tourne : la modification se fait sous le verrou, puis le
-    /// programmeur est resynchronise (appareils ajoutes / supprimes / redimensionnes).
+    /// The only safe way to change the structure (patch, profiles, presets...) while the send
+    /// thread runs: the change is made under the lock, then the programmer is resynchronised
+    /// (fixtures added / removed / resized).
     /// </summary>
     public void EditShow(Action<ShowConfig> edit)
     {
@@ -189,6 +192,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>Brings the programmer in line with the patch: adds new fixtures, drops removed ones, resizes changed profiles.</summary>
     private void SyncPatchLocked()
     {
         var ids = new HashSet<string>();
@@ -234,9 +238,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Valeurs des appareils (programmeur)
+    //  Fixture values (programmer)
     // =================================================================================
 
+    /// <summary>Copy of the programmer values of a fixture (profile order); empty when unknown.</summary>
     public byte[] GetValues(string fixtureId)
     {
         lock (_lock)
@@ -245,6 +250,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>Sets one channel of a fixture in the programmer.</summary>
     public void SetValue(string fixtureId, int channelIndex, byte value)
     {
         lock (_lock)
@@ -256,6 +262,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>Every channel of the fixture back to its profile default.</summary>
     public void ResetToDefaults(string fixtureId)
     {
         lock (_lock)
@@ -268,7 +275,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Oriente une lyre avec des valeurs 16 bits (0..65535) : utilise par le pad XY.</summary>
+    /// <summary>Aims a moving head with 16-bit values (0..65535): used by the XY pad.</summary>
     public void SetPanTilt16(string fixtureId, int pan16, int tilt16)
     {
         lock (_lock)
@@ -284,9 +291,9 @@ public sealed class ShowEngine : IFrameSource
     }
 
     /// <summary>
-    /// Positionne les canaux "Moteur" d'un appareil (ex. les 2 ailes du Spider) : le 1er moteur
-    /// prend "position". Si mirror, un moteur sur deux prend la position symetrique (255 - position) :
-    /// les ailes partent de cotes opposes et reviennent ensemble au milieu.
+    /// Sets the "Motor" channels of a fixture (e.g. the 2 wings of the Spider): the 1st motor
+    /// takes "position". With mirror, every other motor takes the symmetrical position
+    /// (255 - position): the wings start from opposite sides and meet in the middle.
     /// </summary>
     public void SetMotors(string fixtureId, byte position, bool mirror)
     {
@@ -311,7 +318,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Fader d'un groupe de LED (voir LedGroups) : niveau en gardant les proportions.</summary>
+    /// <summary>Fader of an LED group (see LedGroups): level while keeping the ratios.</summary>
     public void SetGroupLevel(string fixtureId, int[] group, byte level, double[]? ratios)
     {
         lock (_lock)
@@ -324,7 +331,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Regle tous les canaux Dimmer d'un appareil.</summary>
+    /// <summary>Sets every Dimmer channel of a fixture.</summary>
     public void SetFixtureDimmer(string fixtureId, byte level)
     {
         lock (_lock)
@@ -344,7 +351,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Lit un axe (pan ou tilt) en 16 bits : coarse * 256 + fin (ou 128 sans canal fin).</summary>
+    /// <summary>Reads an axis (pan or tilt) in 16 bits: coarse * 256 + fine (or 128 without a fine channel).</summary>
     public static int GetAxis16(FixtureProfile profile, byte[] values, ChannelType coarse, ChannelType fine)
     {
         int ci = profile.IndexOf(coarse);
@@ -357,9 +364,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Selection et actions "console"
+    //  Selection and "console" actions
     // =================================================================================
 
+    /// <summary>Ids of the fixtures ticked in the Show tab.</summary>
     public IReadOnlyList<string> GetSelection()
     {
         lock (_lock)
@@ -368,6 +376,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>Sets the fixtures that colours and effects apply to.</summary>
     public void SetSelection(IEnumerable<string> fixtureIds)
     {
         lock (_lock)
@@ -383,8 +392,8 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Applique une couleur aux appareils selectionnes.</summary>
-    /// <param name="openDimmer">Si true, met le dimmer a fond quand il est a 0 (sinon on ne verrait rien).</param>
+    /// <summary>Applies a colour to the selected fixtures.</summary>
+    /// <param name="openDimmer">When true, sets the dimmer to full if it is at 0 (otherwise nothing would show).</param>
     public ColorResult ApplyColor(NamedColor color, bool openDimmer)
     {
         var applied = new List<string>();
@@ -426,7 +435,7 @@ public sealed class ShowEngine : IFrameSource
         return new ColorResult(applied, unsupported);
     }
 
-    /// <summary>Regle le dimmer des appareils selectionnes (0 = eteint, 255 = plein feu).</summary>
+    /// <summary>Sets the dimmer of the selected fixtures (0 = off, 255 = full on).</summary>
     public void SetDimmerForSelection(byte level)
     {
         lock (_lock)
@@ -452,7 +461,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Remet les lyres selectionnees au centre (pan/tilt a mi-course).</summary>
+    /// <summary>Puts the selected moving heads back in the centre (pan/tilt at mid-travel).</summary>
     public void CenterSelection()
     {
         lock (_lock)
@@ -470,9 +479,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Effets, master, blackout, flash, tempo, debug
+    //  Effects, master, blackout, flash, tempo, debug
     // =================================================================================
 
+    /// <summary>Copy of the current live effects (movement, chase, strobe).</summary>
     public LiveEffects GetEffects()
     {
         lock (_lock)
@@ -481,6 +491,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>Replaces the live effects; the effect phases are rebased so that nothing jumps.</summary>
     public void SetEffects(LiveEffects effects)
     {
         lock (_lock)
@@ -521,13 +532,14 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Mode debug : l'univers brut de l'onglet Debug remplace toute la sortie.</summary>
+    /// <summary>Debug mode: the raw universe of the Debug tab replaces the whole output.</summary>
     public bool DebugActive
     {
         get { lock (_lock) { return _debugActive; } }
         set { lock (_lock) { _debugActive = value; } }
     }
 
+    /// <summary>Raw universe used while debug mode is on (copied).</summary>
     public void SetDebugUniverse(byte[] universe)
     {
         lock (_lock)
@@ -536,7 +548,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Dernier univers calcule (pour le moniteur de sortie).</summary>
+    /// <summary>Last computed universe (for the output monitor).</summary>
     public byte[] GetLastOutput()
     {
         lock (_lock)
@@ -546,10 +558,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Flash / strobe par appareil (interrupteurs de l'onglet Soiree)
+    //  Flash / strobe per fixture (switches of the Show tab)
     // =================================================================================
 
-    /// <summary>Flash d'un appareil (tant que le bouton est maintenu) : plein feu, par-dessus master et blackout.</summary>
+    /// <summary>Flash of a fixture (while the button is held): full on, above master and blackout.</summary>
     public void SetFixtureFlash(string fixtureId, bool on)
     {
         lock (_lock)
@@ -566,9 +578,9 @@ public sealed class ShowEngine : IFrameSource
     }
 
     /// <summary>
-    /// Strobe d'un appareil (interrupteur) : strobe materiel de l'appareil s'il en a un
-    /// (obturateur de la lyre, canal strobe du Spider...), sinon strobe logiciel sur son dimmer.
-    /// Sans effet si l'appareil a "Pas de strobe".
+    /// Strobe of a fixture (switch): the fixture's hardware strobe when it has one (shutter of
+    /// the moving head, strobe channel of the Spider...), otherwise a software strobe on its dimmer.
+    /// No effect when the fixture has "No strobe".
     /// </summary>
     public void SetFixtureStrobe(string fixtureId, bool on)
     {
@@ -585,6 +597,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>true when the STROBE switch of the fixture is on.</summary>
     public bool IsFixtureStrobing(string fixtureId)
     {
         lock (_lock)
@@ -593,7 +606,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Vitesse des interrupteurs de strobe : 0 = lent, 255 = rapide.</summary>
+    /// <summary>Speed of the strobe switches: 0 = slow, 255 = fast.</summary>
     public int StrobeSpeed
     {
         get { lock (_lock) { return _strobeSpeed; } }
@@ -601,10 +614,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Effet gauche <-> droite des ailes (Spider)
+    //  Left <-> right effect of the wings (Spider)
     // =================================================================================
 
-    /// <summary>Demarre / arrete l'effet gauche-droite (commence par la gauche).</summary>
+    /// <summary>Starts / stops the left-right effect (starts on the left).</summary>
     public void SetWingSweep(string fixtureId, bool on)
     {
         lock (_lock)
@@ -620,6 +633,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>true when the left/right effect of the fixture is running.</summary>
     public bool IsWingSweeping(string fixtureId)
     {
         lock (_lock)
@@ -628,12 +642,12 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Duree d'un aller (gauche -> droite) : delai fixe, ou N temps au BPM si cale sur le tempo.</summary>
+    /// <summary>Length of one swing (left -> right): fixed delay, or N beats at the BPM when locked to the tempo.</summary>
     private double WingSweepDelayLocked(FixtureInstance fixture) => fixture.WingSweepSyncToBpm
         ? Math.Max(0.25, fixture.WingSweepBeats) * 60.0 / _bpm
         : Math.Max(0.2, fixture.WingSweepDelaySeconds);
 
-    /// <summary>Position (0..255) du 1er moteur : gauche pour un nombre d'allers pair, droite sinon.</summary>
+    /// <summary>Position (0..255) of the 1st motor: left for an even number of swings, right otherwise.</summary>
     public static byte WingSweepPosition(FixtureInstance fixture, double steps)
     {
         double half = 127.5 * Math.Clamp(fixture.WingSweepAmplitudePercent, 0, 100) / 100.0;
@@ -642,8 +656,8 @@ public sealed class ShowEngine : IFrameSource
     }
 
     /// <summary>
-    /// Ecrit la position de l'effet sur les moteurs (un sur deux en miroir si "Inverser"). Le compte
-    /// des allers est recale quand leur duree change (BPM du micro qui bouge) : pas de saut d'aile.
+    /// Writes the effect position to the motors (every other one mirrored with "Invert"). The swing
+    /// count is rebased when their length changes (moving mic BPM): no wing jump.
     /// </summary>
     private void ApplyWingSweepLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, double t)
     {
@@ -664,8 +678,8 @@ public sealed class ShowEngine : IFrameSource
     }
 
     /// <summary>
-    /// Nombre de pas ecoules (fractionnaire) pour un pas de duree "delay". Quand la duree change
-    /// (tempo du micro qui bouge), le compte est recale : l'effet continue sans sauter.
+    /// Number of elapsed steps (fractional) for a step lasting "delay". When the length changes
+    /// (moving mic tempo), the count is rebased: the effect goes on without jumping.
     /// </summary>
     private static double StepsLocked(WingSweepState state, double delay, double t)
     {
@@ -683,9 +697,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Effet au tempo des projecteurs (PAR) : chenillard des groupes de LED / pulsation
+    //  Beat effect of the fixtures (PAR): chase of the LED groups / pulse
     // =================================================================================
 
+    /// <summary>Starts / stops the beat effect of a fixture (the step count starts again).</summary>
     public void SetBeatEffect(string fixtureId, bool on)
     {
         lock (_lock)
@@ -701,6 +716,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>true when the beat effect of the fixture is running.</summary>
     public bool IsBeatEffectRunning(string fixtureId)
     {
         lock (_lock)
@@ -709,21 +725,21 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Duree d'un pas : delai fixe, ou N temps au BPM (saisi ou micro).</summary>
+    /// <summary>Length of a step: fixed delay, or N beats at the BPM (typed or from the mic).</summary>
     private double BeatStepLocked(FixtureInstance fixture) => fixture.BeatSyncToBpm
         ? Math.Max(0.25, fixture.BeatBeats) * 60.0 / _bpm
         : Math.Max(0.05, fixture.BeatDelaySeconds);
 
     /// <summary>
-    /// Chenillard : un groupe de LED (canal de couleur) allume a la fois, chacun son tour.
-    /// Pulsation : tout allume un pas, eteint le suivant. Un groupe ou un dimmer a 0 est allume a
-    /// fond pour que l'effet se voie ; master et blackout s'appliquent ensuite normalement.
+    /// Chase: one LED group (colour channel) on at a time, each in turn.
+    /// Pulse: everything on for one step, off for the next. A group or a dimmer at 0 is set to
+    /// full so that the effect shows; master and blackout then apply as usual.
     /// </summary>
     private void ApplyBeatEffectLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, double t)
     {
         if (!_beatEffect.TryGetValue(fixture.Id, out var state) || !profile.IsInManualMode(values))
         {
-            return; // pas d'effet si l'appareil joue un de ses programmes internes
+            return; // no effect while the fixture plays one of its internal programs
         }
         int[] groups = Enumerable.Range(0, Math.Min(values.Length, profile.ChannelCount))
             .Where(i => ChannelTypeInfo.IsColorMix(profile.Channels[i].Type))
@@ -750,17 +766,17 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Dimmer qui suit le volume (micro)
+    //  Dimmer following the volume (microphone)
     // =================================================================================
 
-    /// <summary>Case "le dimmer suit le volume" : l'intensite est multipliee par SoundDimmerFactor.</summary>
+    /// <summary>"Dimmer follows the volume" box: the intensity is multiplied by SoundDimmerFactor.</summary>
     public bool SoundDimmerEnabled
     {
         get { lock (_lock) { return _soundDimmerEnabled; } }
         set { lock (_lock) { _soundDimmerEnabled = value; } }
     }
 
-    /// <summary>Facteur 0..1 venant du micro (BeatDetector.DimmerFactor), pousse par l'IHM.</summary>
+    /// <summary>0..1 factor coming from the microphone (BeatDetector.DimmerFactor), pushed by the UI.</summary>
     public double SoundDimmerFactor
     {
         get { lock (_lock) { return _soundDimmerFactor; } }
@@ -768,10 +784,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Machines a fumee
+    //  Fog machines
     // =================================================================================
 
-    /// <summary>Bouton "Fumee" maintenu : fume tant que on = true.</summary>
+    /// <summary>"Fog" button held: fogs while on = true.</summary>
     public void SetFogHold(string fixtureId, bool on)
     {
         lock (_lock)
@@ -780,7 +796,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Un coup de fumee de la duree reglee (FogSettings.ShotSeconds), a partir de maintenant.</summary>
+    /// <summary>One fog burst of the set length (FogSettings.ShotSeconds), starting now.</summary>
     public void FogShot(string fixtureId)
     {
         lock (_lock)
@@ -793,7 +809,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Mode auto : un jet tout de suite, puis un jet toutes les (duree + delai) secondes.</summary>
+    /// <summary>Auto mode: a burst right away, then a burst every (length + delay) seconds.</summary>
     public void SetFogAuto(string fixtureId, bool on)
     {
         lock (_lock)
@@ -807,7 +823,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Arrete tout : bouton, coup en cours et mode auto.</summary>
+    /// <summary>Stops everything: button, running burst and auto mode.</summary>
     public void StopFog(string fixtureId)
     {
         lock (_lock)
@@ -819,7 +835,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>"Je viens d'allumer la machine" : demarre l'estimation du temps de chauffe.</summary>
+    /// <summary>"I just switched the machine on": starts the warm-up time estimate.</summary>
     public void MarkFogPoweredOn(string fixtureId)
     {
         lock (_lock)
@@ -828,6 +844,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>Fog status for the UI (fogging, output, auto, time left, warm-up estimate).</summary>
     public FogStatus GetFogStatus(string fixtureId)
     {
         lock (_lock)
@@ -850,7 +867,7 @@ public sealed class ShowEngine : IFrameSource
     //  Scenes
     // =================================================================================
 
-    /// <summary>Photographie l'etat courant (valeurs + effets + selection) dans une nouvelle scene.</summary>
+    /// <summary>Takes a snapshot of the current state (values + effects + selection) in a new scene.</summary>
     public Scene CaptureScene(string name)
     {
         lock (_lock)
@@ -869,7 +886,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Rappelle une scene, avec un fondu de "fadeSeconds" secondes sur les canaux continus.</summary>
+    /// <summary>Recalls a scene, with a fade of "fadeSeconds" seconds on the continuous channels.</summary>
     public void RecallScene(Scene scene, double fadeSeconds)
     {
         lock (_lock)
@@ -878,8 +895,8 @@ public sealed class ShowEngine : IFrameSource
 
             if (fadeSeconds > 0.01)
             {
-                // Point de depart du fondu = ce qui est REELLEMENT en sortie maintenant
-                // (y compris si un autre fondu etait deja en cours) : pas de saut.
+                // Starting point of the fade = what is REALLY on the output right now
+                // (even when another fade was already running): no jump.
                 double k = FadeFactorLocked(t);
                 var from = new Dictionary<string, byte[]>();
                 foreach (var fixture in _show.Fixtures)
@@ -926,9 +943,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Rendu d'une trame
+    //  Rendering a frame
     // =================================================================================
 
+    /// <summary>Computes the universe to send now (IFrameSource): debug universe, or every layer of every enabled fixture.</summary>
     public void Render(byte[] universe)
     {
         if (universe.Length < DmxFrame.UniverseSize + 1)
@@ -950,10 +968,10 @@ public sealed class ShowEngine : IFrameSource
             double fadeK = FadeFactorLocked(t);
             if (fadeK >= 1)
             {
-                _fadeFrom = null; // fondu termine
+                _fadeFrom = null; // fade finished
             }
 
-            // Appareils concernes par les effets, dans l'ordre du patch (pour repartir les phases).
+            // Fixtures affected by the effects, in patch order (to spread the phases).
             var movers = new List<string>();
             var chaseTargets = new List<string>();
             foreach (var fixture in _show.Fixtures)
@@ -994,26 +1012,26 @@ public sealed class ShowEngine : IFrameSource
                     continue;
                 }
 
-                // 1 + 2 : programmeur, avec le fondu de scene eventuel
+                // 1 + 2: programmer, with the scene fade if any
                 var values = BlendLocked(fixture.Id, profile, target, fadeK);
 
-                // 2 bis : effet gauche <-> droite des ailes (remplace la position des moteurs)
+                // 2 bis: left <-> right effect of the wings (replaces the motor positions)
                 ApplyWingSweepLocked(fixture, profile, values, t);
 
-                // 2 ter : effet au tempo des projecteurs (chenillard / pulsation)
+                // 2 ter: beat effect of the fixtures (chase / pulse)
                 ApplyBeatEffectLocked(fixture, profile, values, t);
                 bool selected = _selection.Contains(fixture.Id);
 
                 if (selected)
                 {
-                    // 3 : mouvement
+                    // 3: movement
                     int moverIndex = movers.IndexOf(fixture.Id);
                     if (_effects.Shape != MovementShape.None && moverIndex >= 0)
                     {
                         ApplyMovementLocked(fixture, profile, values, movePhase, moverIndex, movers.Count);
                     }
 
-                    // 4 : chenillard de couleurs
+                    // 4: colour chase
                     if (_effects.ColorChase && palette.Count > 0)
                     {
                         int index = chaseStep + (_effects.ColorChaseAlternate ? chaseTargets.IndexOf(fixture.Id) : 0);
@@ -1021,11 +1039,11 @@ public sealed class ShowEngine : IFrameSource
                     }
                 }
 
-                // 5 : intensite (strobe, master, blackout, flash, interrupteurs flash/strobe de l'appareil)
+                // 5: intensity (strobe, master, blackout, flash, flash/strobe switches of the fixture)
                 ApplyIntensityLocked(fixture, profile, values, selected && strobeDark, t);
                 if (fixture.NoStrobe)
                 {
-                    // Strobe desactive : tout canal qui strobe repasse en "fixe" (0, ou obturateur ouvert).
+                    // Strobe disabled: every strobing channel goes back to "fixed" (0, or open shutter).
                     for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
                     {
                         var channel = profile.Channels[i];
@@ -1036,12 +1054,12 @@ public sealed class ShowEngine : IFrameSource
                     }
                 }
 
-                // 5 bis : fumee (pilotee par le moteur) et securite laser
+                // 5 bis: fog (driven by the engine) and laser safety
                 ApplyFogLocked(fixture, profile, values, t);
                 ApplyLaserInvertLocked(fixture, profile, values);
                 ApplyLaserSafetyLocked(profile, values);
 
-                // 5 ter : masque de couleurs (en dernier : rien ne passe par-dessus)
+                // 5 ter: colour mask (last: nothing goes above it)
                 if (fixture.MutedColors.Count > 0)
                 {
                     for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
@@ -1053,7 +1071,7 @@ public sealed class ShowEngine : IFrameSource
                     }
                 }
 
-                // 6 : ecriture aux adresses du patch
+                // 6: writing at the patch addresses
                 for (int i = 0; i < values.Length; i++)
                 {
                     int channel = fixture.Address + i;
@@ -1069,9 +1087,10 @@ public sealed class ShowEngine : IFrameSource
     }
 
     // =================================================================================
-    //  Details de calcul (tous appeles sous _lock)
+    //  Computation details (all called under _lock)
     // =================================================================================
 
+    /// <summary>Profile and programmer values of a fixture (nulls when unknown).</summary>
     private (FixtureProfile? Profile, byte[]? Values) FindLocked(string fixtureId)
     {
         var fixture = _show.Fixtures.FirstOrDefault(f => f.Id == fixtureId);
@@ -1084,6 +1103,7 @@ public sealed class ShowEngine : IFrameSource
         return (profile, values);
     }
 
+    /// <summary>Fade progress at time <paramref name="t"/>: 0 = start, 1 = done (1 when no fade is running).</summary>
     private double FadeFactorLocked(double t)
     {
         if (_fadeFrom is null || _fadeDuration <= 0)
@@ -1093,6 +1113,7 @@ public sealed class ShowEngine : IFrameSource
         return Math.Clamp((t - _fadeStart) / _fadeDuration, 0, 1);
     }
 
+    /// <summary>Values during a scene fade: continuous channels interpolated, the others switched straight away.</summary>
     private byte[] BlendLocked(string fixtureId, FixtureProfile profile, byte[] target, double k)
     {
         var values = (byte[])target.Clone();
@@ -1109,13 +1130,14 @@ public sealed class ShowEngine : IFrameSource
             }
         }
 
-        // Pan/tilt 16 bits : on interpole la valeur combinee, sinon le canal fin
-        // ferait des allers-retours pendant le fondu.
+        // 16-bit pan/tilt: the combined value is interpolated, otherwise the fine channel
+        // would go back and forth during the fade.
         BlendAxis(profile, values, from, target, k, ChannelType.Pan, ChannelType.PanFine);
         BlendAxis(profile, values, from, target, k, ChannelType.Tilt, ChannelType.TiltFine);
         return values;
     }
 
+    /// <summary>Fades a pan or tilt axis on its combined 16-bit value (coarse + fine).</summary>
     private static void BlendAxis(FixtureProfile profile, byte[] values, byte[] from, byte[] target, double k,
         ChannelType coarse, ChannelType fine)
     {
@@ -1132,10 +1154,11 @@ public sealed class ShowEngine : IFrameSource
         values[fi] = (byte)(v & 0xFF);
     }
 
+    /// <summary>Adds the movement effect (circle, figure eight...) around the set position, with the phase offset of this fixture.</summary>
     private void ApplyMovementLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values,
         double phase, int index, int count)
     {
-        // Decalage de phase entre lyres : 100 % avec 2 lyres = une demi-periode (opposees).
+        // Phase offset between moving heads: 100 % with 2 heads = half a period (opposite).
         double offset = count > 1 ? Math.Clamp(_effects.SpreadPercent, 0, 100) / 100.0 * index / count : 0;
         double theta = 2 * Math.PI * (phase + offset);
         var (dx, dy) = ShapeOffset(_effects.Shape, theta);
@@ -1158,7 +1181,7 @@ public sealed class ShowEngine : IFrameSource
         OffsetAxis(profile, values, ChannelType.Tilt, ChannelType.TiltFine, dy * amplitude);
     }
 
-    /// <summary>Forme du mouvement : decalage normalise (-1..1) en pan (X) et tilt (Y).</summary>
+    /// <summary>Movement shape: normalised offset (-1..1) in pan (X) and tilt (Y).</summary>
     private static (double X, double Y) ShapeOffset(MovementShape shape, double theta) => shape switch
     {
         MovementShape.Circle => (Math.Cos(theta), Math.Sin(theta)),
@@ -1168,6 +1191,7 @@ public sealed class ShowEngine : IFrameSource
         _ => (0, 0),
     };
 
+    /// <summary>Shifts a 16-bit axis by <paramref name="offset"/> (-1..1 times the maximum amplitude).</summary>
     private static void OffsetAxis(FixtureProfile profile, byte[] values, ChannelType coarse, ChannelType fine, double offset)
     {
         int ci = profile.IndexOf(coarse);
@@ -1185,6 +1209,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>Writes a 16-bit value on a coarse channel and its fine channel (if any).</summary>
     private static void SetAxis(FixtureProfile profile, byte[] values, ChannelType coarse, ChannelType fine, int value16)
     {
         int ci = profile.IndexOf(coarse);
@@ -1202,18 +1227,18 @@ public sealed class ShowEngine : IFrameSource
     }
 
     /// <summary>
-    /// Intensite : sur le canal Dimmer s'il existe, sinon sur les canaux de couleur.
-    /// Flash (general ou de l'appareil) et strobe de l'appareil > blackout > master > strobe logiciel.
+    /// Intensity: on the Dimmer channel when there is one, otherwise on the colour channels.
+    /// Flash (global or per fixture) and fixture strobe > blackout > master > software strobe.
     /// </summary>
     private void ApplyIntensityLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, bool strobeDark, double t)
     {
         bool flash = _flash || _fixtureFlash.Contains(fixture.Id);
-        // Strobe de l'appareil : seulement en mode manuel (sinon il joue ses propres programmes).
+        // Fixture strobe: only in manual mode (otherwise it plays its own programs).
         bool fixtureStrobe = _fixtureStrobe.Contains(fixture.Id) && !fixture.NoStrobe && profile.IsInManualMode(values);
 
         if (flash || fixtureStrobe)
         {
-            // Plein feu, obturateur ouvert : par-dessus le master et le blackout.
+            // Full on, open shutter: above master and blackout.
             SetFullIntensity(profile, values);
             if (fixtureStrobe && !flash)
             {
@@ -1223,7 +1248,7 @@ public sealed class ShowEngine : IFrameSource
                 }
                 else if (Frac(t * StrobeHz(_strobeSpeed)) >= 0.5)
                 {
-                    SetIntensity(profile, values, 0); // strobe logiciel : phase eteinte
+                    SetIntensity(profile, values, 0); // software strobe: dark phase
                 }
             }
             return;
@@ -1253,7 +1278,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Dimmer a fond (ou couleurs a fond sans dimmer) et obturateur ouvert (sa valeur par defaut).</summary>
+    /// <summary>Dimmer at full (or colours at full without a dimmer) and shutter open (its default value).</summary>
     private static void SetFullIntensity(FixtureProfile profile, byte[] values)
     {
         SetIntensity(profile, values, 255);
@@ -1267,6 +1292,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
+    /// <summary>Writes an intensity on the Dimmer channels, or on the colour channels when there is no dimmer.</summary>
     private static void SetIntensity(FixtureProfile profile, byte[] values, byte level)
     {
         bool hasDimmer = profile.Has(ChannelType.Dimmer);
@@ -1280,7 +1306,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Ecrit la valeur de strobe (entre StrobeSlow et StrobeFast) sur les canaux qui en ont.</summary>
+    /// <summary>Writes the strobe value (between StrobeSlow and StrobeFast) on the channels that have one.</summary>
     private static void WriteHardwareStrobe(FixtureProfile profile, byte[] values, int speed)
     {
         for (int i = 0; i < values.Length && i < profile.ChannelCount; i++)
@@ -1293,10 +1319,10 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Strobe logiciel des interrupteurs : 1 a 5 flashs/s (limite par la cadence de 10 trames/s).</summary>
+    /// <summary>Software strobe of the switches: 1 to 5 flashes/s (limited by the rate of 10 frames/s).</summary>
     private static double StrobeHz(int speed) => 1 + 4 * Math.Clamp(speed, 0, 255) / 255.0;
 
-    /// <summary>Canal Fumee : debit choisi quand la machine doit fumer, 0 sinon (la valeur du programmeur est ignoree).</summary>
+    /// <summary>Fog channel: the chosen output while the machine must fog, 0 otherwise (the programmer value is ignored).</summary>
     private void ApplyFogLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values, double t)
     {
         if (!profile.IsFogMachine)
@@ -1316,8 +1342,8 @@ public sealed class ShowEngine : IFrameSource
     }
 
     /// <summary>
-    /// Fumee en ce moment ? Retourne aussi le temps restant du jet et, en auto, le temps avant
-    /// le prochain jet. Cycle auto : DurationSeconds de fumee puis DelaySeconds de pause.
+    /// Fogging right now? Also returns the time left of the burst and, in auto, the time before
+    /// the next burst. Auto cycle: DurationSeconds of fog, then DelaySeconds of pause.
     /// </summary>
     private static (bool Fogging, double JetRemaining, double NextJetIn) FogPhaseLocked(FogState state, FogSettings settings, double t)
     {
@@ -1340,6 +1366,7 @@ public sealed class ShowEngine : IFrameSource
         return (false, 0, 0);
     }
 
+    /// <summary>Fog state of a fixture (created on first use).</summary>
     private FogState FogLocked(string fixtureId)
     {
         if (!_fog.TryGetValue(fixtureId, out var state))
@@ -1351,12 +1378,8 @@ public sealed class ShowEngine : IFrameSource
     }
 
     /// <summary>
-    /// Laser : au blackout (ou master a 0), on repasse en mode DMX et on eteint le faisceau
-    /// (couleur 0 = blackout). Un laser ne doit jamais rester allume quand on a tout coupe.
-    /// </summary>
-    /// <summary>
-    /// Laser retourne (cases « Inverser X / Y » = InvertPan / InvertTilt) : position fixe 0-127
-    /// miroir (127 - v) et sens des mouvements echange (128-191 <-> 192-255).
+    /// Laser turned over ("Invert X / Y" boxes = InvertPan / InvertTilt): fixed position 0-127
+    /// mirrored (127 - v) and movement directions swapped (128-191 <-> 192-255).
     /// </summary>
     private static void ApplyLaserInvertLocked(FixtureInstance fixture, FixtureProfile profile, byte[] values)
     {
@@ -1374,7 +1397,7 @@ public sealed class ShowEngine : IFrameSource
         }
     }
 
-    /// <summary>Miroir d'une valeur d'axe laser : 0-127 -> 127-v ; 128-191 <-> 192-255.</summary>
+    /// <summary>Mirror of a laser axis value: 0-127 -> 127-v; 128-191 <-> 192-255.</summary>
     public static byte InvertLaserAxis(byte v) => v switch
     {
         <= 127 => (byte)(127 - v),
@@ -1382,6 +1405,7 @@ public sealed class ShowEngine : IFrameSource
         _ => (byte)(v - 64),
     };
 
+    /// <summary>Laser safety: on blackout (or master at 0), DMX mode and colour 0 (beam off). A laser must never stay on when everything is cut.</summary>
     private void ApplyLaserSafetyLocked(FixtureProfile profile, byte[] values)
     {
         if (!profile.IsLaser || !(_blackout || _master == 0))
@@ -1397,27 +1421,33 @@ public sealed class ShowEngine : IFrameSource
             }
             else if (channel.Type == ChannelType.LaserMode)
             {
-                // Plage "DMX (manuel)" si elle est connue, sinon 255 (dernier mode = DMX sur les Galactic).
+                // "DMX (manual)" range when it is known, otherwise 255 (last mode = DMX on the Galactic).
                 var dmx = channel.Ranges.LastOrDefault(r => TextKey.Normalize(r.Name).StartsWith("dmx"));
                 values[i] = dmx is not null ? dmx.At(0.5) : (byte)255;
             }
         }
     }
 
+    /// <summary>Modulo that is always positive.</summary>
     private static double Mod(double a, double n) => ((a % n) + n) % n;
 
+    /// <summary>Movement speed in cycles per second (fixed, or from the BPM).</summary>
     private double MoveCyclesPerSecond() => _effects.MovementSyncToBpm
         ? _bpm / 60.0 / Math.Max(0.25, _effects.BeatsPerCycle)
         : Math.Max(0, _effects.SpeedCyclesPerMinute) / 60.0;
 
+    /// <summary>Length of a chase step in seconds (fixed, or from the BPM).</summary>
     private double ChaseStepSeconds() => _effects.ColorChaseSyncToBpm
         ? 60.0 / _bpm * Math.Max(0.25, _effects.ColorChaseBeatsPerStep)
         : Math.Max(0.05, _effects.ColorChaseStepSeconds);
 
+    /// <summary>Movement phase (in cycles) at time <paramref name="t"/>.</summary>
     private double MovePhaseLocked(double t) => _movePhaseAtEpoch + (t - _moveEpoch) * MoveCyclesPerSecond();
 
+    /// <summary>Chase step (fractional) at time <paramref name="t"/>.</summary>
     private double ChaseStepLocked(double t) => _chaseStepAtEpoch + (t - _chaseEpoch) / ChaseStepSeconds();
 
+    /// <summary>Rebases the movement and chase phases at the current time (before a speed change).</summary>
     private void RebaseLocked()
     {
         double t = _clock();
@@ -1427,6 +1457,7 @@ public sealed class ShowEngine : IFrameSource
         _chaseEpoch = t;
     }
 
+    /// <summary>Values sized for the profile: saved values where present, profile defaults elsewhere.</summary>
     private static byte[] Fit(FixtureProfile profile, int[]? source)
     {
         var values = profile.DefaultValues();
@@ -1440,6 +1471,7 @@ public sealed class ShowEngine : IFrameSource
         return values;
     }
 
+    /// <summary>Values sized for the profile: copied values where present, profile defaults elsewhere.</summary>
     private static byte[] Fit(FixtureProfile profile, byte[] source)
     {
         var values = profile.DefaultValues();
@@ -1447,7 +1479,9 @@ public sealed class ShowEngine : IFrameSource
         return values;
     }
 
+    /// <summary>Fractional part.</summary>
     private static double Frac(double x) => x - Math.Floor(x);
 
+    /// <summary>Modulo that is always positive.</summary>
     private static int Mod(int a, int n) => ((a % n) + n) % n;
 }

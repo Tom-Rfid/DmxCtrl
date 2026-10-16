@@ -1,195 +1,216 @@
 // =====================================================================================
 //  ShowConfig.cs
 // -------------------------------------------------------------------------------------
-//  Une CONFIGURATION complete (un fichier *.dmxshow.json) = tout ce qu'il faut pour
-//  une soiree dans une salle donnee :
-//    - les profils (types d'appareils) utilises,
-//    - le patch (quels appareils, a quelle adresse),
-//    - les scenes enregistrees,
-//    - l'etat courant (pour retrouver la console comme on l'a laissee),
-//    - quelques reglages (BPM, master, cadence d'envoi...).
+//  A complete CONFIGURATION (one *.dmxshow.json file) = everything needed for a
+//  party in a given venue:
+//    - the profiles (kinds of fixtures) used,
+//    - the patch (which fixtures, at which address),
+//    - the saved scenes,
+//    - the current state (to find the console as it was left),
+//    - a few settings (BPM, master, send rate...).
 //
-//  Le fichier est autonome : on peut l'exporter, le copier sur une cle USB, en avoir
-//  un par salle ou par type de soiree, et l'ouvrir sur un autre PC.
+//  The file is self-contained: it can be exported, copied to a USB stick, there can
+//  be one per venue or per kind of party, and it can be opened on another PC.
 // =====================================================================================
 
 namespace DmxController.Core.Model;
 
-/// <summary>Un appareil branche : nom + profil + adresse DMX de depart.</summary>
+/// <summary>A connected fixture: name + profile + DMX start address.</summary>
 public sealed class FixtureInstance
 {
+    /// <summary>Unique id of the fixture (scenes refer to it).</summary>
     public string Id { get; set; } = FixtureProfile.NewId();
 
-    /// <summary>Nom affiche (titre de l'onglet), ex: "Lyre 1".</summary>
+    /// <summary>Displayed name (tab title), e.g. "Lyre 1".</summary>
     public string Name { get; set; } = "Appareil";
 
+    /// <summary>Id of the profile (kind of fixture).</summary>
     public string ProfileId { get; set; } = "";
 
-    /// <summary>Adresse DMX de depart, reglee aussi dans le menu de l'appareil (1 a 512).</summary>
+    /// <summary>DMX start address, also set in the fixture's menu (1 to 512).</summary>
     public int Address { get; set; } = 1;
 
-    /// <summary>Un appareil desactive garde sa place dans le patch mais n'envoie rien.</summary>
+    /// <summary>A disabled fixture keeps its place in the patch but sends nothing.</summary>
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// Inverse le sens des EFFETS de mouvement pour cet appareil (utile pour deux
-    /// lyres placees face a face, ou une lyre accrochee tete en bas).
+    /// Inverts the direction of the movement EFFECTS for this fixture (useful for two moving
+    /// heads facing each other, or a moving head hung upside down). Laser: inverts X.
     /// </summary>
     public bool InvertPan { get; set; }
 
+    /// <summary>Inverts the tilt of the movement effects (laser: inverts Y).</summary>
     public bool InvertTilt { get; set; }
 
     /// <summary>
-    /// Appareils a 2 moteurs (ailes du Spider) : le pad de l'onglet fait partir les ailes en
-    /// miroir (cotes opposes) au lieu de les faire bouger dans le meme sens.
+    /// Fixtures with 2 motors (Spider wings): the tab's pad moves the wings mirrored
+    /// (opposite sides) instead of moving them in the same direction.
     /// </summary>
     public bool MirrorMotors { get; set; }
 
     /// <summary>
-    /// "Pas de strobe" : les canaux de type Strobe de cet appareil sont forces a 0 a chaque
-    /// trame, meme si une scene ou un curseur demande un strobe.
+    /// "No strobe": the strobing channels of this fixture are forced to their fixed value on
+    /// every frame, even when a scene or a slider asks for a strobe.
     /// </summary>
     public bool NoStrobe { get; set; }
 
-    /// <summary>Valeur de strobe memorisee quand on desactive le strobe (case « Strobe ») : rendue en le reactivant.</summary>
+    /// <summary>Strobe value remembered when the strobe is disabled ("Strobe" box): given back when it is enabled again.</summary>
     public byte StrobeMemory { get; set; }
 
     /// <summary>
-    /// Masque de couleurs : les canaux de ces types (Red, Green, Blue, White...) sont forces a 0
-    /// en sortie, a chaque trame, quoi que demandent scenes, chenillard ou flash.
+    /// Colour mask: the channels of these types (Red, Green, Blue, White...) are forced to 0
+    /// on the output, on every frame, whatever scenes, chase or flash ask for.
     /// </summary>
     public List<ChannelType> MutedColors { get; set; } = new();
 
     /// <summary>
-    /// Effet "gauche <-> droite" des appareils a 2 moteurs (ailes du Spider) : les ailes vont a
-    /// gauche, attendent WingSweepDelaySeconds, vont a droite, attendent, etc. En miroir
-    /// (MirrorMotors), l'aile 2 fait le mouvement oppose.
+    /// "Left <-> right" effect of the fixtures with 2 motors (Spider wings): the wings go
+    /// left, wait WingSweepDelaySeconds, go right, wait, etc. Mirrored (MirrorMotors),
+    /// wing 2 makes the opposite move.
     /// </summary>
     public double WingSweepDelaySeconds { get; set; } = 2;
 
-    /// <summary>Amplitude de l'effet gauche/droite autour du milieu (100 % = toute la course 0-135°).</summary>
+    /// <summary>Amplitude of the left/right effect around the middle (100 % = the whole 0-135° travel).</summary>
     public int WingSweepAmplitudePercent { get; set; } = 100;
 
-    /// <summary>Effet gauche/droite cale sur le tempo (BPM, eventuellement detecte au micro).</summary>
+    /// <summary>Left/right effect locked to the tempo (BPM, possibly detected by the microphone).</summary>
     public bool WingSweepSyncToBpm { get; set; }
 
-    /// <summary>Nombre de temps pour un aller quand l'effet est cale sur le tempo.</summary>
+    /// <summary>Number of beats for one swing when the effect is locked to the tempo.</summary>
     public double WingSweepBeats { get; set; } = 2;
 
-    /// <summary>Effet au tempo des projecteurs (PAR...) : chenillard des groupes de LED ou pulsation.</summary>
+    /// <summary>Beat effect of the fixtures (PAR...): chase of the LED groups or pulse.</summary>
     public BeatEffectKind BeatEffect { get; set; } = BeatEffectKind.Chase;
 
-    /// <summary>Duree d'un pas de l'effet en mode "delai" (s).</summary>
+    /// <summary>Length of one effect step in "delay" mode (s).</summary>
     public double BeatDelaySeconds { get; set; } = 0.5;
 
-    /// <summary>Effet cale sur le tempo (BPM saisi ou micro) plutot que sur un delai fixe.</summary>
+    /// <summary>Effect locked to the tempo (typed BPM or microphone) rather than to a fixed delay.</summary>
     public bool BeatSyncToBpm { get; set; }
 
-    /// <summary>Nombre de temps par pas quand l'effet est cale sur le tempo.</summary>
+    /// <summary>Number of beats per step when the effect is locked to the tempo.</summary>
     public double BeatBeats { get; set; } = 1;
 
     /// <summary>
-    /// Case "Flash / strobe" du patch : l'appareil a ses interrupteurs FLASH et STROBE dans
-    /// l'onglet Soiree.
+    /// "Flash / strobe" box of the patch: the fixture has its FLASH and STROBE switches in
+    /// the Show tab.
     /// </summary>
     public bool Flash { get; set; } = true;
 
-    /// <summary>Reglages de la machine a fumee (utilises seulement si le profil a un canal Fumee).</summary>
+    /// <summary>Fog machine settings (used only when the profile has a Fog channel).</summary>
     public FogSettings Fog { get; set; } = new();
 
-    /// <summary>Dernier canal DMX occupe par cet appareil.</summary>
+    /// <summary>Last DMX channel used by this fixture.</summary>
     public int EndAddress(FixtureProfile? profile) => Address + Math.Max(1, profile?.ChannelCount ?? 1) - 1;
 }
 
-/// <summary>Effet au tempo d'un projecteur sans moteur.</summary>
+/// <summary>Beat effect of a fixture without motors.</summary>
 public enum BeatEffectKind
 {
-    /// <summary>Les groupes de LED (UV 1, 2, 3 ou R, V, B...) s'allument chacun leur tour.</summary>
+    /// <summary>The LED groups (UV 1, 2, 3 or R, G, B...) light up one after the other.</summary>
     Chase,
 
-    /// <summary>Tout s'allume puis s'eteint, un pas sur deux.</summary>
+    /// <summary>Everything lights up then goes dark, every other step.</summary>
     Pulse,
 }
 
 /// <summary>
-/// Reglages d'une machine a fumee. Le mode auto enchaine : fumee pendant DurationSeconds,
-/// puis pause pendant DelaySeconds, et recommence.
+/// Settings of a fog machine. Auto mode cycles: fog for DurationSeconds, then a pause
+/// of DelaySeconds, and again.
 /// </summary>
 public sealed class FogSettings
 {
-    /// <summary>Debit de fumee envoye (0..100 %).</summary>
+    /// <summary>Fog output sent (0..100 %).</summary>
     public int LevelPercent { get; set; } = 100;
 
-    /// <summary>Duree d'un jet de fumee en mode auto, en secondes.</summary>
+    /// <summary>Length of a fog burst in auto mode, in seconds.</summary>
     public double DurationSeconds { get; set; } = 5;
 
-    /// <summary>Duree du bouton « Coup » (jet manuel), en secondes : de 0,5 a <see cref="MaxShotSeconds"/>.</summary>
+    /// <summary>Length of the "Burst" button (manual burst), in seconds: from 0.5 to <see cref="MaxShotSeconds"/>.</summary>
     public double ShotSeconds { get; set; } = 3;
 
     public const double MaxShotSeconds = 5;
 
-    /// <summary>Mode auto : un jet toutes les N minutes (periode = duree du jet + pause), arrondi a la minute.</summary>
+    /// <summary>Auto mode: one burst every N minutes (period = burst length + pause), rounded to the minute.</summary>
     public int IntervalMinutes => (int)Math.Clamp(Math.Round((DurationSeconds + DelaySeconds) / 60.0), 1, 30);
 
-    /// <summary>Regle la pause pour avoir un jet toutes les <paramref name="minutes"/> minutes (1 a 30).</summary>
+    /// <summary>Sets the pause to get one burst every <paramref name="minutes"/> minutes (1 to 30).</summary>
     public void SetIntervalMinutes(int minutes) =>
         DelaySeconds = Math.Max(1, Math.Clamp(minutes, 1, 30) * 60 - DurationSeconds);
 
-    /// <summary>Pause entre deux jets en mode auto, en secondes.</summary>
+    /// <summary>Pause between two bursts in auto mode, in seconds.</summary>
     public double DelaySeconds { get; set; } = 60;
 
-    /// <summary>Temps de chauffe de la machine apres allumage (notice Ayra WSM02 : environ 6 min).</summary>
+    /// <summary>Warm-up time of the machine after switching on (Ayra WSM02 manual: about 6 min).</summary>
     public double WarmupMinutes { get; set; } = 6;
 }
 
-/// <summary>Reglages de la configuration (sauvegardes avec elle).</summary>
+/// <summary>Settings of the configuration (saved with it).</summary>
 public sealed class ShowSettings
 {
+    /// <summary>Tempo used by the effects locked to the BPM.</summary>
     public double Bpm { get; set; } = 120;
+    /// <summary>Master intensity (0..255).</summary>
     public int Master { get; set; } = 255;
+    /// <summary>Scene fade time in seconds.</summary>
     public double FadeSeconds { get; set; } = 1.0;
+    /// <summary>Auto mode: seconds between two scenes.</summary>
     public double AutoIntervalSeconds { get; set; } = 8;
+    /// <summary>Auto mode timed in beats (AutoBeats) instead of seconds.</summary>
     public bool AutoSyncToBpm { get; set; }
+    /// <summary>Auto mode: beats between two scenes (when timed on the BPM).</summary>
     public double AutoIntervalBeats { get; set; } = 16;
 
-    /// <summary>Intervalle entre deux trames envoyees au boitier (100 ms = appli d'origine).</summary>
+    /// <summary>Interval between two frames sent to the box (100 ms = original app).</summary>
     public int SendIntervalMs { get; set; } = 100;
 
+    /// <summary>Colour buttons open a dimmer that is at 0.</summary>
     public bool OpenDimmerOnColor { get; set; } = true;
 
-    /// <summary>Micro choisi (nom du peripherique Windows), null = micro par defaut.</summary>
+    /// <summary>Chosen microphone (Windows device name), null = default microphone.</summary>
     public string? MicrophoneName { get; set; }
 
-    /// <summary>Dimmer suivant le volume : duree de remontee quand la musique revient (s).</summary>
+    /// <summary>Dimmer following the volume: time to come back up when the music returns (s).</summary>
     public double SoundDimmerRecoverySeconds { get; set; } = 2;
 }
 
-/// <summary>Contenu complet d'un fichier de configuration.</summary>
+/// <summary>Complete content of a configuration file.</summary>
 public sealed class ShowConfig
 {
+    /// <summary>File format version (refuses files from a newer version).</summary>
     public int FormatVersion { get; set; } = 1;
+    /// <summary>Configuration name (title bar).</summary>
     public string Name { get; set; } = "Soirée";
+    /// <summary>Kinds of fixtures used.</summary>
     public List<FixtureProfile> Profiles { get; set; } = new();
+    /// <summary>Patch: the fixtures, in tab order.</summary>
     public List<FixtureInstance> Fixtures { get; set; } = new();
+    /// <summary>Saved scenes, in button order.</summary>
     public List<Scene> Scenes { get; set; } = new();
 
-    /// <summary>Etat de la console au moment de l'enregistrement (restaure a l'ouverture).</summary>
+    /// <summary>Console state when it was saved (restored when opening).</summary>
     public Scene LiveState { get; set; } = new() { Name = "État courant" };
 
+    /// <summary>Settings saved with the configuration.</summary>
     public ShowSettings Settings { get; set; } = new();
 
+    /// <summary>Profile with this id, or null.</summary>
     public FixtureProfile? FindProfile(string? id) => Profiles.FirstOrDefault(p => p.Id == id);
 }
 
 /// <summary>
-/// Reglages propres a CE PC (pas a une configuration) : dernier fichier ouvert,
-/// dernier port COM... Stockes dans %APPDATA%\DmxController\settings.json.
+/// Settings of THIS PC (not of a configuration): last file opened, last COM port,
+/// language... Stored in %APPDATA%\DmxController\settings.json.
 /// </summary>
 public sealed class AppSettings
 {
+    /// <summary>Last configuration file opened (reopened at start-up).</summary>
     public string? LastShowPath { get; set; }
+    /// <summary>Last COM port used.</summary>
     public string? LastPort { get; set; }
+    /// <summary>Connect to the box automatically at start-up.</summary>
     public bool AutoConnect { get; set; }
+    /// <summary>Recently opened configuration files (most recent first).</summary>
     public List<string> RecentShows { get; set; } = new();
 
     /// <summary>Interface language ("en" or "fr"). English by default for a new installation.</summary>

@@ -3,8 +3,8 @@ using System.Drawing.Drawing2D;
 namespace DmxController.UI;
 
 /// <summary>
-/// Mini dessin d'un motif du laser Galactic (approximation a l'oeil de ce que projette l'appareil).
-/// Les formes sont tracees dans un repere -1..1 (x vers la droite, y vers le bas).
+/// Small drawing of a pattern of the Galactic laser (approximation by eye of what the fixture projects).
+/// The shapes are drawn in a -1..1 frame (x to the right, y down).
 /// </summary>
 internal sealed class LaserPatternIcon : Control
 {
@@ -13,6 +13,7 @@ internal sealed class LaserPatternIcon : Control
 
     private readonly int _index;
 
+    /// <summary>Creates the drawing of pattern number <paramref name="index"/> + 1.</summary>
     public LaserPatternIcon(int index)
     {
         _index = index;
@@ -22,6 +23,7 @@ internal sealed class LaserPatternIcon : Control
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
     }
 
+    /// <summary>Dark background, then the pattern drawn in green in a -1..1 frame.</summary>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -35,9 +37,10 @@ internal sealed class LaserPatternIcon : Control
         g.Restore(state);
     }
 
+    /// <summary>Beam pen: plain or dotted (fine = denser dots).</summary>
     private static Pen Line(float width = 1.4f, bool dotted = false, bool fine = false)
     {
-        // Le repere est mis a l'echelle : on exprime l'epaisseur en "pixels" / echelle approximative.
+        // The frame is scaled: the width is given in "pixels" / approximate scale.
         var pen = new Pen(Beam, width / 10f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
         if (dotted)
         {
@@ -48,8 +51,10 @@ internal sealed class LaserPatternIcon : Control
         return pen;
     }
 
+    /// <summary>Short helper for a point.</summary>
     private static PointF P(float x, float y) => new(x, y);
 
+    /// <summary>Points of a sine wave at height <paramref name="y"/>, <paramref name="periods"/> periods wide.</summary>
     private static PointF[] Wave(float y, float amplitude, float periods, float from = -1f, float to = 1f)
     {
         var points = new PointF[33];
@@ -62,7 +67,7 @@ internal sealed class LaserPatternIcon : Control
         return points;
     }
 
-    /// <summary>Contour d'une croix creuse, tournee de <paramref name="turn"/> radians.</summary>
+    /// <summary>Outline of a hollow cross, rotated by <paramref name="turn"/> radians.</summary>
     private static PointF[] Cross(float turn)
     {
         const float a = 0.3f, b = 0.9f;
@@ -71,6 +76,7 @@ internal sealed class LaserPatternIcon : Control
         return pts.Select(q => P(q.X * c - q.Y * s, q.X * s + q.Y * c)).ToArray();
     }
 
+    /// <summary>Draws pattern <paramref name="index"/> + 1 (shapes noted by eye on the fixture).</summary>
     private static void Draw(Graphics g, int index)
     {
         using var pen = Line();
@@ -98,7 +104,7 @@ internal sealed class LaserPatternIcon : Control
                 g.DrawPolygon(pen, star);
                 break;
             }
-            case 9: g.DrawPolygon(pen, new[] { P(0.8f, -0.8f), P(-0.8f, -0.8f), P(-0.8f, 0.8f), P(-0.45f, 0.8f), P(-0.45f, -0.45f), P(0.8f, -0.45f) }); break; // L epais
+            case 9: g.DrawPolygon(pen, new[] { P(0.8f, -0.8f), P(-0.8f, -0.8f), P(-0.8f, 0.8f), P(-0.45f, 0.8f), P(-0.45f, -0.45f), P(0.8f, -0.45f) }); break; // thick L
             case 10: g.DrawPolygon(pen, new[] { P(-0.9f, -0.75f), P(0.9f, 0.75f), P(0.9f, -0.75f), P(-0.9f, 0.75f) }); break;
             case 11:
             {
@@ -129,7 +135,7 @@ internal sealed class LaserPatternIcon : Control
             case 17: g.DrawLines(pen, new[] { P(-0.95f, 0.7f), P(0, -0.75f), P(0.95f, 0.7f) }); break;
             case 18: g.DrawLines(pen, new[] { P(-0.9f, -0.7f), P(-0.45f, 0.7f), P(0, -0.3f), P(0.45f, 0.7f), P(0.9f, -0.7f) }); break;
             case 19:
-                // E dont la barre du milieu est un aller-retour creux, ouvert cote gauche.
+                // E whose middle bar is a hollow back-and-forth, open on the left.
                 g.DrawLines(pen, new[] { P(0.6f, -0.8f), P(-0.6f, -0.8f), P(-0.6f, -0.12f), P(0.45f, -0.12f), P(0.45f, 0.12f), P(-0.6f, 0.12f), P(-0.6f, 0.8f), P(0.6f, 0.8f) });
                 break;
             case 20: g.DrawLine(pen, -0.9f, 0, 0.9f, 0); break;
@@ -150,7 +156,7 @@ internal sealed class LaserPatternIcon : Control
                 g.DrawLine(pen, 0, -0.7f, 0.9f, -0.7f);
                 break;
             case 26:
-                // Cercle allume seulement en diagonale (NE, NO, SO, SE).
+                // Circle lit only on the diagonals (NE, NW, SW, SE).
                 foreach (int a in new[] { 45, 135, 225, 315 }) g.DrawArc(pen, -0.85f, -0.85f, 1.7f, 1.7f, a - 25, 50);
                 break;
             case 27:

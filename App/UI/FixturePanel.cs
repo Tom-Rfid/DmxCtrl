@@ -1,18 +1,17 @@
 // =====================================================================================
 //  FixturePanel.cs
 // -------------------------------------------------------------------------------------
-//  Onglet d'UN appareil, genere automatiquement a partir de son profil :
-//    - en-tete : nom, profil, plage d'adresses, avertissement si canaux non verifies
-//    - pad XY pour orienter la lyre (si le profil a pan/tilt)
-//    - pad "ailes" pour un appareil a 2 moteurs (Spider) : gauche/droite = position
-//      des 2 ailes, haut/bas = dimmer ; case "Inverser" = ailes en miroir
-//    - une ligne par canal : curseur 0-255, valeur, liste de presets,
-//      bouton "+" (enregistrer la valeur actuelle comme preset), case "OK" (verifie)
+//  Tab of ONE fixture, generated automatically from its profile:
+//    - header: name, profile, address range, warning if channels are unchecked
+//    - XY pad to aim the moving head (if the profile has pan/tilt)
+//    - "wings" pad for a fixture with 2 motors (Spider): left/right = position
+//      of both wings, up/down = dimmer; "Invert" box = mirrored wings
+//    - one row per channel: 0-255 slider, value, preset list,
+//      "+" button (save the current value as a preset), "OK" box (checked)
 //
-//  Le bouton "+" est la facon la plus simple de completer un profil sur place :
-//  on bouge le curseur de la roue de couleurs jusqu'au rouge, "+", on tape "Rouge"
-//  -> le bouton Rouge de l'onglet Soiree fonctionne alors pour toutes les lyres
-//  de ce modele.
+//  The "+" button is the simplest way to complete a profile on site: move the
+//  colour wheel slider to red, "+", type "Rouge" -> the Red button of the Show
+//  tab then works for every moving head of this model.
 // =====================================================================================
 
 using System.ComponentModel;
@@ -21,11 +20,14 @@ using DmxController.Core.Model;
 
 namespace DmxController.UI;
 
+/// <summary>Generic tab of one fixture (moving head, Spider, PAR...), built from its profile.</summary>
 [DesignerCategory("Code")]
 internal sealed class FixturePanel : UserControl
 {
+    /// <summary>Item of a preset list: name and value.</summary>
     private sealed record PresetItem(string Name, byte Value)
     {
+        /// <summary>Text shown in the list: translated name and value.</summary>
         public override string ToString() => $"{Tr.T(Name)} ({Value})";
     }
 
@@ -35,7 +37,7 @@ internal sealed class FixturePanel : UserControl
     private readonly FixtureInstance _fixture;
     private readonly FixtureProfile _profile;
     private readonly TrackBar[] _sliders;
-    private readonly NumericUpDown[] _values; // valeur saisissable (et boutons + / -) a cote de chaque barre
+    private readonly NumericUpDown[] _values; // editable value (and + / - buttons) next to each slider
     private readonly Label[] _names;
     private readonly ComboBox[] _presets;
     private readonly CheckBox[] _verified;
@@ -43,47 +45,48 @@ internal sealed class FixturePanel : UserControl
     private readonly XYPad? _wings;
     private readonly CheckBox? _mirrorWings;
     private readonly Label? _wingsInfo;
-    private readonly int[] _motors;   // index des canaux Moteur dans le profil
-    private readonly int _dimmer;     // index du canal Dimmer (-1 si aucun)
+    private readonly int[] _motors;   // indexes of the Motor channels in the profile
+    private readonly int _dimmer;     // index of the Dimmer channel (-1 if none)
 
-    // Faders "LED gauche / droite" (appareils a ailes) : groupes de canaux de couleur, et
-    // memoire des proportions de chaque groupe pour retrouver la couleur apres un passage a 0.
+    // "Left / right LED" faders (fixtures with wings): groups of colour channels, and the
+    // remembered ratios of each group to get the colour back after going through 0.
     private readonly VerticalFader? _ledLeft;
     private readonly VerticalFader? _ledRight;
     private readonly int[] _groupLeft = Array.Empty<int>();
     private readonly int[] _groupRight = Array.Empty<int>();
     private readonly double[]?[] _groupRatios = new double[]?[2];
 
-    private readonly CheckBox? _strobeOn; // case « Strobe » (actif / desactive), si un canal sait strober
+    private readonly CheckBox? _strobeOn; // "Strobe" box (enabled / disabled), when a channel can strobe
     private readonly int _strobeIndex = -1;
 
-    // Effet gauche <-> droite des ailes (appareils a 2 moteurs)
+    // Left <-> right effect of the wings (fixtures with 2 motors)
     private readonly CheckBox? _sweep;
     private readonly NumericUpDown? _sweepDelay;
     private readonly NumericUpDown? _sweepAmplitude;
     private readonly CheckBox? _sweepSync;
     private readonly NumericUpDown? _sweepBeats;
-    private readonly CheckBox? _micListen;   // ecouter le micro (partage avec l'onglet Soiree)
+    private readonly CheckBox? _micListen;   // listen to the microphone (shared with the Show tab)
     private readonly Label? _micBpm;
-    private readonly CheckBox? _micFollow;   // mode "tempo du micro"
-    private readonly CheckBox? _modeDelay;   // mode "delai en secondes"
-    private readonly NumericUpDown? _bpmBox; // mode "tempo en BPM" (= BPM de l'onglet Soiree)
+    private readonly CheckBox? _micFollow;   // "mic tempo" mode
+    private readonly CheckBox? _modeDelay;   // "delay in seconds" mode
+    private readonly NumericUpDown? _bpmBox; // "tempo in BPM" mode (= BPM of the Show tab)
     private bool _micUpdating;
 
+    /// <summary>Rate source of the left/right effect: fixed delay, typed BPM or microphone tempo.</summary>
     private enum SweepMode { Delay, Bpm, Mic }
 
-    // Masque de couleurs (All, R, G, B, White) : cases cochees = couleurs autorisees en sortie.
+    // Colour mask (All, R, G, B, White): ticked boxes = colours allowed on output.
     private readonly CheckBox? _maskAll;
     private readonly List<CheckBox> _maskBoxes = new();
     private bool _maskUpdating;
     private readonly Label _warning = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 6, 3, 3) };
     private readonly ToolTip _tips = new();
     private bool _updating;
-    private bool _numberUpdating; // case numerique mise a jour par le code (pas par l'utilisateur)
-    private readonly BeatEffectBlock? _beatBlock; // effet au tempo (projecteurs sans moteur)
-    private readonly GroupLevelPad? _groupPad;    // graphique des groupes A, B, C, Tous
+    private bool _numberUpdating; // numeric box updated by code (not by the user)
+    private readonly BeatEffectBlock? _beatBlock; // beat effect (fixtures without motors)
+    private readonly GroupLevelPad? _groupPad;    // chart of groups A, B, C, All
 
-    // Bandeau affiche quand l'appareil joue un programme interne (canal Mode hors "Manuel").
+    // Banner shown while the fixture plays an internal program (Mode channel not on "Manual").
     private readonly Label _modeLock = new()
     {
         Text = Tr.T("Mode programme interne : dimmer, groupes, strobe et effet au tempo sont inactifs. ") +
@@ -95,10 +98,11 @@ internal sealed class FixturePanel : UserControl
         Visible = false,
         Margin = new Padding(3, 4, 3, 4),
     };
-    private readonly VerticalFader? _groupsFader; // les 3 groupes ensemble
-    private readonly int[] _groups = Array.Empty<int>(); // index des canaux de groupes de LED
+    private readonly VerticalFader? _groupsFader; // the 3 groups together
+    private readonly int[] _groups = Array.Empty<int>(); // indexes of the LED group channels
     private double[]? _groupsRatios;
 
+    /// <summary>Builds the tab of <paramref name="fixture"/>: header, pads, effect blocks and one row per channel.</summary>
     public FixturePanel(ShowContext ctx, FixtureInstance fixture, FixtureProfile profile)
     {
         _ctx = ctx;
@@ -116,7 +120,7 @@ internal sealed class FixturePanel : UserControl
         _motors = Enumerable.Range(0, count).Where(i => profile.Channels[i].Type == ChannelType.Motor).ToArray();
         _dimmer = profile.IndexOf(ChannelType.Dimmer);
 
-        // ---------------- En-tete ----------------
+        // ---------------- Header ----------------
         var header = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
@@ -148,7 +152,7 @@ internal sealed class FixturePanel : UserControl
             });
         }
 
-        // ---------------- Pad XY (lyres) ----------------
+        // ---------------- XY pad (moving heads) ----------------
         Panel? left = null;
         if (profile.CanMove)
         {
@@ -177,8 +181,8 @@ internal sealed class FixturePanel : UserControl
         }
         else if (_motors.Length >= 2)
         {
-            // Appareil a 2 moteurs (ailes du Spider) : X = position des ailes, Y = dimmer (haut = 100 %),
-            // et a droite du pad, un fader vertical par aile pour ses LED.
+            // Fixture with 2 motors (Spider wings): X = wing position, Y = dimmer (top = 100 %),
+            // and right of the pad, one vertical fader per wing for its LEDs.
             left = new Panel { Dock = DockStyle.Left, Width = 400, Padding = new Padding(10), AutoScroll = true };
 
             (_groupLeft, _groupRight) = LedGroups.Split(profile);
@@ -226,13 +230,13 @@ internal sealed class FixturePanel : UserControl
             _tips.SetToolTip(_wings, Tr.T("Gauche / droite : les 2 ailes (opposées avec « Inverser »). Haut / bas : dimmer."));
             left.Controls.AddRange(new Control[] { _wings, _mirrorWings, center, reset, _wingsInfo });
 
-            // Masque de couleurs : une couleur decochee est forcee a 0 en sortie DMX, quoi qu'il arrive.
+            // Colour mask: an unticked colour is forced to 0 on the DMX output, whatever happens.
             var maskRow = new FlowLayoutPanel
             {
                 Location = new Point(9, 210),
                 Size = new Size(265, 26),
                 AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink, // sinon il garde 100 px de haut et cache la suite
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, // otherwise it stays 100 px high and hides what follows
                 WrapContents = false,
                 Margin = new Padding(0),
             };
@@ -260,9 +264,9 @@ internal sealed class FixturePanel : UserControl
             _tips.SetToolTip(_maskAll, Tr.T("Coche / décoche toutes les couleurs."));
             left.Controls.Add(maskRow);
 
-            // Effet automatique gauche <-> droite avec un delai (suit la case "Inverser").
-            // Tableau (et non positions fixes) : les libelles prennent la place qu'il leur faut,
-            // meme avec la mise a l'echelle de Windows (125 %, 150 %...).
+            // Automatic left <-> right effect with a delay (follows the "Invert" box).
+            // A table (not fixed positions): labels take the room they need, even with
+            // Windows display scaling (125 %, 150 %...).
             _sweep = new CheckBox
             {
                 Text = Tr.T("Effet gauche ↔ droite"),
@@ -275,7 +279,7 @@ internal sealed class FixturePanel : UserControl
             _sweep.CheckedChanged += (_, _) => OnSweepToggled();
             _sweepDelay = new NumericUpDown { Minimum = 0.2m, Maximum = 60, DecimalPlaces = 1, Increment = 0.1m, Width = 70 };
             _sweepAmplitude = new NumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Width = 70 };
-            // 3 modes qui s'excluent : delai fixe (s), tempo saisi en BPM, tempo detecte au micro.
+            // 3 mutually exclusive modes: fixed delay (s), tempo typed in BPM, tempo detected by the mic.
             _modeDelay = new CheckBox { Text = Tr.T("Délai"), AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
             _sweepSync = new CheckBox { Text = Tr.T("Tempo"), AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
             _bpmBox = new NumericUpDown { Minimum = 30, Maximum = 300, DecimalPlaces = 1, Increment = 1, Width = 70 };
@@ -291,7 +295,7 @@ internal sealed class FixturePanel : UserControl
             _sweepSync.CheckedChanged += (_, _) => OnModeChecked(SweepMode.Bpm, _sweepSync);
             _bpmBox.ValueChanged += (_, _) => OnBpmTyped();
 
-            // Micro : meme micro que l'onglet Soiree (_ctx.Mic).
+            // Microphone: the same one as the Show tab (_ctx.Mic).
             _micListen = new CheckBox
             {
                 Text = Tr.T("Micro"),
@@ -360,12 +364,12 @@ internal sealed class FixturePanel : UserControl
             header.Controls.Add(reset);
             header.Controls.Add(_modeLock);
 
-            // Projecteur a plusieurs groupes de LED (PAR UV, PAR RGB...) : effet au tempo a gauche.
+            // Fixture with several LED groups (UV PAR, RGB PAR...): beat effect on the left.
             if (profile.Channels.Count(c => ChannelTypeInfo.IsColorMix(c.Type)) >= 2)
             {
                 left = new Panel { Dock = DockStyle.Left, Width = 330, Padding = new Padding(10), AutoScroll = true };
 
-                // Graphique des groupes (A, B, C, Tous) + fader des 3 groupes ensemble + TOUT COUPER.
+                // Group chart (A, B, C, All) + fader for the 3 groups together + ALL OFF.
                 _groups = Enumerable.Range(0, count).Where(i => ChannelTypeInfo.IsColorMix(profile.Channels[i].Type)).ToArray();
                 _groupPad = new GroupLevelPad
                 {
@@ -397,7 +401,7 @@ internal sealed class FixturePanel : UserControl
             }
         }
 
-        // ---------------- Une ligne par canal ----------------
+        // ---------------- One row per channel ----------------
         var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
         var table = new TableLayoutPanel
         {
@@ -414,14 +418,14 @@ internal sealed class FixturePanel : UserControl
 
         for (int i = 0; i < count; i++)
         {
-            int index = i; // capture pour les lambdas
+            int index = i; // captured for the lambdas
             var channel = profile.Channels[i];
 
             _names[i] = new Label { AutoSize = true, MinimumSize = new Size(260, 0), Anchor = AnchorStyles.Left, Margin = new Padding(3, 6, 3, 3) };
             _tips.SetToolTip(_names[i], $"{ChannelTypeInfo.DisplayName(channel.Type)}" +
                                         (string.IsNullOrWhiteSpace(channel.Notes) ? "" : $"\n{Tr.T(channel.Notes)}"));
 
-            _sliders[i] = Ui.Slider(0, 255, left is null ? 330 : 230); // plus etroit si un pad occupe la gauche
+            _sliders[i] = Ui.Slider(0, 255, left is null ? 330 : 230); // narrower when a pad uses the left side
             _sliders[i].ValueChanged += (_, _) => OnSlider(index);
 
             _values[i] = new NumericUpDown { Minimum = 0, Maximum = 255, Width = 58, Margin = new Padding(3, 4, 3, 3) }; _values[i].ValueChanged += (_, _) => OnNumberTyped(index);
@@ -445,8 +449,8 @@ internal sealed class FixturePanel : UserControl
             table.Controls.Add(add, 4, i);
             table.Controls.Add(_verified[i], 5, i);
 
-            // A cote du (premier) canal qui sait strober (canal Strobe, obturateur de la 260X...) :
-            // case « Strobe » (actif / desactive avec memoire de la valeur) + bouton « Strobe 0 ».
+            // Next to the (first) channel that can strobe (Strobe channel, shutter of the 260X...):
+            // "Strobe" box (enabled / disabled, remembering the value) + "Strobe 0" button.
             if (channel.IsStrobeCapable && _strobeOn is null)
             {
                 _strobeIndex = i;
@@ -471,7 +475,7 @@ internal sealed class FixturePanel : UserControl
         }
         scroll.Controls.Add(table);
 
-        // Ordre d'ajout : la zone "Fill" en premier, les bords ensuite.
+        // Order of adding: the "Fill" area first, then the edges.
         Controls.Add(scroll);
         if (left is not null)
         {
@@ -486,9 +490,10 @@ internal sealed class FixturePanel : UserControl
         RefreshFromEngine();
     }
 
+    /// <summary>Id of the fixture shown by this tab.</summary>
     public string FixtureId => _fixture.Id;
 
-    /// <summary>Recopie les valeurs du moteur dans les curseurs (apres un rappel de scene, une couleur...).</summary>
+    /// <summary>Copies the engine values into the sliders (after a scene recall, a colour...).</summary>
     public void RefreshFromEngine()
     {
         if (IsDisposed)
@@ -512,11 +517,11 @@ internal sealed class FixturePanel : UserControl
         {
             _updating = false;
         }
-        UpdateMicUi(); // BPM de l'effet (tap tempo de l'onglet Soiree...)
+        UpdateMicUi(); // effect BPM (tap tempo of the Show tab...)
         _beatBlock?.UpdateUi();
     }
 
-    /// <summary>Met a jour presets, cases "OK", libelles "(?)" et avertissement.</summary>
+    /// <summary>Refreshes presets, "OK" boxes, "(?)" labels and the warning.</summary>
     public void RefreshProfileDetails()
     {
         if (IsDisposed)
@@ -558,7 +563,7 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
-    /// <summary>Graphique : colonne d'un groupe -> ce groupe ; derniere colonne -> les 3 au meme niveau.</summary>
+    /// <summary>Chart: column of a group -> that group; last column -> all 3 at the same level.</summary>
     private void OnGroupPad(int column, byte level)
     {
         OpenDimmerIfClosed();
@@ -576,7 +581,7 @@ internal sealed class FixturePanel : UserControl
         RefreshFromEngine();
     }
 
-    /// <summary>Fader "3 groupes" : niveau commun en gardant les proportions entre groupes.</summary>
+    /// <summary>"3 groups" fader: common level, keeping the ratios between groups.</summary>
     private void OnGroupsFader()
     {
         if (_updating || _groupsFader is null)
@@ -588,7 +593,7 @@ internal sealed class FixturePanel : UserControl
         RefreshFromEngine();
     }
 
-    /// <summary>Le dimmer general doit etre ouvert, sinon regler un groupe ne se verrait pas.</summary>
+    /// <summary>The master dimmer must be open, otherwise setting a group would show nothing.</summary>
     private void OpenDimmerIfClosed()
     {
         byte[] values = _ctx.Engine.GetValues(_fixture.Id);
@@ -599,9 +604,9 @@ internal sealed class FixturePanel : UserControl
     }
 
     /// <summary>
-    /// Mode de l'appareil (canal Mode) : hors « Manuel », il joue ses programmes internes et ignore
-    /// dimmer, groupes et strobe -> ces reglages, le graphique et l'effet au tempo sont grises
-    /// (et l'effet arrete). Le canal Mode (avec ses presets) et la vitesse restent utilisables.
+    /// Fixture mode (Mode channel): outside "Manual" it plays its internal programs and ignores
+    /// dimmer, groups and strobe -> these settings, the chart and the beat effect are greyed out
+    /// (and the effect is stopped). The Mode channel (with its presets) and the speed stay usable.
     /// </summary>
     private void UpdateManualLock(byte[] values)
     {
@@ -622,7 +627,7 @@ internal sealed class FixturePanel : UserControl
         }
         if (_strobeOn?.Parent is Control strobeRow)
         {
-            strobeRow.Enabled = manual; // case « Strobe » + bouton « Strobe 0 »
+            strobeRow.Enabled = manual; // "Strobe" box + "Strobe 0" button
         }
         if (_groupPad is not null && _groupsFader is not null)
         {
@@ -633,21 +638,21 @@ internal sealed class FixturePanel : UserControl
         {
             if (!manual && _beatBlock.Enabled)
             {
-                _beatBlock.Stop(); // un programme interne remplace l'effet
+                _beatBlock.Stop(); // an internal program replaces the effect
             }
             _beatBlock.Enabled = manual;
         }
         _modeLock.Visible = !manual;
     }
 
-    /// <summary>TOUT COUPER : effet au tempo arrete, mode manuel, dimmer, groupes et strobe a 0.</summary>
+    /// <summary>ALL OFF: beat effect stopped, manual mode, dimmer, groups and strobe at 0.</summary>
     private void CutAll()
     {
         _beatBlock?.Stop();
         _ctx.Engine.SetFixtureStrobe(_fixture.Id, false);
         if (_profile.ManualModeRange() is { } mode)
         {
-            _ctx.Engine.SetValue(_fixture.Id, mode.Index, mode.Manual.From); // arrete les programmes internes
+            _ctx.Engine.SetValue(_fixture.Id, mode.Index, mode.Manual.From); // stops the internal programs
         }
         for (int i = 0; i < _profile.ChannelCount; i++)
         {
@@ -661,7 +666,7 @@ internal sealed class FixturePanel : UserControl
         _ctx.Status(Tr.F("{0} : tout coupé.", _fixture.Name));
     }
 
-    /// <summary>Graphique et fader des groupes recales sur les valeurs actuelles.</summary>
+    /// <summary>Group chart and fader realigned on the current values.</summary>
     private void SyncGroups(byte[] values)
     {
         if (_groupPad is null || _groupsFader is null || !_groups.All(i => i < values.Length))
@@ -672,11 +677,11 @@ internal sealed class FixturePanel : UserControl
         _groupsFader.Value = LedGroups.Level(values, _groups);
         if (LedGroups.Level(values, _groups) >= 32)
         {
-            _groupsRatios = LedGroups.Ratios(values, _groups); // proportions memorisees (voir RememberRatios)
+            _groupsRatios = LedGroups.Ratios(values, _groups); // remembered ratios (see RememberRatios)
         }
     }
 
-    /// <summary>Affiche une valeur dans la case numerique sans relancer d'evenement.</summary>
+    /// <summary>Shows a value in the numeric box without raising an event again.</summary>
     private void ShowNumber(int index, byte value)
     {
         _numberUpdating = true;
@@ -690,7 +695,7 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
-    /// <summary>Valeur tapee (ou + / -) : la barre suit, et c'est elle qui envoie au moteur.</summary>
+    /// <summary>Typed value (or + / -): the slider follows, and the slider is what sends it to the engine.</summary>
     private void OnNumberTyped(int index)
     {
         if (_numberUpdating || _updating)
@@ -700,6 +705,7 @@ internal sealed class FixturePanel : UserControl
         _sliders[index].Value = (int)_values[index].Value; // -> OnSlider
     }
 
+    /// <summary>A channel slider moved: sends the value to the engine and updates the related controls (pads, presets, strobe box).</summary>
     private void OnSlider(int index)
     {
         if (_updating)
@@ -717,11 +723,11 @@ internal sealed class FixturePanel : UserControl
         if (type is ChannelType.Pan or ChannelType.PanFine or ChannelType.Tilt or ChannelType.TiltFine
             or ChannelType.Motor or ChannelType.Dimmer or ChannelType.Macro || ChannelTypeInfo.IsColorMix(type))
         {
-            SyncPads(_ctx.Engine.GetValues(_fixture.Id)); // Macro : mode manuel / programme -> grise ou non
+            SyncPads(_ctx.Engine.GetValues(_fixture.Id)); // Macro: manual mode / program -> greyed out or not
         }
     }
 
-    /// <summary>Recale les pads (lyre et ailes) sur les valeurs actuelles des canaux.</summary>
+    /// <summary>Realigns the pads (moving head and wings) on the current channel values.</summary>
     private void SyncPads(byte[] values)
     {
         SyncGroups(values);
@@ -739,7 +745,7 @@ internal sealed class FixturePanel : UserControl
             _wings.ValueX = wing1 * 257; // 0..255 -> 0..65535
             if (_dimmer >= 0 && _dimmer < values.Length)
             {
-                _wings.ValueY = (255 - values[_dimmer]) * 257; // haut du pad = dimmer a fond
+                _wings.ValueY = (255 - values[_dimmer]) * 257; // top of the pad = dimmer full
             }
             _wingsInfo.Text = Tr.F("Aile 1 : {0}°   Aile 2 : {1}°", Degrees(wing1), Degrees(wing2)) +
                               (_dimmer >= 0 && _dimmer < values.Length ? Tr.F("   Dimmer : {0} %", (values[_dimmer] * 100 / 255)) : "");
@@ -755,8 +761,8 @@ internal sealed class FixturePanel : UserControl
     }
 
     /// <summary>
-    /// Memorise les proportions d'un groupe de LED tant qu'elles sont assez lumineuses pour etre
-    /// precises : ainsi, une aile rouge descendue a 0 puis remontee redevient rouge.
+    /// Remembers the ratios of an LED group while they are bright enough to be accurate:
+    /// that way a red wing taken down to 0 and back up is red again.
     /// </summary>
     private void RememberRatios(int side, byte[] values, int[] group)
     {
@@ -766,6 +772,7 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
+    /// <summary>Left or right LED fader moved: sets the level of that wing's LED group, keeping the colour ratios.</summary>
     private void OnLedFader(int side)
     {
         if (_updating)
@@ -777,7 +784,7 @@ internal sealed class FixturePanel : UserControl
         var group = side == 0 ? _groupLeft : _groupRight;
         _ctx.Engine.SetGroupLevel(_fixture.Id, group, (byte)fader.Value, _groupRatios[side]);
 
-        // Mise a jour des curseurs des LED sans relire la position du fader en cours de glisse.
+        // Updates the LED sliders without reading back the position of the fader being dragged.
         byte[] values = _ctx.Engine.GetValues(_fixture.Id);
         _updating = true;
         try
@@ -794,11 +801,12 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
+    /// <summary>Names of the channels of an LED group (for tooltips).</summary>
     private string LedNames(int[] group) => string.Join(", ", group.Select(i => _profile.Channels[i].Name));
 
     /// <summary>
-    /// Case « Strobe » : decochee -> la valeur actuelle est memorisee, le canal repasse en fixe et le
-    /// moteur bloque tout strobe (FixtureInstance.NoStrobe) ; cochee -> l'ancienne valeur revient.
+    /// "Strobe" box: unticked -> the current value is remembered, the channel goes back to fixed and
+    /// the engine blocks any strobe (FixtureInstance.NoStrobe); ticked -> the old value comes back.
     /// </summary>
     private void OnStrobeToggled()
     {
@@ -815,7 +823,7 @@ internal sealed class FixturePanel : UserControl
             _fixture.NoStrobe = !on;
             if (!on && channel.IsStrobeValue(current))
             {
-                _fixture.StrobeMemory = current; // pour le retrouver en recochant
+                _fixture.StrobeMemory = current; // to get it back when ticking again
             }
         });
         if (on)
@@ -830,11 +838,11 @@ internal sealed class FixturePanel : UserControl
             _ctx.Engine.SetValue(_fixture.Id, _strobeIndex, channel.NoStrobeValue);
         }
         _ctx.MarkDirty();
-        _ctx.NotifyLiveStateChanged(); // ce panneau + l'onglet Soiree (interrupteur STROBE)
+        _ctx.NotifyLiveStateChanged(); // this panel + the Show tab (STROBE switch)
         _ctx.Status(on ? Tr.F("{0} : strobe réactivé ({1}).", _fixture.Name, _fixture.StrobeMemory) : Tr.F("{0} : strobe désactivé (valeur {1} mémorisée).", _fixture.Name, current));
     }
 
-    /// <summary>Bouton « Strobe 0 » : canal en fixe (0, ou obturateur ouvert), la case reste comme elle est.</summary>
+    /// <summary>"Strobe 0" button: channel set to fixed (0, or open shutter); the box stays as it is.</summary>
     private void SetStrobeFixed()
     {
         if (_strobeIndex < 0)
@@ -846,7 +854,7 @@ internal sealed class FixturePanel : UserControl
         _ctx.Status(Tr.F("{0} : strobe à 0.", _fixture.Name));
     }
 
-    /// <summary>Barre du strobe bougee dans une valeur de strobe alors qu'il est desactive : on le reactive.</summary>
+    /// <summary>Strobe slider moved into a strobe value while the strobe is disabled: it is enabled again.</summary>
     private void ReactivateStrobeIfNeeded(int index, byte value)
     {
         if (index != _strobeIndex || _strobeOn is null || _strobeOn.Checked || !_profile.Channels[index].IsStrobeValue(value))
@@ -862,9 +870,10 @@ internal sealed class FixturePanel : UserControl
         _ctx.Status(Tr.F("{0} : strobe réactivé ({1}).", _fixture.Name, value));
     }
 
-    /// <summary>Moteur du Spider : 0..255 = 0..135° (notice).</summary>
+    /// <summary>Spider motor: 0..255 = 0..135° (manual).</summary>
     private static int Degrees(byte value) => (int)Math.Round(value * 135.0 / 255);
 
+    /// <summary>Wings pad moved: X sets the motor positions (mirrored with "Invert"), Y sets the dimmer.</summary>
     private void OnWingsChanged(object? sender, EventArgs e)
     {
         if (_updating || _wings is null)
@@ -882,8 +891,8 @@ internal sealed class FixturePanel : UserControl
     }
 
     /// <summary>
-    /// Case "Inverser" : memorisee dans le patch (sauvegardee avec la config). On realigne
-    /// tout de suite l'aile 2 sur l'aile 1 (en miroir ou dans le meme sens).
+    /// "Invert" box: remembered in the patch (saved with the configuration). Wing 2 is realigned
+    /// on wing 1 right away (mirrored or in the same direction).
     /// </summary>
     private void OnMirrorChanged()
     {
@@ -904,6 +913,7 @@ internal sealed class FixturePanel : UserControl
         RefreshFromEngine();
     }
 
+    /// <summary>Left/right effect button: starts or stops the effect in the engine and saves the settings.</summary>
     private void OnSweepToggled()
     {
         if (_sweep is null)
@@ -919,6 +929,7 @@ internal sealed class FixturePanel : UserControl
             : Tr.F("{0} : effet gauche ↔ droite arrêté.", _fixture.Name));
     }
 
+    /// <summary>"Mic" button: starts or stops the shared microphone.</summary>
     private void OnMicListenToggled()
     {
         if (_micUpdating || _micListen is null)
@@ -942,7 +953,7 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
-    /// <summary>"All" : coche ou decoche toutes les couleurs d'un coup.</summary>
+    /// <summary>"All": ticks or unticks every colour at once.</summary>
     private void OnMaskAllChanged()
     {
         if (_maskUpdating || _maskAll is null)
@@ -958,6 +969,7 @@ internal sealed class FixturePanel : UserControl
         ApplyMask();
     }
 
+    /// <summary>A colour mask box changed: updates the engine mask (see ApplyMask).</summary>
     private void OnMaskChanged()
     {
         if (_maskUpdating || _maskAll is null)
@@ -971,8 +983,8 @@ internal sealed class FixturePanel : UserControl
     }
 
     /// <summary>
-    /// Couleurs decochees -> masque du moteur : des la trame suivante elles sortent a 0. Les valeurs
-    /// des curseurs sont gardees : en recochant, la couleur revient comme avant.
+    /// Unticked colours -> engine mask: from the next frame they go out at 0. The slider values are
+    /// kept: when ticked again, the colour comes back as before.
     /// </summary>
     private void ApplyMask()
     {
@@ -984,13 +996,13 @@ internal sealed class FixturePanel : UserControl
             : Tr.F("{0} : coupé en sortie → {1}.", _fixture.Name, (string.Join(", ", _maskBoxes.Where(b => !b.Checked).Select(b => b.Text)))));
     }
 
-    /// <summary>Mode actuel, d'apres l'appareil (cale ou non sur le tempo) et le micro (le BPM le suit ou non).</summary>
+    /// <summary>Current mode, from the fixture (locked to the tempo or not) and the microphone (the BPM follows it or not).</summary>
     private SweepMode CurrentMode() =>
         !_fixture.WingSweepSyncToBpm ? SweepMode.Delay
         : _ctx.Mic.FollowBpm ? SweepMode.Mic
         : SweepMode.Bpm;
 
-    /// <summary>Une case de mode cochee : les autres se decochent. Decocher la case active la recoche.</summary>
+    /// <summary>A mode box was ticked: the others are unticked. Unticking the active box ticks it again.</summary>
     private void OnModeChecked(SweepMode mode, CheckBox box)
     {
         if (_micUpdating)
@@ -999,13 +1011,13 @@ internal sealed class FixturePanel : UserControl
         }
         if (!box.Checked)
         {
-            ShowMode(CurrentMode()); // il faut toujours un mode
+            ShowMode(CurrentMode()); // there must always be a mode
             return;
         }
 
         if (mode == SweepMode.Mic && !_ctx.Mic.IsListening && _micListen is not null)
         {
-            _micListen.Checked = true; // -> OnMicListenToggled : allume le micro
+            _micListen.Checked = true; // -> OnMicListenToggled: switches the microphone on
         }
         _ctx.Mic.FollowBpm = mode == SweepMode.Mic;
         _ctx.Engine.EditShow(_ => _fixture.WingSweepSyncToBpm = mode != SweepMode.Delay);
@@ -1013,7 +1025,7 @@ internal sealed class FixturePanel : UserControl
         ShowMode(mode);
     }
 
-    /// <summary>Coche la case du mode et n'active que les reglages utiles.</summary>
+    /// <summary>Ticks the mode box and enables only the useful settings.</summary>
     private void ShowMode(SweepMode mode)
     {
         if (_modeDelay is null || _sweepSync is null || _micFollow is null || _sweepDelay is null || _bpmBox is null || _sweepBeats is null)
@@ -1036,7 +1048,7 @@ internal sealed class FixturePanel : UserControl
         _sweepBeats.Enabled = mode != SweepMode.Delay;
     }
 
-    /// <summary>BPM saisi : c'est le BPM general (onglet Soiree), utilise par l'effet en mode Tempo.</summary>
+    /// <summary>Typed BPM: it is the global BPM (Show tab), used by the effect in Tempo mode.</summary>
     private void OnBpmTyped()
     {
         if (_micUpdating || _bpmBox is null)
@@ -1045,10 +1057,10 @@ internal sealed class FixturePanel : UserControl
         }
         _ctx.Engine.Bpm = (double)_bpmBox.Value;
         _ctx.Show.Settings.Bpm = _ctx.Engine.Bpm;
-        _ctx.NotifyLiveStateChanged(); // l'onglet Soiree affiche le nouveau BPM
+        _ctx.NotifyLiveStateChanged(); // the Show tab shows the new BPM
     }
 
-    /// <summary>Etat du micro -> controles de l'onglet (10 fois/s pendant l'ecoute).</summary>
+    /// <summary>Microphone state -> controls of the tab (10 times/s while listening).</summary>
     private void UpdateMicUi()
     {
         if (IsDisposed || _micListen is null || _micBpm is null || _micFollow is null)
@@ -1062,14 +1074,14 @@ internal sealed class FixturePanel : UserControl
             _micListen.Checked = mic.IsListening;
             if (_bpmBox is not null && !_bpmBox.Focused)
             {
-                Ui.SetValue(_bpmBox, _ctx.Engine.Bpm); // tap tempo ou micro
+                Ui.SetValue(_bpmBox, _ctx.Engine.Bpm); // tap tempo or microphone
             }
         }
         finally
         {
             _micUpdating = false;
         }
-        ShowMode(CurrentMode()); // le micro a pu etre cale / decale depuis l'onglet Soiree
+        ShowMode(CurrentMode()); // the microphone may have been locked / unlocked from the Show tab
         _micListen.Text = mic.IsListening ? Tr.T("Micro : ON") : Tr.T("Micro");
         _micListen.BackColor = mic.IsListening ? Color.FromArgb(120, 200, 120) : SystemColors.Control;
         _micListen.UseVisualStyleBackColor = !mic.IsListening;
@@ -1079,7 +1091,7 @@ internal sealed class FixturePanel : UserControl
         _micBpm.ForeColor = mic.IsListening && bpm > 0 ? Ui.OkColor : mic.IsListening ? Ui.WarningColor : Color.DimGray;
     }
 
-    /// <summary>Delai et amplitude de l'effet : enregistres avec la configuration.</summary>
+    /// <summary>Delay and amplitude of the effect: saved with the configuration.</summary>
     private void SaveSweepSettings()
     {
         if (_sweepDelay is null || _sweepAmplitude is null || _sweepBeats is null)
@@ -1098,6 +1110,7 @@ internal sealed class FixturePanel : UserControl
         _ctx.MarkDirty();
     }
 
+    /// <summary>XY pad moved: aims the moving head (16-bit pan/tilt).</summary>
     private void OnXyChanged(object? sender, EventArgs e)
     {
         if (_updating || _xy is null)
@@ -1108,15 +1121,16 @@ internal sealed class FixturePanel : UserControl
         RefreshFromEngine();
     }
 
+    /// <summary>Preset picked in the list: moves the channel slider to its value.</summary>
     private void OnPresetChosen(int index)
     {
         if (_presets[index].SelectedItem is PresetItem preset)
         {
-            _sliders[index].Value = preset.Value; // declenche OnSlider -> moteur
+            _sliders[index].Value = preset.Value; // triggers OnSlider -> engine
         }
     }
 
-    /// <summary>Selectionne dans la liste le preset correspondant a la valeur actuelle (ou "— preset —").</summary>
+    /// <summary>Selects in the list the preset matching the current value (or "— preset —").</summary>
     private void SyncPresetCombo(int index, byte value)
     {
         var combo = _presets[index];
@@ -1135,6 +1149,7 @@ internal sealed class FixturePanel : UserControl
         }
     }
 
+    /// <summary>"+" button: asks a name and saves the current value as a preset of the profile (shared by every fixture of the model).</summary>
     private void AddPreset(int index)
     {
         byte value = (byte)_sliders[index].Value;
@@ -1146,7 +1161,7 @@ internal sealed class FixturePanel : UserControl
             return;
         }
 
-        // Modification du profil sous le verrou du moteur (le thread d'envoi lit les presets).
+        // Profile change under the engine lock (the send thread reads the presets).
         _ctx.Engine.EditShow(_ =>
         {
             channel.Presets.RemoveAll(p => TextKey.Same(p.Name, name));
@@ -1158,6 +1173,7 @@ internal sealed class FixturePanel : UserControl
         _ctx.Status(Tr.F("Preset « {0} » = {1} ajouté au profil « {2} » (valable pour tous les appareils de ce modèle).", name, value, _profile.Name));
     }
 
+    /// <summary>"OK" box of a channel: marks the channel as checked in the profile.</summary>
     private void OnVerifiedChanged(int index)
     {
         if (_updating)
@@ -1170,17 +1186,19 @@ internal sealed class FixturePanel : UserControl
         _ctx.NotifyProfileDetailsChanged();
     }
 
+    /// <summary>"Default values" button: every channel back to its profile default.</summary>
     private void ResetDefaults()
     {
         _ctx.Engine.ResetToDefaults(_fixture.Id);
         RefreshFromEngine();
     }
 
+    /// <summary>Unsubscribes from the context and the microphone before the tab is destroyed.</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            // Indispensable : sinon le contexte garderait une reference vers ce panneau detruit.
+            // Required: otherwise the context would keep a reference to this destroyed panel.
             _ctx.LiveStateChanged -= RefreshFromEngine;
             _ctx.ProfileDetailsChanged -= RefreshProfileDetails;
             _ctx.Mic.Changed -= UpdateMicUi;

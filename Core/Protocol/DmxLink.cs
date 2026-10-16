@@ -1,17 +1,17 @@
 // =====================================================================================
 //  DmxLink.cs
 // -------------------------------------------------------------------------------------
-//  Liaison avec le boitier USB-RDM-DMX Bluetooth :
-//    1) ouverture du port COM virtuel (Bluetooth SPP, ex: COM6 "sortant") ;
-//    2) envoi du handshake de connexion ;
-//    3) boucle d'envoi continue dans un thread dedie : a chaque tour, on demande a
-//       la "source" (le moteur de spectacle, IFrameSource) de calculer l'univers DMX,
-//       on construit la trame (DmxFrame.Build) et on l'ecrit sur le port ;
-//    4) a la fermeture, handshake de deconnexion.
+//  Link with the USB-RDM-DMX Bluetooth box:
+//    1) opens the virtual COM port (Bluetooth SPP, e.g. "outgoing" COM6);
+//    2) sends the connection handshake;
+//    3) continuous send loop in a dedicated thread: on each turn, the "source" (the
+//       show engine, IFrameSource) is asked to compute the DMX universe, the frame
+//       is built (DmxFrame.Build) and written to the port;
+//    4) on closing, disconnection handshake.
 //
-//  L'appli Android d'origine envoie une trame toutes les 100 ms (10 Hz) : c'est la
-//  valeur par defaut. Une cadence plus rapide donnerait des mouvements plus fluides
-//  mais n'a PAS encore ete testee sur le boitier (voir CLAUDE.md, a faire).
+//  The original Android app sends one frame every 100 ms (10 Hz): that is the
+//  default value. A faster rate would give smoother movements but has NOT been
+//  tested on the box yet (see CLAUDE.md, to do).
 // =====================================================================================
 
 using System.Diagnostics;
@@ -20,22 +20,23 @@ using System.IO.Ports;
 namespace DmxController.Core.Protocol;
 
 /// <summary>
-/// Fournisseur de l'univers DMX a envoyer. Le moteur de spectacle (ShowEngine)
-/// implemente cette interface.
+/// Provider of the DMX universe to send. The show engine (ShowEngine) implements
+/// this interface.
 /// </summary>
 public interface IFrameSource
 {
     /// <summary>
-    /// Remplit l'univers (513 octets, index N = canal DMX N, deja remis a zero).
-    /// Appele depuis le thread d'envoi : l'implementation doit etre thread-safe.
+    /// Fills the universe (513 bytes, index N = DMX channel N, already cleared).
+    /// Called from the send thread: the implementation must be thread-safe.
     /// </summary>
     void Render(byte[] universe);
 }
 
+/// <summary>Bluetooth serial link with the box and continuous send loop.</summary>
 public sealed class DmxLink : IDisposable
 {
-    // Protege Connect / Disconnect / Start / Stop (appeles depuis l'IHM ET depuis
-    // une tache de reconnexion automatique en arriere-plan).
+    // Protects Connect / Disconnect / Start / Stop (called from the UI AND from an
+    // automatic reconnection task in the background).
     private readonly object _stateLock = new();
 
     private SerialPort? _port;
@@ -45,41 +46,46 @@ public sealed class DmxLink : IDisposable
     private int _codeNum;
     private long _framesSent;
 
-    /// <summary>Source de l'univers DMX (en pratique : le ShowEngine).</summary>
+    /// <summary>Source of the DMX universe (in practice: the ShowEngine).</summary>
     public IFrameSource? Source { get; set; }
 
     /// <summary>
-    /// Leve depuis le thread d'envoi quand l'ecriture echoue (Bluetooth coupe,
-    /// boitier eteint...). L'abonne doit repasser sur le thread de l'IHM
-    /// (BeginInvoke) avant de toucher a l'interface ou d'appeler Disconnect().
+    /// Raised from the send thread when writing fails (Bluetooth dropped, box switched
+    /// off...). The subscriber must switch back to the UI thread (BeginInvoke) before
+    /// touching the interface or calling Disconnect().
     /// </summary>
     public event EventHandler<string>? ConnectionLost;
 
-    /// <summary>Intervalle entre deux trames, en millisecondes (20 a 1000).</summary>
+    /// <summary>Interval between two frames, in milliseconds (20 to 1000).</summary>
     public int SendIntervalMs
     {
         get => _sendIntervalMs;
         set => _sendIntervalMs = Math.Clamp(value, 20, 1000);
     }
 
+    /// <summary>true while the COM port is open.</summary>
     public bool IsConnected => _port is { IsOpen: true };
+    /// <summary>true while the send loop runs.</summary>
     public bool IsSending => _sending;
+    /// <summary>Name of the open port (e.g. "COM6").</summary>
     public string? PortName => _port?.PortName;
+    /// <summary>Number of frames sent since the connection.</summary>
     public long FramesSent => Interlocked.Read(ref _framesSent);
+    /// <summary>Message of the last connection or sending error.</summary>
     public string? LastError { get; private set; }
 
-    /// <summary>Liste des ports COM presents sur la machine, tries.</summary>
+    /// <summary>List of the COM ports present on the machine, sorted.</summary>
     public static string[] GetPortNames() =>
         SerialPort.GetPortNames()
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(p => p.Length)               // COM6 avant COM10
+            .OrderBy(p => p.Length)               // COM6 before COM10
             .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
     /// <summary>
-    /// Ouvre le port et envoie le handshake. Peut bloquer plusieurs secondes le temps
-    /// que Windows etablisse la liaison Bluetooth : a appeler hors du thread de l'IHM.
-    /// Le debit n'a pas d'importance (port virtuel Bluetooth, pas un vrai UART).
+    /// Opens the port and sends the handshake. Can block for several seconds while Windows
+    /// sets up the Bluetooth link: call it outside the UI thread.
+    /// The baud rate does not matter (virtual Bluetooth port, not a real UART).
     /// </summary>
     public void Connect(string portName, int baudRate = 9600)
     {
@@ -95,10 +101,10 @@ public sealed class DmxLink : IDisposable
             {
                 port.Open();
 
-                // Defaut connu de .NET avec les ports COM Bluetooth : si la liaison meurt, le
-                // "finaliseur" du flux serie leve une IOException ("delai de temporisation de
-                // semaphore expire") sur un thread interne, ce qui ferait planter l'appli. On le
-                // desactive : c'est SafeClose() qui ferme le port, en avalant ces erreurs.
+                // Known .NET issue with Bluetooth COM ports: when the link dies, the "finalizer" of
+                // the serial stream throws an IOException ("semaphore timeout period has expired")
+                // on an internal thread, which would crash the app. It is disabled: SafeClose()
+                // closes the port and swallows these errors.
                 GC.SuppressFinalize(port.BaseStream);
 
                 byte[] hello = DmxFrame.HandshakeConnect();
@@ -117,8 +123,8 @@ public sealed class DmxLink : IDisposable
     }
 
     /// <summary>
-    /// Comme Connect + StartSending, mais sans jamais lever d'exception : retourne false et le
-    /// message d'erreur (boitier eteint, hors de portee, port occupe...).
+    /// Like Connect + StartSending, but never throws: returns false and the error message
+    /// (box off, out of range, port busy...).
     /// </summary>
     public bool TryConnectAndStart(string portName, out string? error)
     {
@@ -131,14 +137,14 @@ public sealed class DmxLink : IDisposable
         }
         catch (Exception ex)
         {
-            Disconnect(); // ne leve jamais
+            Disconnect(); // never throws
             error = FriendlyError(ex);
             LastError = error;
             return false;
         }
     }
 
-    /// <summary>Message comprehensible pour les erreurs typiques d'un port Bluetooth.</summary>
+    /// <summary>Understandable message for the typical errors of a Bluetooth port.</summary>
     public static string FriendlyError(Exception ex) => ex switch
     {
         IOException io when io.Message.Contains("maphore", StringComparison.OrdinalIgnoreCase) =>
@@ -148,7 +154,7 @@ public sealed class DmxLink : IDisposable
         _ => ex.Message,
     };
 
-    /// <summary>Ferme et libere un port sans jamais lever d'exception (liaison Bluetooth morte...).</summary>
+    /// <summary>Closes and releases a port without ever throwing (dead Bluetooth link...).</summary>
     private static void SafeClose(SerialPort port)
     {
         try
@@ -160,7 +166,7 @@ public sealed class DmxLink : IDisposable
         }
         catch (Exception)
         {
-            // liaison deja morte
+            // link already dead
         }
         try
         {
@@ -168,11 +174,11 @@ public sealed class DmxLink : IDisposable
         }
         catch (Exception)
         {
-            // idem
+            // same
         }
     }
 
-    /// <summary>Demarre la boucle d'envoi continu (thread d'arriere-plan).</summary>
+    /// <summary>Starts the continuous send loop (background thread).</summary>
     public void StartSending()
     {
         lock (_stateLock)
@@ -192,14 +198,14 @@ public sealed class DmxLink : IDisposable
         }
     }
 
-    /// <summary>Arrete la boucle d'envoi (le port reste ouvert).</summary>
+    /// <summary>Stops the send loop (the port stays open).</summary>
     public void StopSending()
     {
         lock (_stateLock)
         {
             _sending = false;
             var thread = _thread;
-            // Jamais de Join sur soi-meme (cas ou on serait appele depuis le thread d'envoi).
+            // Never Join itself (in case we are called from the send thread).
             if (thread is not null && thread != Thread.CurrentThread)
             {
                 thread.Join(1500);
@@ -208,7 +214,7 @@ public sealed class DmxLink : IDisposable
         }
     }
 
-    /// <summary>Arrete l'envoi, envoie le handshake de deconnexion et ferme le port. Ne leve jamais.</summary>
+    /// <summary>Stops sending, sends the disconnection handshake and closes the port. Never throws.</summary>
     public void Disconnect()
     {
         lock (_stateLock)
@@ -232,18 +238,20 @@ public sealed class DmxLink : IDisposable
             }
             catch (Exception)
             {
-                // Le boitier a peut-etre deja coupe la liaison : on ferme quand meme.
+                // The box may already have dropped the link: close anyway.
             }
             SafeClose(port);
         }
     }
 
+    /// <summary>Next frame counter (0..255, wraps around).</summary>
     private int NextCodeNum()
     {
         _codeNum = (_codeNum + 1) & 0xFF;
         return _codeNum;
     }
 
+    /// <summary>Send loop (background thread): computes the universe, builds the frame, writes it, waits for the next one.</summary>
     private void SendLoop()
     {
         var universe = DmxFrame.NewUniverse();
@@ -277,17 +285,18 @@ public sealed class DmxLink : IDisposable
                 }
                 catch (Exception)
                 {
-                    // Un abonne defaillant (fenetre deja fermee...) ne doit pas faire
-                    // planter tout le processus depuis ce thread.
+                    // A faulty subscriber (window already closed...) must not crash the whole process
+                    // from this thread.
                 }
                 return;
             }
 
-            // On vise une cadence reguliere : on retire le temps deja passe a calculer.
+            // Aim for a steady rate: subtract the time already spent computing.
             long elapsed = clock.ElapsedMilliseconds - started;
             Thread.Sleep((int)Math.Max(1, _sendIntervalMs - elapsed));
         }
     }
 
+    /// <summary>Disconnects (handshake and port closed).</summary>
     public void Dispose() => Disconnect();
 }

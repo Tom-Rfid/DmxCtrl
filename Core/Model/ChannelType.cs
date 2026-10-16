@@ -1,16 +1,17 @@
 // =====================================================================================
 //  ChannelType.cs
 // -------------------------------------------------------------------------------------
-//  Role d'un canal DMX dans un appareil. C'est l'information cle d'un profil :
-//  c'est grace a elle que le moteur sait quel canal fondre, quel canal regler par
-//  le master, ou ecrire une couleur, quels canaux bouger pour un cercle, etc.
+//  Role of a DMX channel in a fixture. It is the key information of a profile:
+//  thanks to it the engine knows which channel to fade, which channel the master
+//  drives, where to write a colour, which channels to move for a circle, etc.
 //
-//  Les noms de l'enum sont en anglais (stables dans les fichiers JSON) ; l'IHM
-//  affiche les libelles francais de ChannelTypeInfo.DisplayName().
+//  The enum names are in English (stable in the JSON files); the UI shows the
+//  labels of ChannelTypeInfo.DisplayName() in the current language.
 // =====================================================================================
 
 namespace DmxController.Core.Model;
 
+/// <summary>Role of a channel in a fixture.</summary>
 public enum ChannelType
 {
     Generic,
@@ -39,10 +40,10 @@ public enum ChannelType
     Motor,
     Control,
 
-    // --- Machine a fumee : le moteur pilote ce canal lui-meme (manuel / coup / auto) ---
+    // --- Fog machine: the engine drives this channel itself (manual / burst / auto) ---
     Fog,
 
-    // --- Laser (Showtec Galactic...) : utilises par l'onglet laser ---
+    // --- Laser (Showtec Galactic...): used by the laser tab ---
     LaserMode,
     LaserPattern,
     LaserColor,
@@ -52,11 +53,13 @@ public enum ChannelType
     LaserRoll,
 }
 
+/// <summary>Labels and categories of the channel roles.</summary>
 public static class ChannelTypeInfo
 {
+    /// <summary>Every channel role, in declaration order.</summary>
     public static IReadOnlyList<ChannelType> All { get; } = Enum.GetValues<ChannelType>();
 
-    /// <summary>Libelle francais affiche dans l'interface.</summary>
+    /// <summary>Label shown in the interface (translated with Tr).</summary>
     public static string DisplayName(ChannelType type) => type switch
     {
         ChannelType.Generic => Tr.T("Générique"),
@@ -96,9 +99,9 @@ public static class ChannelTypeInfo
     };
 
     /// <summary>
-    /// Canaux "continus" qu'on peut fondre progressivement lors d'un changement de
-    /// scene. Les autres (roue de couleurs, gobo, macro...) basculent d'un coup :
-    /// fondre une roue de couleurs ferait defiler toutes les couleurs intermediaires.
+    /// "Continuous" channels that can be faded gradually on a scene change. The others
+    /// (colour wheel, gobo, macro...) switch at once: fading a colour wheel would scroll
+    /// through every colour in between.
     /// </summary>
     public static bool IsFadeable(ChannelType type) => type is
         ChannelType.Dimmer or ChannelType.Pan or ChannelType.PanFine or ChannelType.Tilt or
@@ -106,7 +109,7 @@ public static class ChannelTypeInfo
         ChannelType.White or ChannelType.Amber or ChannelType.UV or ChannelType.Intensity or
         ChannelType.Focus or ChannelType.Motor;
 
-    /// <summary>Canaux de melange de couleur (utilises comme intensite si l'appareil n'a pas de dimmer).</summary>
+    /// <summary>Colour mixing channels (used as intensity when the fixture has no dimmer).</summary>
     public static bool IsColorMix(ChannelType type) => type is
         ChannelType.Red or ChannelType.Green or ChannelType.Blue or ChannelType.White or
         ChannelType.Amber or ChannelType.UV or ChannelType.Intensity;

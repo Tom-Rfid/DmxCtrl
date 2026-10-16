@@ -18,6 +18,7 @@ using System.Text.RegularExpressions;
 
 namespace DmxController.Core.Localization;
 
+/// <summary>Interface translation (French keys, English table in Tr.En.cs).</summary>
 public static partial class Tr
 {
     /// <summary>Code of the French language (the language of the keys).</summary>
@@ -58,6 +59,7 @@ public static partial class Tr
     /// <summary>True when an English text exists for this French text (used by the tests to find gaps).</summary>
     public static bool HasEnglish(string french) => TryTranslate(french, out _);
 
+    /// <summary>Lookup of a translation (exact, number template, "A : B" composite); false when nothing matches.</summary>
     private static bool TryTranslate(string french, out string english)
     {
         if (En.TryGetValue(french, out english!))

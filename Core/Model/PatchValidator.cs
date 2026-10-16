@@ -1,30 +1,36 @@
 // =====================================================================================
 //  PatchValidator.cs
 // -------------------------------------------------------------------------------------
-//  Verifie l'adressage : appareils qui se chevauchent, qui depassent le canal 512,
-//  ou dont le profil a disparu. Les appareils DESACTIVES sont ignores (pas d'alerte :
-//  on peut laisser dans le patch un appareil absent ce soir).
+//  Checks the addressing: fixtures that overlap, that go beyond channel 512, or whose
+//  profile disappeared. DISABLED fixtures are ignored (no warning: a fixture missing
+//  tonight can stay in the patch).
 //
-//  Calcule aussi les plages libres et l'adresse a proposer pour un appareil :
-//  la premiere plage libre assez grande (entre deux appareils ou a la fin).
+//  Also computes the free ranges and the address to suggest for a fixture: the first
+//  free range that is large enough (between two fixtures or at the end).
 // =====================================================================================
 
 namespace DmxController.Core.Model;
 
+/// <summary>An addressing problem: message and the fixtures involved.</summary>
 public sealed record PatchProblem(string Message, IReadOnlyList<string> FixtureIds);
 
-/// <summary>Plage de canaux libres (inclusifs).</summary>
+/// <summary>Range of free channels (inclusive).</summary>
 public sealed record FreeRange(int Start, int End)
 {
+    /// <summary>Number of channels of the range.</summary>
     public int Length => End - Start + 1;
 
+    /// <summary>"a-b" (or "a" for a single channel).</summary>
     public override string ToString() => Start == End ? $"{Start}" : $"{Start}-{End}";
 }
 
+/// <summary>Addressing checks and free-address search.</summary>
 public static class PatchValidator
 {
+    /// <summary>Checks the patch of a configuration.</summary>
     public static List<PatchProblem> Validate(ShowConfig show) => Validate(show.Fixtures, show.Profiles);
 
+    /// <summary>Checks the enabled fixtures: missing profile, empty profile, outside the universe, overlaps.</summary>
     public static List<PatchProblem> Validate(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles)
     {
         var problems = new List<PatchProblem>();
@@ -72,7 +78,7 @@ public static class PatchValidator
         return problems;
     }
 
-    /// <summary>Plages occupees par les appareils actifs (sauf ignoreFixtureId), triees.</summary>
+    /// <summary>Ranges used by the enabled fixtures (except ignoreFixtureId), sorted.</summary>
     public static List<(int Start, int End)> UsedRanges(IReadOnlyList<FixtureInstance> fixtures,
         IReadOnlyList<FixtureProfile> profiles, string? ignoreFixtureId = null)
     {
@@ -92,7 +98,7 @@ public static class PatchValidator
         return used.OrderBy(r => r.Start).ToList();
     }
 
-    /// <summary>true si les canaux address .. address+channelCount-1 sont dans l'univers et libres.</summary>
+    /// <summary>true when channels address .. address+channelCount-1 are inside the universe and free.</summary>
     public static bool IsFree(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles,
         int address, int channelCount, string? ignoreFixtureId = null)
     {
@@ -101,7 +107,7 @@ public static class PatchValidator
                UsedRanges(fixtures, profiles, ignoreFixtureId).All(r => end < r.Start || address > r.End);
     }
 
-    /// <summary>Toutes les plages libres de l'univers (appareils actifs uniquement).</summary>
+    /// <summary>Every free range of the universe (enabled fixtures only).</summary>
     public static List<FreeRange> FreeRanges(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles,
         string? ignoreFixtureId = null)
     {
@@ -123,9 +129,9 @@ public static class PatchValidator
     }
 
     /// <summary>
-    /// Premiere adresse ou "channelCount" canaux consecutifs sont libres (appareils
-    /// actifs uniquement) : dans un trou entre deux appareils s'il est assez grand,
-    /// sinon apres le dernier. Retourne -1 si l'univers est plein.
+    /// First address where "channelCount" consecutive channels are free (enabled fixtures
+    /// only): in a gap between two fixtures when it is large enough, otherwise after the
+    /// last one. Returns -1 when the universe is full.
     /// </summary>
     public static int NextFreeAddress(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles,
         int channelCount, string? ignoreFixtureId = null)
@@ -136,8 +142,8 @@ public static class PatchValidator
     }
 
     /// <summary>
-    /// Adresse a proposer pour un appareil : on garde "current" si ses canaux sont libres,
-    /// sinon la premiere plage libre assez grande. -1 si rien ne rentre.
+    /// Address to suggest for a fixture: "current" is kept when its channels are free,
+    /// otherwise the first free range that is large enough. -1 when nothing fits.
     /// </summary>
     public static int SuggestAddress(IReadOnlyList<FixtureInstance> fixtures, IReadOnlyList<FixtureProfile> profiles,
         int channelCount, int current, string? fixtureId)

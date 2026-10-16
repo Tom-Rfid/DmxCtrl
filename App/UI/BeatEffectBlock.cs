@@ -1,13 +1,13 @@
 // =====================================================================================
 //  BeatEffectBlock.cs
 // -------------------------------------------------------------------------------------
-//  Bloc "Effet au tempo" des projecteurs sans moteur (PAR UV, PAR RGB...) :
-//    - bouton marche / arret ;
-//    - effet : chenillard des groupes de LED (UV 1 -> 2 -> 3...) ou pulsation ;
-//    - 3 modes qui s'excluent pour la cadence, comme l'effet gauche/droite du Spider :
-//        Delai (s)  |  Tempo (BPM saisi = BPM general)  |  Tempo du micro (auto) ;
-//    - "1 pas = N temps" en modes tempo.
-//  Les reglages sont enregistres avec l'appareil (FixtureInstance.Beat*).
+//  "Beat effect" block of fixtures without motors (UV PAR, RGB PAR...):
+//    - start / stop button;
+//    - effect: chase of the LED groups (UV 1 -> 2 -> 3...) or pulse;
+//    - 3 mutually exclusive modes for the rate, like the Spider left/right effect:
+//        Delay (s)  |  Tempo (typed BPM = global BPM)  |  Mic tempo (automatic);
+//    - "1 step = N beats" in the tempo modes.
+//  The settings are saved with the fixture (FixtureInstance.Beat*).
 // =====================================================================================
 
 using System.ComponentModel;
@@ -15,13 +15,17 @@ using DmxController.Core.Model;
 
 namespace DmxController.UI;
 
+/// <summary>"Beat effect" block of a fixture without motors (chase / pulse of its LED groups).</summary>
 [DesignerCategory("Code")]
 internal sealed class BeatEffectBlock : TableLayoutPanel
 {
+    /// <summary>Rate source of the effect: fixed delay, typed BPM or microphone tempo.</summary>
     private enum Mode { Delay, Bpm, Mic }
 
+    /// <summary>Item of the effect list (chase or pulse) with its displayed text.</summary>
     private sealed record KindItem(BeatEffectKind Kind, string Text)
     {
+        /// <summary>Text shown in the drop-down list.</summary>
         public override string ToString() => Text;
     }
 
@@ -40,6 +44,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
     private readonly ToolTip _tips = new();
     private bool _updating;
 
+    /// <summary>Builds the block for <paramref name="fixture"/> and loads its saved settings.</summary>
     public BeatEffectBlock(ShowContext ctx, FixtureInstance fixture, FixtureProfile profile)
     {
         _ctx = ctx;
@@ -93,6 +98,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         UpdateRunButton();
     }
 
+    /// <summary>Adds a row to the block: first control, optional second control and unit label.</summary>
     private void Row(Control first, Control? second = null, string unit = "")
     {
         int row = RowCount++;
@@ -116,6 +122,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
 
     // ---------------------------------------------------------------------------------
 
+    /// <summary>Start / stop button: switches the engine effect and saves the settings.</summary>
     private void OnRunToggled()
     {
         _ctx.Engine.SetBeatEffect(_fixture.Id, _run.Checked);
@@ -123,15 +130,17 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         _ctx.Status(_run.Checked ? Tr.F("{0} : effet au tempo lancé.", _fixture.Name) : Tr.F("{0} : effet au tempo arrêté.", _fixture.Name));
     }
 
-    /// <summary>Arrete l'effet (bouton TOUT COUPER de l'onglet).</summary>
+    /// <summary>Stops the effect (ALL OFF button of the tab).</summary>
     public void Stop() => _run.Checked = false; // -> OnRunToggled
 
+    /// <summary>Colours the start button according to the running state.</summary>
     private void UpdateRunButton()
     {
         _run.BackColor = _run.Checked ? Color.FromArgb(255, 210, 60) : SystemColors.Control;
         _run.UseVisualStyleBackColor = !_run.Checked;
     }
 
+    /// <summary>Copies the block settings into the fixture (saved with the configuration) and marks it modified.</summary>
     private void Save()
     {
         var kind = (_kind.SelectedItem as KindItem)?.Kind ?? BeatEffectKind.Chase;
@@ -146,12 +155,13 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         _ctx.MarkDirty();
     }
 
+    /// <summary>Mode currently in use, from the fixture settings and the microphone state.</summary>
     private Mode CurrentMode() =>
         !_fixture.BeatSyncToBpm ? Mode.Delay
         : _ctx.Mic.FollowBpm ? Mode.Mic
         : Mode.Bpm;
 
-    /// <summary>Une case de mode cochee : les autres se decochent ; decocher la case active la recoche.</summary>
+    /// <summary>A mode box was ticked: the others are unticked; unticking the active box ticks it again.</summary>
     private void OnModeChecked(Mode mode, CheckBox box)
     {
         if (_updating)
@@ -165,7 +175,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         }
         if (mode == Mode.Mic && !_ctx.Mic.IsListening)
         {
-            _micListen.Checked = true; // -> allume le micro
+            _micListen.Checked = true; // -> switches the microphone on
         }
         _ctx.Mic.FollowBpm = mode == Mode.Mic;
         _ctx.Engine.EditShow(_ => _fixture.BeatSyncToBpm = mode != Mode.Delay);
@@ -173,6 +183,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         ShowMode(mode);
     }
 
+    /// <summary>Ticks the box of <paramref name="mode"/> and enables only the settings it uses.</summary>
     private void ShowMode(Mode mode)
     {
         _updating = true;
@@ -191,6 +202,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         _beats.Enabled = mode != Mode.Delay;
     }
 
+    /// <summary>Typed BPM: becomes the global BPM (Show tab), used in Tempo mode.</summary>
     private void OnBpmTyped()
     {
         if (_updating)
@@ -202,6 +214,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         _ctx.NotifyLiveStateChanged();
     }
 
+    /// <summary>"Mic" button: starts or stops the shared microphone.</summary>
     private void OnMicListenToggled()
     {
         if (_updating)
@@ -225,7 +238,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         }
     }
 
-    /// <summary>Etat du micro et BPM -> controles (appele par le micro et par l'onglet).</summary>
+    /// <summary>Microphone state and BPM -> controls (called by the microphone and by the tab).</summary>
     public void UpdateUi()
     {
         if (IsDisposed)
@@ -257,6 +270,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
         _micBpm.ForeColor = mic.IsListening && bpm > 0 ? Ui.OkColor : mic.IsListening ? Ui.WarningColor : Color.DimGray;
     }
 
+    /// <summary>Unsubscribes from the microphone and the context before the block is destroyed.</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)

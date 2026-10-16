@@ -1,21 +1,21 @@
 // =====================================================================================
 //  PatchDialog.cs
 // -------------------------------------------------------------------------------------
-//  Fenetre "Patch / adressage" : la liste des appareils branches (un appareil = un
-//  onglet dans la fenetre principale).
+//  "Patch / addressing" window: the list of connected fixtures (one fixture = one
+//  tab in the main window).
 //
-//    - a gauche, la liste : Actif, nom, modele, adresse, canaux, Flash/strobe ;
-//      les cases Actif et Flash se cochent directement dans la liste ;
-//    - a droite, la fiche de l'appareil selectionne : nom, MODELE, adresse...
-//      Choisir un modele (y compris un modele de la bibliotheque integree : lyre 260X,
-//      Spider, fumee Ayra, laser Showtec, PAR UV) charge son nombre de canaux et
-//      propose une adresse libre : l'adresse actuelle si elle tient encore, sinon la
-//      premiere plage libre assez grande (entre deux appareils ou a la fin).
-//    - "Ajouter" : choisir le modele, l'adresse libre est trouvee toute seule.
+//    - on the left, the list: Enabled, name, model, address, channels, Flash/strobe;
+//      the Enabled and Flash boxes are ticked directly in the list;
+//    - on the right, the card of the selected fixture: name, MODEL, address...
+//      Picking a model (including a model of the built-in library: 260X moving head,
+//      Spider, Ayra fog, Showtec laser, UV PAR) loads its channel count and suggests
+//      a free address: the current one if it still fits, otherwise the first free
+//      range that is large enough (between two fixtures or at the end).
+//    - "Add": pick the model, the free address is found automatically.
 //
-//  Un appareil DESACTIVE garde sa place dans le patch mais n'envoie rien et ne
-//  declenche aucune alerte d'adressage (pratique pour un appareil absent ce soir).
-//  On travaille sur une COPIE : rien ne change tant qu'on n'a pas clique sur OK.
+//  A DISABLED fixture keeps its place in the patch but sends nothing and raises no
+//  addressing warning (handy for a fixture missing tonight).
+//  The dialog works on a COPY: nothing changes until OK is clicked.
 // =====================================================================================
 
 using System.ComponentModel;
@@ -24,12 +24,14 @@ using DmxController.Core.Storage;
 
 namespace DmxController.UI;
 
+/// <summary>"Patch / addressing" window: list of fixtures, their model and DMX address.</summary>
 [DesignerCategory("Code")]
 internal sealed class PatchDialog : Form
 {
-    /// <summary>Element de la liste des modeles : profil de la config ou modele de la bibliotheque.</summary>
+    /// <summary>Item of the model list: profile of the configuration or model of the library.</summary>
     private sealed record ModelItem(string Id, string Name, bool FromLibrary)
     {
+        /// <summary>Text of the model list: translated name, "[library]" for a model not yet in the configuration.</summary>
         public override string ToString() => FromLibrary ? Tr.F("{0}   [bibliothèque]", Tr.T(Name)) : Tr.T(Name);
     }
 
@@ -53,7 +55,7 @@ internal sealed class PatchDialog : Form
     };
     private readonly Label _problems = new() { Dock = DockStyle.Bottom, Height = 76, Padding = new Padding(8) };
 
-    // Fiche de l'appareil selectionne
+    // Card of the selected fixture
     private readonly TextBox _name = new() { Width = 250 };
     private readonly ComboBox _model = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 290, DropDownWidth = 420 };
     private readonly NumericUpDown _address = new() { Minimum = 1, Maximum = 512, Width = 70 };
@@ -65,20 +67,22 @@ internal sealed class PatchDialog : Form
     private readonly Label _freeRanges = new() { AutoSize = true, MaximumSize = new Size(330, 0), ForeColor = Color.DimGray, Margin = new Padding(3, 8, 3, 3) };
     private readonly GroupBox _detail = new() { Text = Tr.T("Appareil sélectionné"), Dock = DockStyle.Top, Height = 330, Padding = new Padding(8), Font = Ui.BoldFont };
 
-    // Ajout
+    // Adding
     private readonly ComboBox _addModel = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 290, DropDownWidth = 420 };
 
     private bool _loading;
 
+    /// <summary>Edited patch (valid only when DialogResult == OK).</summary>
     public List<FixtureInstance> ResultFixtures { get; private set; } = new();
 
-    /// <summary>Profils de la configuration + modeles de la bibliotheque ajoutes pendant l'edition.</summary>
+    /// <summary>Profiles of the configuration + library models added while editing.</summary>
     public List<FixtureProfile> ResultProfiles { get; private set; } = new();
 
+    /// <summary>Opens the window on a copy of the patch; <paramref name="addNewOnOpen"/> starts with the "add a fixture" choice.</summary>
     public PatchDialog(ShowConfig show, bool addNewOnOpen)
     {
         _fixtures = show.Fixtures.Select(f => ShowJson.Clone(f)).ToList();
-        _profiles = show.Profiles.ToList(); // memes objets : les profils ne sont pas modifies ici
+        _profiles = show.Profiles.ToList(); // same objects: the profiles are not modified here
 
         Text = Tr.T("Patch — appareils et adressage DMX");
         Font = new Font("Segoe UI", 9f);
@@ -117,9 +121,10 @@ internal sealed class PatchDialog : Form
     }
 
     // =================================================================================
-    //  Construction
+    //  Building
     // =================================================================================
 
+    /// <summary>Fixture list (Enabled, name, model, address, channels, Flash/strobe).</summary>
     private void BuildGrid()
     {
         _grid.Columns.AddRange(
@@ -131,7 +136,7 @@ internal sealed class PatchDialog : Form
             new DataGridViewTextBoxColumn { HeaderText = Tr.T("Dernier canal"), FillWeight = 60 },
             new DataGridViewCheckBoxColumn { HeaderText = Tr.T("Flash / strobe"), FillWeight = 55 });
 
-        // Les cases se cochent d'un clic dans la liste (la liste est en lecture seule).
+        // Boxes are ticked with one click in the list (the list is read-only).
         _grid.CellContentClick += (_, e) =>
         {
             if (e.RowIndex < 0 || e.RowIndex >= _fixtures.Count)
@@ -158,11 +163,12 @@ internal sealed class PatchDialog : Form
         _grid.SelectionChanged += (_, _) => LoadDetail();
     }
 
+    /// <summary>Right panel: card of the selected fixture and the "add a fixture" area.</summary>
     private Control BuildSidePanel()
     {
         var side = new Panel { Dock = DockStyle.Right, Width = 370, Padding = new Padding(6) };
 
-        // ---------------- Fiche ----------------
+        // ---------------- Card ----------------
         var table = Ui.Table(2);
         table.Font = new Font("Segoe UI", 9f);
         Ui.Row(table, Tr.T("Nom"), _name);
@@ -186,7 +192,7 @@ internal sealed class PatchDialog : Form
         _invertPan.CheckedChanged += (_, _) => EditSelected(f => f.InvertPan = _invertPan.Checked);
         _invertTilt.CheckedChanged += (_, _) => EditSelected(f => f.InvertTilt = _invertTilt.Checked);
 
-        // ---------------- Ajout / liste ----------------
+        // ---------------- Add / list ----------------
         var addButton = new Button { Text = Tr.T("Ajouter cet appareil"), AutoSize = true, Font = Ui.BoldFont };
         addButton.Click += (_, _) => AddFixture();
         var duplicate = new Button { Text = Tr.T("Dupliquer"), Width = 100 };
@@ -220,10 +226,10 @@ internal sealed class PatchDialog : Form
         return side;
     }
 
-    /// <summary>Profils de la config + modeles de la bibliotheque qui n'y sont pas encore, par ordre alphabetique.</summary>
+    /// <summary>Profiles of the configuration + library models not in it yet, in alphabetical order.</summary>
     private void FillModelCombos()
     {
-        // Ordre alphabetique (sans tenir compte des majuscules ni des accents).
+        // Alphabetical order (ignoring case and accents).
         var items = _profiles.Select(p => new ModelItem(p.Id, p.Name, FromLibrary: false))
             .Concat(FixtureLibrary.All().Where(m => _profiles.All(p => p.Id != m.Id)).Select(m => new ModelItem(m.Id, m.Name, FromLibrary: true)))
             .OrderBy(m => TextKey.Normalize(m.Name), StringComparer.Ordinal)
@@ -238,15 +244,17 @@ internal sealed class PatchDialog : Form
     }
 
     // =================================================================================
-    //  Liste
+    //  List
     // =================================================================================
 
+    /// <summary>Profile of a fixture among the profiles being edited.</summary>
     private FixtureProfile? ProfileOf(FixtureInstance fixture) => _profiles.FirstOrDefault(p => p.Id == fixture.ProfileId);
 
     private int SelectedIndex => _grid.CurrentRow?.Index ?? -1;
 
     private FixtureInstance? Selected => SelectedIndex >= 0 && SelectedIndex < _fixtures.Count ? _fixtures[SelectedIndex] : null;
 
+    /// <summary>Refills the list and selects row <paramref name="selectIndex"/>.</summary>
     private void RebuildGrid(int selectIndex)
     {
         _loading = true;
@@ -275,6 +283,7 @@ internal sealed class PatchDialog : Form
         ValidateAll();
     }
 
+    /// <summary>Refreshes the cells of one row from its fixture.</summary>
     private void RefreshRow(int index)
     {
         var fixture = _fixtures[index];
@@ -290,6 +299,7 @@ internal sealed class PatchDialog : Form
         row.DefaultCellStyle.ForeColor = fixture.Enabled ? SystemColors.ControlText : Color.Gray;
     }
 
+    /// <summary>Checks the whole patch, shows the problems and the free channels.</summary>
     private List<PatchProblem> ValidateAll()
     {
         var problems = PatchValidator.Validate(_fixtures, _profiles);
@@ -317,9 +327,10 @@ internal sealed class PatchDialog : Form
     }
 
     // =================================================================================
-    //  Fiche de l'appareil selectionne
+    //  Card of the selected fixture
     // =================================================================================
 
+    /// <summary>Loads the card of the selected fixture.</summary>
     private void LoadDetail()
     {
         if (_loading)
@@ -358,6 +369,7 @@ internal sealed class PatchDialog : Form
         }
     }
 
+    /// <summary>Text under the address: channel range and whether it is free.</summary>
     private void UpdateRangeLabel(FixtureInstance fixture)
     {
         var profile = ProfileOf(fixture);
@@ -375,7 +387,7 @@ internal sealed class PatchDialog : Form
         _range.ForeColor = !fixture.Enabled ? Color.Gray : free ? Ui.OkColor : Color.DarkRed;
     }
 
-    /// <summary>Applique une modification de la fiche a l'appareil selectionne, puis rafraichit.</summary>
+    /// <summary>Applies a change of the card to the selected fixture, then refreshes.</summary>
     private void EditSelected(Action<FixtureInstance> edit)
     {
         if (_loading || Selected is not FixtureInstance fixture)
@@ -390,10 +402,10 @@ internal sealed class PatchDialog : Form
     }
 
     /// <summary>
-    /// Nouveau modele pour l'appareil : son profil est ajoute a la config si c'est un modele de la
-    /// bibliotheque, le nombre de canaux suit, l'adresse est conservee si elle tient encore,
-    /// sinon la premiere plage libre assez grande est proposee. Le nom suit le modele s'il
-    /// etait le nom par defaut de l'ancien modele (« Spider » -> « Lyre 3 »).
+    /// New model for the fixture: its profile is added to the configuration when it comes from
+    /// the library, the channel count follows, the address is kept if it still fits, otherwise
+    /// the first free range that is large enough is suggested. The name follows the model when
+    /// it was the default name of the old model ("Spider" -> "Lyre 3").
     /// </summary>
     private void OnModelChosen()
     {
@@ -414,7 +426,7 @@ internal sealed class PatchDialog : Form
         {
             fixture.Name = UniqueName(profile.FixtureNameBase, fixture.Id);
         }
-        fixture.Flash = !profile.IsFogMachine; // la fumee n'a pas d'interrupteur flash
+        fixture.Flash = !profile.IsFogMachine; // the fog machine has no flash switch
 
         int address = PatchValidator.SuggestAddress(_fixtures, _profiles, profile.ChannelCount, fixture.Address, fixture.Id);
         string message;
@@ -440,6 +452,7 @@ internal sealed class PatchDialog : Form
         _range.Text += Environment.NewLine + message;
     }
 
+    /// <summary>true when <paramref name="name"/> is a default name of the model ("Lyre", "Lyre 2"...) or the generic "Appareil" / "Fixture".</summary>
     private static bool IsDefaultName(string name, string baseName)
     {
         string trimmed = name.TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ');
@@ -448,6 +461,7 @@ internal sealed class PatchDialog : Form
                string.Equals(name, Tr.T("Appareil"), StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>First free name "base N" (N = 1, 2, 3...) among the other fixtures.</summary>
     private string UniqueName(string baseName, string? ignoreId = null)
     {
         var names = _fixtures.Where(f => f.Id != ignoreId).Select(f => f.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -465,6 +479,7 @@ internal sealed class PatchDialog : Form
     //  Actions
     // =================================================================================
 
+    /// <summary>Adds a fixture of the chosen model at the first free address (disabled when the universe is full).</summary>
     private void AddFixture()
     {
         if (_addModel.SelectedItem is not ModelItem item || FixtureLibrary.EnsureProfile(_profiles, item.Id) is not FixtureProfile profile)
@@ -496,6 +511,7 @@ internal sealed class PatchDialog : Form
         _name.SelectAll();
     }
 
+    /// <summary>Duplicates the selected fixture at the next free address.</summary>
     private void DuplicateFixture()
     {
         if (Selected is not FixtureInstance original)
@@ -512,6 +528,7 @@ internal sealed class PatchDialog : Form
         RebuildGrid(SelectedIndex + 1);
     }
 
+    /// <summary>Removes the selected fixture.</summary>
     private void RemoveFixture()
     {
         if (Selected is not FixtureInstance fixture)
@@ -523,6 +540,7 @@ internal sealed class PatchDialog : Form
         RebuildGrid(index);
     }
 
+    /// <summary>"Free address" button: moves the selected fixture to the first free range.</summary>
     private void AssignNextFreeAddress()
     {
         if (Selected is not FixtureInstance fixture)
@@ -539,6 +557,7 @@ internal sealed class PatchDialog : Form
         _address.Value = address; // -> EditSelected
     }
 
+    /// <summary>Moves the selected fixture up (-1) or down (+1): the order of the rows is the order of the tabs.</summary>
     private void MoveSelected(int delta)
     {
         int index = SelectedIndex;
@@ -551,6 +570,7 @@ internal sealed class PatchDialog : Form
         RebuildGrid(target);
     }
 
+    /// <summary>OK: warns about remaining conflicts, then closes with the edited patch.</summary>
     private void Accept()
     {
         var problems = ValidateAll();

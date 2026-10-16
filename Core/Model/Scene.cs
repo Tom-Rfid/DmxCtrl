@@ -1,17 +1,18 @@
 // =====================================================================================
 //  Scene.cs
 // -------------------------------------------------------------------------------------
-//  Une SCENE est une "photo" de la console : les valeurs de chaque canal de chaque
-//  appareil + les effets en cours (mouvement, chenillard, strobe) + la selection
-//  d'appareils a laquelle ces effets s'appliquent. Rappeler une scene remet tout
-//  ca en place, avec un fondu optionnel.
+//  A SCENE is a "snapshot" of the console: the values of every channel of every
+//  fixture + the running effects (movement, chase, strobe) + the fixture selection
+//  these effects apply to. Recalling a scene puts all that back, with an optional
+//  fade.
 //
-//  Les valeurs sont rangees par Id d'appareil (et non par adresse DMX) : si on
-//  change l'adressage dans le patch, les scenes restent valables.
+//  Values are stored by fixture Id (not by DMX address): when the addressing changes
+//  in the patch, the scenes stay valid.
 // =====================================================================================
 
 namespace DmxController.Core.Model;
 
+/// <summary>Movement effect shapes.</summary>
 public enum MovementShape
 {
     None,
@@ -21,10 +22,13 @@ public enum MovementShape
     TiltSweep,
 }
 
+/// <summary>Labels of the movement shapes.</summary>
 public static class MovementShapeInfo
 {
+    /// <summary>Every shape, in declaration order.</summary>
     public static IReadOnlyList<MovementShape> All { get; } = Enum.GetValues<MovementShape>();
 
+    /// <summary>Translated label of a shape.</summary>
     public static string DisplayName(MovementShape shape) => shape switch
     {
         MovementShape.None => Tr.T("Aucun (position fixe)"),
@@ -36,59 +40,71 @@ public static class MovementShapeInfo
     };
 }
 
-/// <summary>Effets "live" calcules en temps reel par le moteur.</summary>
+/// <summary>"Live" effects computed in real time by the engine.</summary>
 public sealed class LiveEffects
 {
-    // --- Mouvement (lyres) : autour de la position reglee dans l'onglet de l'appareil ---
+    // --- Movement (moving heads): around the position set in the fixture's tab ---
+    /// <summary>Movement shape (None = fixed position).</summary>
     public MovementShape Shape { get; set; } = MovementShape.None;
 
-    /// <summary>Vitesse en cycles par minute (si non cale sur le BPM).</summary>
+    /// <summary>Speed in cycles per minute (when not locked to the BPM).</summary>
     public double SpeedCyclesPerMinute { get; set; } = 20;
 
+    /// <summary>Movement speed taken from the BPM (MovementBeatsPerCycle) instead of MovementSpeed.</summary>
     public bool MovementSyncToBpm { get; set; }
 
-    /// <summary>Nombre de temps (beats) pour un cycle complet quand on est cale sur le BPM.</summary>
+    /// <summary>Number of beats for a full cycle when locked to the BPM.</summary>
     public double BeatsPerCycle { get; set; } = 8;
 
-    /// <summary>Amplitude : 100 % = +/- un quart de la course totale du pan/tilt.</summary>
+    /// <summary>Amplitude: 100 % = +/- a quarter of the full pan/tilt travel.</summary>
     public int SizePercent { get; set; } = 40;
 
-    /// <summary>Decalage entre appareils : 0 % = tous synchro, 100 % = repartis (2 lyres = opposees).</summary>
+    /// <summary>Offset between fixtures: 0 % = all in sync, 100 % = spread out (2 heads = opposite).</summary>
     public int SpreadPercent { get; set; } = 50;
 
-    /// <summary>Inverse le pan d'un appareil sur deux (effet miroir).</summary>
+    /// <summary>Inverts the pan of every other fixture (mirror effect).</summary>
     public bool Mirror { get; set; }
 
-    // --- Chenillard de couleurs ---
+    // --- Colour chase ---
+    /// <summary>Colour chase on.</summary>
     public bool ColorChase { get; set; }
+    /// <summary>Length of a chase step in seconds (when not locked to the BPM).</summary>
     public double ColorChaseStepSeconds { get; set; } = 1.0;
+    /// <summary>Chase step taken from the BPM (ColorChaseBeats) instead of ColorChaseStepSeconds.</summary>
     public bool ColorChaseSyncToBpm { get; set; }
+    /// <summary>Number of beats per chase step when locked to the BPM.</summary>
     public double ColorChaseBeatsPerStep { get; set; } = 2;
 
-    /// <summary>true = chaque appareil a une couleur differente (decalee d'un cran).</summary>
+    /// <summary>true = each fixture has a different colour (shifted by one step).</summary>
     public bool ColorChaseAlternate { get; set; } = true;
 
-    /// <summary>Noms des couleurs de ColorPalette utilisees, dans l'ordre.</summary>
+    /// <summary>Names of the ColorPalette colours used, in order.</summary>
     public List<string> ColorChasePalette { get; set; } = new() { "Rouge", "Orange", "Jaune", "Vert", "Cyan", "Bleu", "Violet", "Magenta" };
 
-    // --- Strobe logiciel (coupe le dimmer en rythme) ---
+    // --- Software strobe (cuts the dimmer in rhythm) ---
+    /// <summary>Software strobe on.</summary>
     public bool Strobe { get; set; }
+    /// <summary>Software strobe frequency (flashes per second).</summary>
     public double StrobeHz { get; set; } = 4;
 }
 
+/// <summary>Saved scene: values of every fixture, effects and selection.</summary>
 public sealed class Scene
 {
+    /// <summary>Unique id of the scene.</summary>
     public string Id { get; set; } = FixtureProfile.NewId();
+    /// <summary>Name shown on the scene button.</summary>
     public string Name { get; set; } = "Scène";
 
-    /// <summary>Incluse dans l'enchainement automatique (mode auto).</summary>
+    /// <summary>Included in the automatic sequence (auto mode).</summary>
     public bool IncludeInAuto { get; set; } = true;
 
-    /// <summary>Id d'appareil -> valeurs de ses canaux (dans l'ordre du profil).</summary>
+    /// <summary>Fixture Id -> values of its channels (in profile order).</summary>
     public Dictionary<string, int[]> Values { get; set; } = new();
 
+    /// <summary>Live effects of the scene.</summary>
     public LiveEffects Effects { get; set; } = new();
 
-    /// <summary>Id des appareils auxquels s'appliquent couleurs et effets.</summary>
+    /// <summary>Ids of the fixtures that colours and effects apply to.</summary>
     public List<string> Selection { get; set; } = new();
 }

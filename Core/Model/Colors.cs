@@ -1,13 +1,14 @@
 // =====================================================================================
 //  Colors.cs
 // -------------------------------------------------------------------------------------
-//  Palette de couleurs de la console + traduction "couleur -> valeurs de canaux"
-//  selon ce que sait faire chaque appareil :
-//    - melange RGB(W) : on ecrit directement les composantes (Spider) ;
-//    - roue de couleurs : on cherche un PRESET portant le meme nom que la couleur
-//      (ex. preset "Rouge" sur le canal Roue de couleurs de la 260X). Tant que ces
-//      presets n'ont pas ete releves sur l'appareil, la couleur n'est pas dispo
-//      pour lui : l'IHM le signale au lieu d'envoyer une valeur au hasard.
+//  Colour palette of the console + translation "colour -> channel values"
+//  depending on what each fixture can do:
+//    - RGB(W) mixing: the components are written directly (Spider);
+//    - colour wheel: a PRESET with the same name as the colour is looked up
+//      (e.g. preset "Rouge" on the Colour wheel channel of the 260X). As long as these
+//      presets have not been recorded on the fixture, the colour is not available
+//      for it: the UI says so instead of sending a random value.
+//  Colour names are French keys (used to match presets); the UI translates them.
 // =====================================================================================
 
 using System.Globalization;
@@ -15,14 +16,17 @@ using System.Text;
 
 namespace DmxController.Core.Model;
 
-/// <param name="IsUv">Couleur "UV" : allume la LED UV (lumiere noire) et eteint les autres.</param>
+/// <param name="IsUv">"UV" colour: switches the UV LED (black light) on and the others off.</param>
 public sealed record NamedColor(string Name, byte R, byte G, byte B, bool IsUv = false)
 {
+    /// <summary>Pure white (not UV).</summary>
     public bool IsWhite => !IsUv && R == 255 && G == 255 && B == 255;
 }
 
+/// <summary>Colours of the console.</summary>
 public static class ColorPalette
 {
+    /// <summary>Colours of the console, in button order. Names are French keys (translated when shown).</summary>
     public static IReadOnlyList<NamedColor> All { get; } = new[]
     {
         new NamedColor("Rouge", 255, 0, 0),
@@ -34,17 +38,19 @@ public static class ColorPalette
         new NamedColor("Violet", 120, 0, 255),
         new NamedColor("Magenta", 255, 0, 255),
         new NamedColor("Blanc", 255, 255, 255),
-        new NamedColor("UV", 90, 0, 170, IsUv: true), // affiche en violet fonce dans l'IHM
+        new NamedColor("UV", 90, 0, 170, IsUv: true), // shown in dark purple in the UI
     };
 
+    /// <summary>Colour by name (ignoring case and accents), or null.</summary>
     public static NamedColor? Find(string? name) => All.FirstOrDefault(c => TextKey.Same(c.Name, name));
 }
 
+/// <summary>Writes a console colour into the channel values of a fixture.</summary>
 public static class ColorMapper
 {
     /// <summary>
-    /// Ecrit la couleur dans les valeurs d'un appareil (tableau dans l'ordre du profil).
-    /// Retourne false si l'appareil ne sait pas afficher cette couleur.
+    /// Writes the colour into the values of a fixture (array in profile order).
+    /// Returns false when the fixture cannot show this colour.
     /// </summary>
     public static bool Apply(FixtureProfile profile, byte[] values, NamedColor color)
     {
@@ -55,7 +61,7 @@ public static class ColorMapper
 
         if (color.IsUv)
         {
-            // UV : seulement les appareils qui ont une LED UV (ou un preset "UV" sur leur roue).
+            // UV: only the fixtures that have a UV LED (or a "UV" preset on their wheel).
             if (profile.Has(ChannelType.UV))
             {
                 for (int i = 0; i < channels.Count && i < values.Length; i++)
@@ -70,7 +76,7 @@ public static class ColorMapper
         }
         else if (hasRgb || (hasWhite && color.IsWhite))
         {
-            // Pour le blanc, on prefere la LED blanche dediee si elle existe (plus belle).
+            // For white, the dedicated white LED is preferred when there is one (nicer).
             bool whiteOnly = color.IsWhite && hasWhite;
             for (int i = 0; i < channels.Count && i < values.Length; i++)
             {
@@ -87,7 +93,7 @@ public static class ColorMapper
             applied = true;
         }
 
-        // Roue de couleurs : uniquement via un preset du meme nom (jamais de valeur devinee).
+        // Colour wheel: only through a preset with the same name (never a guessed value).
         for (int i = 0; i < channels.Count && i < values.Length; i++)
         {
             if (channels[i].Type != ChannelType.ColorWheel)
@@ -107,9 +113,10 @@ public static class ColorMapper
     }
 }
 
-/// <summary>Comparaison de noms insensible a la casse et aux accents ("Bleu" == "bleu", "Éclair" == "eclair").</summary>
+/// <summary>Name comparison ignoring case and accents ("Bleu" == "bleu", "Éclair" == "eclair").</summary>
 public static class TextKey
 {
+    /// <summary>Lower-case text without accents, used to compare names.</summary>
     public static string Normalize(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -129,5 +136,6 @@ public static class TextKey
         return sb.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
     }
 
+    /// <summary>true when both names are equal ignoring case and accents.</summary>
     public static bool Same(string? a, string? b) => Normalize(a) == Normalize(b);
 }

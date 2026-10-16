@@ -1,9 +1,11 @@
 // =====================================================================================
 //  Controls.cs
 // -------------------------------------------------------------------------------------
-//  Deux controles dessines a la main :
-//    - XYPad      : carre ou l'on clique/glisse pour orienter une lyre (pan/tilt)
-//    - DmxMonitor : barres montrant les valeurs reellement envoyees au boitier
+//  Hand-drawn controls:
+//    - XYPad         : square where you click/drag to aim a moving head (pan/tilt)
+//    - VerticalFader : console-style vertical fader
+//    - GroupLevelPad : bar chart of the LED groups of a fixture (A, B, C, All)
+//    - DmxMonitor    : bars showing the values actually sent to the box
 // =====================================================================================
 
 using System.ComponentModel;
@@ -12,26 +14,27 @@ using DmxController.Core.Protocol;
 
 namespace DmxController.UI;
 
-/// <summary>Pad 2D en valeurs 16 bits (0..65535) : pan/tilt pour une lyre, ailes/dimmer pour le Spider.</summary>
+/// <summary>2D pad with 16-bit values (0..65535): pan/tilt for a moving head, wings/dimmer for the Spider.</summary>
 [DesignerCategory("Code")]
 internal sealed class XYPad : Control
 {
     private int _x = 32768;
     private int _y = 32768;
 
-    /// <summary>Libelle de l'axe horizontal (dessine en bas a gauche).</summary>
+    /// <summary>Label of the horizontal axis (drawn bottom left).</summary>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string XLabel { get; set; } = Tr.T("Pan →");
 
-    /// <summary>Libelle de l'axe vertical (dessine en haut a gauche).</summary>
+    /// <summary>Label of the vertical axis (drawn top left).</summary>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string YLabel { get; set; } = Tr.T("Tilt ↓");
 
-    /// <summary>Leve quand l'utilisateur deplace le point (pas lors d'un changement par code).</summary>
+    /// <summary>Raised when the user moves the point (not on a change made by code).</summary>
     public event EventHandler? ValueChanged;
 
+    /// <summary>Creates the pad (double-buffered, centred point).</summary>
     public XYPad()
     {
         DoubleBuffered = true;
@@ -66,6 +69,7 @@ internal sealed class XYPad : Control
 
     private Rectangle Inner => new(8, 8, Math.Max(1, Width - 16), Math.Max(1, Height - 16));
 
+    /// <summary>Click: moves the point under the mouse.</summary>
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
@@ -76,6 +80,7 @@ internal sealed class XYPad : Control
         }
     }
 
+    /// <summary>Drag with the left button: the point follows the mouse.</summary>
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
@@ -85,6 +90,7 @@ internal sealed class XYPad : Control
         }
     }
 
+    /// <summary>Converts a mouse position into 16-bit X/Y values and raises ValueChanged.</summary>
     private void SetFromPoint(Point p)
     {
         var r = Inner;
@@ -94,6 +100,7 @@ internal sealed class XYPad : Control
         ValueChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Draws the grid, the axis labels and the current point.</summary>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -125,17 +132,18 @@ internal sealed class XYPad : Control
 }
 
 /// <summary>
-/// Fader vertical facon console : bas = 0 %, haut = 100 % (valeur 0..255). On clique ou on
-/// glisse n'importe ou dans la zone ; la molette ajuste par pas de 5 %.
+/// Console-style vertical fader: bottom = 0 %, top = 100 % (value 0..255). Click or drag
+/// anywhere in the area; the mouse wheel moves it in 5 % steps.
 /// </summary>
 [DesignerCategory("Code")]
 internal sealed class VerticalFader : Control
 {
     private int _value;
 
-    /// <summary>Leve quand l'utilisateur change la valeur (pas lors d'un changement par code).</summary>
+    /// <summary>Raised when the user changes the value (not on a change made by code).</summary>
     public event EventHandler? ValueChanged;
 
+    /// <summary>Creates the fader (double-buffered, value 0).</summary>
     public VerticalFader()
     {
         DoubleBuffered = true;
@@ -156,13 +164,14 @@ internal sealed class VerticalFader : Control
         }
     }
 
-    /// <summary>Couleur de remplissage (ex. blanc chaud pour des LED).</summary>
+    /// <summary>Fill colour (e.g. warm white for LEDs).</summary>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Color FillColor { get; set; } = Color.FromArgb(255, 200, 80);
 
     private Rectangle Track => new(6, 6, Math.Max(1, Width - 12), Math.Max(1, Height - 30));
 
+    /// <summary>Click: sets the value at the mouse height.</summary>
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
@@ -174,6 +183,7 @@ internal sealed class VerticalFader : Control
         }
     }
 
+    /// <summary>Drag with the left button: the value follows the mouse height.</summary>
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
@@ -183,19 +193,22 @@ internal sealed class VerticalFader : Control
         }
     }
 
+    /// <summary>Mouse wheel: +/- 5 % per notch.</summary>
     protected override void OnMouseWheel(MouseEventArgs e)
     {
         base.OnMouseWheel(e);
         Change(_value + Math.Sign(e.Delta) * 13); // ~5 %
     }
 
+    /// <summary>Converts a mouse height into a value (bottom = 0, top = 255).</summary>
     private void SetFromY(int y)
     {
         var r = Track;
-        double fraction = 1 - Math.Clamp((y - r.Top) / (double)r.Height, 0, 1); // bas = 0, haut = 1
+        double fraction = 1 - Math.Clamp((y - r.Top) / (double)r.Height, 0, 1); // bottom = 0, top = 1
         Change((int)Math.Round(fraction * 255));
     }
 
+    /// <summary>Sets the value (clamped to 0..255) and raises ValueChanged when it changed.</summary>
     private void Change(int value)
     {
         value = Math.Clamp(value, 0, 255);
@@ -208,6 +221,7 @@ internal sealed class VerticalFader : Control
         ValueChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Draws the background, the filled part up to the level and the knob mark.</summary>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -222,7 +236,7 @@ internal sealed class VerticalFader : Control
         using var border = new Pen(Color.FromArgb(110, 118, 140));
         g.DrawRectangle(border, r);
 
-        // Petit repere horizontal au niveau actuel (la "manette" du fader).
+        // Small horizontal mark at the current level (the fader "knob").
         using var knob = new Pen(Color.White, 3);
         g.DrawLine(knob, r.Left - 3, r.Bottom - h, r.Right + 3, r.Bottom - h);
 
@@ -233,9 +247,9 @@ internal sealed class VerticalFader : Control
 }
 
 /// <summary>
-/// Graphique des groupes de LED d'un projecteur (PAR UV : groupes A, B, C) + une derniere colonne
-/// "Tous". En X : la colonne = le groupe pilote ; en Y : son niveau (bas = 0 %, haut = 100 %).
-/// On clique ou on glisse : le groupe sous la souris prend le niveau de la hauteur du pointeur.
+/// Chart of the LED groups of a fixture (UV PAR: groups A, B, C) + a last "All" column.
+/// X: the column = the controlled group; Y: its level (bottom = 0 %, top = 100 %).
+/// Click or drag: the group under the mouse takes the level of the pointer height.
 /// </summary>
 [DesignerCategory("Code")]
 internal sealed class GroupLevelPad : Control
@@ -243,9 +257,10 @@ internal sealed class GroupLevelPad : Control
     private byte[] _levels = Array.Empty<byte>();
     private int _active = -1;
 
-    /// <summary>Leve quand l'utilisateur regle une colonne : (index de colonne, niveau 0..255). Derniere colonne = tous.</summary>
+    /// <summary>Raised when the user sets a column: (column index, level 0..255). Last column = all.</summary>
     public event Action<int, byte>? LevelChanged;
 
+    /// <summary>Creates the chart (double-buffered).</summary>
     public GroupLevelPad()
     {
         DoubleBuffered = true;
@@ -254,12 +269,12 @@ internal sealed class GroupLevelPad : Control
         Cursor = Cursors.Hand;
     }
 
-    /// <summary>Noms des groupes (A, B, C...) ; une colonne "Tous" est ajoutee a la fin.</summary>
+    /// <summary>Group names (A, B, C...); an "All" column is added at the end.</summary>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string[] GroupNames { get; set; } = { "A", "B", "C" };
 
-    /// <summary>Niveaux actuels des groupes (affichage, sans lever d'evenement).</summary>
+    /// <summary>Current levels of the groups (display only, no event raised).</summary>
     public void SetLevels(byte[] levels)
     {
         _levels = levels;
@@ -270,6 +285,7 @@ internal sealed class GroupLevelPad : Control
 
     private Rectangle Area => new(6, 6, Math.Max(1, Width - 12), Math.Max(1, Height - 28));
 
+    /// <summary>Click: the column under the mouse takes the level of the pointer height.</summary>
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
@@ -281,16 +297,18 @@ internal sealed class GroupLevelPad : Control
         }
     }
 
+    /// <summary>Drag: same as a click, the column under the mouse can change while dragging.</summary>
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
         if (e.Button == MouseButtons.Left)
         {
-            _active = ColumnAt(e.X); // on peut glisser d'un groupe a l'autre
+            _active = ColumnAt(e.X); // you can drag from one group to the next
             Apply(e.Y);
         }
     }
 
+    /// <summary>Releases the mouse capture.</summary>
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
@@ -298,20 +316,23 @@ internal sealed class GroupLevelPad : Control
         Invalidate();
     }
 
+    /// <summary>Index of the column under horizontal position <paramref name="x"/>.</summary>
     private int ColumnAt(int x)
     {
         var r = Area;
         return Math.Clamp((int)((x - r.Left) / (double)r.Width * Columns), 0, Columns - 1);
     }
 
+    /// <summary>Converts the pointer height into a level and raises LevelChanged for the active column.</summary>
     private void Apply(int y)
     {
         var r = Area;
-        double fraction = 1 - Math.Clamp((y - r.Top) / (double)r.Height, 0, 1); // haut = 100 %
+        double fraction = 1 - Math.Clamp((y - r.Top) / (double)r.Height, 0, 1); // top = 100 %
         LevelChanged?.Invoke(_active, (byte)Math.Round(fraction * 255));
         Invalidate();
     }
 
+    /// <summary>Draws one bar per group plus the "All" column, with their percentages.</summary>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -330,7 +351,7 @@ internal sealed class GroupLevelPad : Control
                 g.FillRectangle(highlight, x, r.Top, columnWidth, r.Height);
             }
 
-            // Niveau : celui du groupe, ou le plus fort des groupes pour "Tous".
+            // Level: the group's own, or the highest of the groups for "All".
             bool isAll = c == Columns - 1;
             int level = isAll ? (_levels.Length == 0 ? 0 : _levels.Max()) : (c < _levels.Length ? _levels[c] : 0);
             float h = level / 255f * r.Height;
@@ -344,7 +365,7 @@ internal sealed class GroupLevelPad : Control
             TextRenderer.DrawText(g, Tr.F("{0}  {1} %", name, (level * 100 / 255)), Font, new Rectangle((int)x, Height - 22, (int)columnWidth, 20),
                 Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
-        // Reperes 50 % et bord.
+        // 50 % mark and border.
         using var half = new Pen(Color.FromArgb(90, 94, 110)) { DashStyle = DashStyle.Dot };
         g.DrawLine(half, r.Left, r.Top + r.Height / 2, r.Right, r.Top + r.Height / 2);
         using var border = new Pen(Color.FromArgb(110, 118, 140));
@@ -352,13 +373,14 @@ internal sealed class GroupLevelPad : Control
     }
 }
 
-/// <summary>Moniteur de sortie : une barre par canal DMX.</summary>
+/// <summary>Output monitor: one bar per DMX channel.</summary>
 [DesignerCategory("Code")]
 internal sealed class DmxMonitor : Control
 {
     private readonly byte[] _values = DmxFrame.NewUniverse();
     private int _count = 48;
 
+    /// <summary>Creates the monitor (double-buffered).</summary>
     public DmxMonitor()
     {
         DoubleBuffered = true;
@@ -366,7 +388,7 @@ internal sealed class DmxMonitor : Control
         BackColor = Color.FromArgb(24, 26, 32);
     }
 
-    /// <summary>Nombre de canaux affiches (a partir du canal 1).</summary>
+    /// <summary>Number of channels shown (from channel 1).</summary>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int ChannelCount
@@ -379,12 +401,14 @@ internal sealed class DmxMonitor : Control
         }
     }
 
+    /// <summary>Shows a new universe (513 bytes, index N = channel N).</summary>
     public void SetValues(byte[] universe)
     {
         Array.Copy(universe, _values, Math.Min(universe.Length, _values.Length));
         Invalidate();
     }
 
+    /// <summary>Draws one bar per channel, with channel numbers every 8 channels.</summary>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
