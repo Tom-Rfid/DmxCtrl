@@ -139,7 +139,7 @@ internal static class Ui
         double luminance = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B;
         return new Button
         {
-            Text = color.Name,
+            Text = Tr.T(color.Name),
             BackColor = back,
             ForeColor = luminance > 140 ? Color.Black : Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -179,8 +179,8 @@ internal static class InputDialog
         };
         var label = new Label { Text = prompt, Location = new Point(12, 12), Size = new Size(416, 50) };
         var box = new TextBox { Text = initial, Location = new Point(12, 66), Width = 416 };
-        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(266, 108), Width = 78 };
-        var cancel = new Button { Text = "Annuler", DialogResult = DialogResult.Cancel, Location = new Point(350, 108), Width = 78 };
+        var ok = new Button { Text = Tr.T("OK"), DialogResult = DialogResult.OK, Location = new Point(266, 108), Width = 78 };
+        var cancel = new Button { Text = Tr.T("Annuler"), DialogResult = DialogResult.Cancel, Location = new Point(350, 108), Width = 78 };
         form.Controls.AddRange(new Control[] { label, box, ok, cancel });
         form.AcceptButton = ok;
         form.CancelButton = cancel;

@@ -22,12 +22,12 @@ internal sealed class XYPad : Control
     /// <summary>Libelle de l'axe horizontal (dessine en bas a gauche).</summary>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public string XLabel { get; set; } = "Pan →";
+    public string XLabel { get; set; } = Tr.T("Pan →");
 
     /// <summary>Libelle de l'axe vertical (dessine en haut a gauche).</summary>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public string YLabel { get; set; } = "Tilt ↓";
+    public string YLabel { get; set; } = Tr.T("Tilt ↓");
 
     /// <summary>Leve quand l'utilisateur deplace le point (pas lors d'un changement par code).</summary>
     public event EventHandler? ValueChanged;
@@ -226,7 +226,7 @@ internal sealed class VerticalFader : Control
         using var knob = new Pen(Color.White, 3);
         g.DrawLine(knob, r.Left - 3, r.Bottom - h, r.Right + 3, r.Bottom - h);
 
-        string text = $"{_value * 100 / 255} %";
+        string text = Tr.F("{0} %", (_value * 100 / 255));
         TextRenderer.DrawText(g, text, Font, new Rectangle(0, Height - 22, Width, 20), Color.White,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
     }
@@ -340,8 +340,8 @@ internal sealed class GroupLevelPad : Control
             {
                 g.DrawLine(grid, x, r.Top, x, r.Bottom);
             }
-            string name = isAll ? "Tous" : GroupNames[c];
-            TextRenderer.DrawText(g, $"{name}  {level * 100 / 255} %", Font, new Rectangle((int)x, Height - 22, (int)columnWidth, 20),
+            string name = isAll ? Tr.T("Tous") : GroupNames[c];
+            TextRenderer.DrawText(g, Tr.F("{0}  {1} %", name, (level * 100 / 255)), Font, new Rectangle((int)x, Height - 22, (int)columnWidth, 20),
                 Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
         // Reperes 50 % et bord.

@@ -106,7 +106,7 @@ public static class FixtureLibrary
                     }
                 }
             }
-            messages.Add($"Profil « {model.Name} » mis à jour depuis la bibliothèque (table DMX corrigée : {old.ChannelCount} → {model.ChannelCount} canaux, valeurs des scènes reclassées).");
+            messages.Add(Tr.F("Profil « {0} » mis à jour depuis la bibliothèque (table DMX corrigée : {1} → {2} canaux, valeurs des scènes reclassées).", Tr.T(model.Name), old.ChannelCount, model.ChannelCount));
         }
         return messages;
     }

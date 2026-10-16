@@ -26,7 +26,7 @@ internal sealed class FixturePanel : UserControl
 {
     private sealed record PresetItem(string Name, byte Value)
     {
-        public override string ToString() => $"{Name} ({Value})";
+        public override string ToString() => $"{Tr.T(Name)} ({Value})";
     }
 
     private const string NoPreset = "— preset —";
@@ -86,8 +86,8 @@ internal sealed class FixturePanel : UserControl
     // Bandeau affiche quand l'appareil joue un programme interne (canal Mode hors "Manuel").
     private readonly Label _modeLock = new()
     {
-        Text = "Mode programme interne : dimmer, groupes, strobe et effet au tempo sont inactifs. " +
-               "Choisis « Manuel (DMX direct) » dans le canal Mode pour les retrouver.",
+        Text = Tr.T("Mode programme interne : dimmer, groupes, strobe et effet au tempo sont inactifs. ") +
+               Tr.T("Choisis « Manuel (DMX direct) » dans le canal Mode pour les retrouver."),
         AutoSize = true,
         MaximumSize = new Size(1000, 0),
         Font = Ui.BoldFont,
@@ -127,20 +127,20 @@ internal sealed class FixturePanel : UserControl
         };
         header.Controls.Add(new Label
         {
-            Text = $"{fixture.Name}  —  {profile.Manufacturer} {profile.Name}".Trim(),
+            Text = $"{fixture.Name}  —  {profile.Manufacturer} {Tr.T(profile.Name)}".Trim(),
             AutoSize = true,
             Font = Ui.TitleFont,
         });
         header.Controls.Add(Ui.Text(
-            $"Adresse DMX {fixture.Address} : canaux {fixture.Address} à {fixture.EndAddress(profile)}" +
-            (fixture.Enabled ? "" : "   —   APPAREIL DÉSACTIVÉ dans le patch (rien n'est envoyé)"),
+            Tr.F("Adresse DMX {0} : canaux {1} à {2}", fixture.Address, fixture.Address, fixture.EndAddress(profile)) +
+            (fixture.Enabled ? "" : Tr.T("   —   APPAREIL DÉSACTIVÉ dans le patch (rien n'est envoyé)")),
             color: fixture.Enabled ? Color.DimGray : Color.DarkRed));
         header.Controls.Add(_warning);
         if (!string.IsNullOrWhiteSpace(profile.Notes))
         {
             header.Controls.Add(new Label
             {
-                Text = profile.Notes,
+                Text = Tr.T(profile.Notes),
                 AutoSize = true,
                 MaximumSize = new Size(1000, 0),
                 ForeColor = Color.DimGray,
@@ -156,19 +156,19 @@ internal sealed class FixturePanel : UserControl
             _xy = new XYPad { Location = new Point(12, 6), Size = new Size(260, 260) };
             _xy.ValueChanged += OnXyChanged;
 
-            var center = new Button { Text = "Centrer", Location = new Point(12, 274), Width = 126, Height = 30 };
+            var center = new Button { Text = Tr.T("Centrer"), Location = new Point(12, 274), Width = 126, Height = 30 };
             center.Click += (_, _) =>
             {
                 _ctx.Engine.SetPanTilt16(_fixture.Id, 32768, 32768);
                 RefreshFromEngine();
             };
-            var reset = new Button { Text = "Par défaut", Location = new Point(146, 274), Width = 126, Height = 30 };
+            var reset = new Button { Text = Tr.T("Par défaut"), Location = new Point(146, 274), Width = 126, Height = 30 };
             reset.Click += (_, _) => ResetDefaults();
 
             var hint = new Label
             {
-                Text = "Clique / glisse dans le carré pour orienter la lyre.\n" +
-                       "Les effets de mouvement de l'onglet Soirée tournent autour de cette position.",
+                Text = Tr.T("Clique / glisse dans le carré pour orienter la lyre.\n") +
+                       Tr.T("Les effets de mouvement de l'onglet Soirée tournent autour de cette position."),
                 Location = new Point(12, 312),
                 Size = new Size(260, 60),
                 ForeColor = Color.DimGray,
@@ -188,42 +188,42 @@ internal sealed class FixturePanel : UserControl
                 _ledRight = new VerticalFader { Location = new Point(340, 6), Size = new Size(48, 200) };
                 _ledLeft.ValueChanged += (_, _) => OnLedFader(0);
                 _ledRight.ValueChanged += (_, _) => OnLedFader(1);
-                _tips.SetToolTip(_ledLeft, $"LED de l'aile gauche ({LedNames(_groupLeft)}) : bas = 0 %, haut = 100 %.\nGarde la couleur en cours (les proportions entre LED).");
-                _tips.SetToolTip(_ledRight, $"LED de l'aile droite ({LedNames(_groupRight)}) : bas = 0 %, haut = 100 %.\nGarde la couleur en cours (les proportions entre LED).");
+                _tips.SetToolTip(_ledLeft, Tr.F("LED de l'aile gauche ({0}) : bas = 0 %, haut = 100 %.\nGarde la couleur en cours (les proportions entre LED).", LedNames(_groupLeft)));
+                _tips.SetToolTip(_ledRight, Tr.F("LED de l'aile droite ({0}) : bas = 0 %, haut = 100 %.\nGarde la couleur en cours (les proportions entre LED).", LedNames(_groupRight)));
                 left.Controls.Add(_ledLeft);
                 left.Controls.Add(_ledRight);
-                left.Controls.Add(new Label { Text = "LED\ngauche", Location = new Point(276, 210), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
-                left.Controls.Add(new Label { Text = "LED\ndroite", Location = new Point(332, 210), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
+                left.Controls.Add(new Label { Text = Tr.T("LED\ngauche"), Location = new Point(276, 210), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
+                left.Controls.Add(new Label { Text = Tr.T("LED\ndroite"), Location = new Point(332, 210), Size = new Size(64, 46), TextAlign = ContentAlignment.TopCenter });
             }
             _wings = new XYPad
             {
                 Location = new Point(12, 6),
                 Size = new Size(260, 200),
-                XLabel = "Ailes ← gauche · droite →",
-                YLabel = _dimmer >= 0 ? "Dimmer : haut = 100 %, bas = 0" : "",
+                XLabel = Tr.T("Ailes ← gauche · droite →"),
+                YLabel = _dimmer >= 0 ? Tr.T("Dimmer : haut = 100 %, bas = 0") : "",
             };
             _wings.ValueChanged += OnWingsChanged;
 
             _mirrorWings = new CheckBox
             {
-                Text = "Inverser (ailes en miroir)",
+                Text = Tr.T("Inverser (ailes en miroir)"),
                 Checked = fixture.MirrorMotors,
                 Location = new Point(12, 240),
                 AutoSize = true,
             };
             _mirrorWings.CheckedChanged += (_, _) => OnMirrorChanged();
 
-            var center = new Button { Text = "Ailes au milieu", Location = new Point(12, 266), Width = 126, Height = 30 };
+            var center = new Button { Text = Tr.T("Ailes au milieu"), Location = new Point(12, 266), Width = 126, Height = 30 };
             center.Click += (_, _) =>
             {
                 _ctx.Engine.SetMotors(_fixture.Id, 128, _mirrorWings.Checked);
                 RefreshFromEngine();
             };
-            var reset = new Button { Text = "Par défaut", Location = new Point(146, 266), Width = 126, Height = 30 };
+            var reset = new Button { Text = Tr.T("Par défaut"), Location = new Point(146, 266), Width = 126, Height = 30 };
             reset.Click += (_, _) => ResetDefaults();
 
             _wingsInfo = new Label { Location = new Point(12, 302), Size = new Size(260, 20), Font = Ui.BoldFont };
-            _tips.SetToolTip(_wings, "Gauche / droite : les 2 ailes (opposées avec « Inverser »). Haut / bas : dimmer.");
+            _tips.SetToolTip(_wings, Tr.T("Gauche / droite : les 2 ailes (opposées avec « Inverser »). Haut / bas : dimmer."));
             left.Controls.AddRange(new Control[] { _wings, _mirrorWings, center, reset, _wingsInfo });
 
             // Masque de couleurs : une couleur decochee est forcee a 0 en sortie DMX, quoi qu'il arrive.
@@ -236,12 +236,12 @@ internal sealed class FixturePanel : UserControl
                 WrapContents = false,
                 Margin = new Padding(0),
             };
-            _maskAll = new CheckBox { Text = "All", AutoSize = true, Font = Ui.BoldFont };
+            _maskAll = new CheckBox { Text = Tr.T("All"), AutoSize = true, Font = Ui.BoldFont };
             maskRow.Controls.Add(_maskAll);
             var colors = new (ChannelType Type, string Label, Color Color)[]
             {
                 (ChannelType.Red, "R", Color.Red), (ChannelType.Green, "G", Color.Green),
-                (ChannelType.Blue, "B", Color.Blue), (ChannelType.White, "White", SystemColors.ControlText),
+                (ChannelType.Blue, "B", Color.Blue), (ChannelType.White, Tr.T("White"), SystemColors.ControlText),
             };
             foreach (var (type, label, color) in colors)
             {
@@ -251,13 +251,13 @@ internal sealed class FixturePanel : UserControl
                 }
                 var box = new CheckBox { Text = label, AutoSize = true, Tag = type, ForeColor = color, Font = Ui.BoldFont, Checked = !fixture.MutedColors.Contains(type) };
                 box.CheckedChanged += (_, _) => OnMaskChanged();
-                _tips.SetToolTip(box, $"Décoché : toutes les LED {label} sont coupées (0) en sortie, même pendant un flash ou un chenillard.");
+                _tips.SetToolTip(box, Tr.F("Décoché : toutes les LED {0} sont coupées (0) en sortie, même pendant un flash ou un chenillard.", label));
                 _maskBoxes.Add(box);
                 maskRow.Controls.Add(box);
             }
             _maskAll.Checked = _maskBoxes.All(b => b.Checked);
             _maskAll.CheckedChanged += (_, _) => OnMaskAllChanged();
-            _tips.SetToolTip(_maskAll, "Coche / décoche toutes les couleurs.");
+            _tips.SetToolTip(_maskAll, Tr.T("Coche / décoche toutes les couleurs."));
             left.Controls.Add(maskRow);
 
             // Effet automatique gauche <-> droite avec un delai (suit la case "Inverser").
@@ -265,7 +265,7 @@ internal sealed class FixturePanel : UserControl
             // meme avec la mise a l'echelle de Windows (125 %, 150 %...).
             _sweep = new CheckBox
             {
-                Text = "Effet gauche ↔ droite",
+                Text = Tr.T("Effet gauche ↔ droite"),
                 Appearance = Appearance.Button,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Font = Ui.BoldFont,
@@ -276,8 +276,8 @@ internal sealed class FixturePanel : UserControl
             _sweepDelay = new NumericUpDown { Minimum = 0.2m, Maximum = 60, DecimalPlaces = 1, Increment = 0.1m, Width = 70 };
             _sweepAmplitude = new NumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Width = 70 };
             // 3 modes qui s'excluent : delai fixe (s), tempo saisi en BPM, tempo detecte au micro.
-            _modeDelay = new CheckBox { Text = "Délai", AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
-            _sweepSync = new CheckBox { Text = "Tempo", AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
+            _modeDelay = new CheckBox { Text = Tr.T("Délai"), AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
+            _sweepSync = new CheckBox { Text = Tr.T("Tempo"), AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
             _bpmBox = new NumericUpDown { Minimum = 30, Maximum = 300, DecimalPlaces = 1, Increment = 1, Width = 70 };
             _sweepBeats = new NumericUpDown { Minimum = 0.25m, Maximum = 64, DecimalPlaces = 2, Increment = 0.25m, Width = 70 };
             Ui.SetValue(_sweepDelay, fixture.WingSweepDelaySeconds);
@@ -294,7 +294,7 @@ internal sealed class FixturePanel : UserControl
             // Micro : meme micro que l'onglet Soiree (_ctx.Mic).
             _micListen = new CheckBox
             {
-                Text = "Micro",
+                Text = Tr.T("Micro"),
                 Appearance = Appearance.Button,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Size = new Size(110, 28),
@@ -302,15 +302,15 @@ internal sealed class FixturePanel : UserControl
             };
             _micListen.CheckedChanged += (_, _) => OnMicListenToggled();
             _micBpm = new Label { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 8, 3, 3) };
-            _micFollow = new CheckBox { Text = "Tempo du micro", AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
+            _micFollow = new CheckBox { Text = Tr.T("Tempo du micro"), AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
             _micFollow.CheckedChanged += (_, _) => OnModeChecked(SweepMode.Mic, _micFollow);
 
-            _tips.SetToolTip(_sweep, "Les ailes vont à gauche, attendent le délai, vont à droite, attendent… " +
-                                     "Avec « Inverser », l'aile 2 fait le mouvement opposé.");
-            _tips.SetToolTip(_modeDelay, "Un aller toutes les N secondes.");
-            _tips.SetToolTip(_sweepSync, "Tempo saisi en BPM (le même que l'onglet Soirée / tap tempo) : 1 aller = N temps.");
-            _tips.SetToolTip(_micListen, "Écoute le micro pour détecter le tempo (le même micro que l'onglet Soirée).");
-            _tips.SetToolTip(_micFollow, "Le BPM suit le tempo détecté au micro, et l'effet gauche/droite se cale dessus.");
+            _tips.SetToolTip(_sweep, Tr.T("Les ailes vont à gauche, attendent le délai, vont à droite, attendent… ") +
+                                     Tr.T("Avec « Inverser », l'aile 2 fait le mouvement opposé."));
+            _tips.SetToolTip(_modeDelay, Tr.T("Un aller toutes les N secondes."));
+            _tips.SetToolTip(_sweepSync, Tr.T("Tempo saisi en BPM (le même que l'onglet Soirée / tap tempo) : 1 aller = N temps."));
+            _tips.SetToolTip(_micListen, Tr.T("Écoute le micro pour détecter le tempo (le même micro que l'onglet Soirée)."));
+            _tips.SetToolTip(_micFollow, Tr.T("Le BPM suit le tempo détecté au micro, et l'effet gauche/droite se cale dessus."));
 
             var effect = new TableLayoutPanel
             {
@@ -341,12 +341,12 @@ internal sealed class FixturePanel : UserControl
                 }
             }
             Row(_sweep);
-            Row(_modeDelay, _sweepDelay, "s");
-            Row(_sweepSync, _bpmBox, "BPM");
+            Row(_modeDelay, _sweepDelay, Tr.T("s"));
+            Row(_sweepSync, _bpmBox, Tr.T("BPM"));
             Row(_micFollow, _micListen);
             Row(_micBpm);
-            Row(Ui.Text("1 aller (tempo) ="), _sweepBeats, "temps");
-            Row(Ui.Text("Amplitude"), _sweepAmplitude, "%");
+            Row(Ui.Text(Tr.T("1 aller (tempo) =")), _sweepBeats, Tr.T("temps"));
+            Row(Ui.Text(Tr.T("Amplitude")), _sweepAmplitude, Tr.T("%"));
             left.Controls.Add(effect);
             ShowMode(CurrentMode());
 
@@ -355,7 +355,7 @@ internal sealed class FixturePanel : UserControl
         }
         else
         {
-            var reset = new Button { Text = "Valeurs par défaut", AutoSize = true };
+            var reset = new Button { Text = Tr.T("Valeurs par défaut"), AutoSize = true };
             reset.Click += (_, _) => ResetDefaults();
             header.Controls.Add(reset);
             header.Controls.Add(_modeLock);
@@ -374,14 +374,14 @@ internal sealed class FixturePanel : UserControl
                     GroupNames = _groups.Select((_, k) => ((char)('A' + k)).ToString()).ToArray(),
                 };
                 _groupPad.LevelChanged += OnGroupPad;
-                _tips.SetToolTip(_groupPad, "X : groupe A, B, C ou Tous. Y : niveau (bas = 0 %, haut = 100 %). Clique ou glisse.");
+                _tips.SetToolTip(_groupPad, Tr.T("X : groupe A, B, C ou Tous. Y : niveau (bas = 0 %, haut = 100 %). Clique ou glisse."));
                 _groupsFader = new VerticalFader { Location = new Point(258, 6), Size = new Size(48, 180), FillColor = Color.FromArgb(160, 100, 240) };
                 _groupsFader.ValueChanged += (_, _) => OnGroupsFader();
-                _tips.SetToolTip(_groupsFader, "Les 3 groupes en même temps (garde leurs proportions).");
-                var faderLabel = new Label { Text = "3 groupes", Location = new Point(250, 188), Size = new Size(64, 18), TextAlign = ContentAlignment.TopCenter };
+                _tips.SetToolTip(_groupsFader, Tr.T("Les 3 groupes en même temps (garde leurs proportions)."));
+                var faderLabel = new Label { Text = Tr.T("3 groupes"), Location = new Point(250, 188), Size = new Size(64, 18), TextAlign = ContentAlignment.TopCenter };
                 var cutAll = new Button
                 {
-                    Text = "TOUT COUPER",
+                    Text = Tr.T("TOUT COUPER"),
                     Location = new Point(9, 210),
                     Size = new Size(297, 34),
                     Font = Ui.BoldFont,
@@ -390,7 +390,7 @@ internal sealed class FixturePanel : UserControl
                     FlatStyle = FlatStyle.Flat,
                 };
                 cutAll.Click += (_, _) => CutAll();
-                _tips.SetToolTip(cutAll, "Dimmer, groupes et strobe à 0, effet au tempo arrêté.");
+                _tips.SetToolTip(cutAll, Tr.T("Dimmer, groupes et strobe à 0, effet au tempo arrêté."));
 
                 _beatBlock = new BeatEffectBlock(ctx, fixture, profile) { Location = new Point(9, 252) };
                 left.Controls.AddRange(new Control[] { _groupPad, _groupsFader, faderLabel, cutAll, _beatBlock });
@@ -419,7 +419,7 @@ internal sealed class FixturePanel : UserControl
 
             _names[i] = new Label { AutoSize = true, MinimumSize = new Size(260, 0), Anchor = AnchorStyles.Left, Margin = new Padding(3, 6, 3, 3) };
             _tips.SetToolTip(_names[i], $"{ChannelTypeInfo.DisplayName(channel.Type)}" +
-                                        (string.IsNullOrWhiteSpace(channel.Notes) ? "" : $"\n{channel.Notes}"));
+                                        (string.IsNullOrWhiteSpace(channel.Notes) ? "" : $"\n{Tr.T(channel.Notes)}"));
 
             _sliders[i] = Ui.Slider(0, 255, left is null ? 330 : 230); // plus etroit si un pad occupe la gauche
             _sliders[i].ValueChanged += (_, _) => OnSlider(index);
@@ -430,11 +430,11 @@ internal sealed class FixturePanel : UserControl
             _presets[i].SelectionChangeCommitted += (_, _) => OnPresetChosen(index);
 
             var add = new Button { Text = "+", Width = 28, Height = 26, Margin = new Padding(3, 3, 3, 3) };
-            _tips.SetToolTip(add, "Enregistrer la valeur actuelle comme preset (ex. « Rouge » sur la roue de couleurs)");
+            _tips.SetToolTip(add, Tr.T("Enregistrer la valeur actuelle comme preset (ex. « Rouge » sur la roue de couleurs)"));
             add.Click += (_, _) => AddPreset(index);
 
-            _verified[i] = new CheckBox { Text = "OK", AutoSize = true, Margin = new Padding(6, 6, 3, 3) };
-            _tips.SetToolTip(_verified[i], "Coche quand tu as vérifié sur l'appareil que ce canal fait bien ce qui est indiqué");
+            _verified[i] = new CheckBox { Text = Tr.T("OK"), AutoSize = true, Margin = new Padding(6, 6, 3, 3) };
+            _tips.SetToolTip(_verified[i], Tr.T("Coche quand tu as vérifié sur l'appareil que ce canal fait bien ce qui est indiqué"));
             _verified[i].CheckedChanged += (_, _) => OnVerifiedChanged(index);
 
             table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -452,20 +452,20 @@ internal sealed class FixturePanel : UserControl
                 _strobeIndex = i;
                 _strobeOn = new CheckBox
                 {
-                    Text = "Strobe",
+                    Text = Tr.T("Strobe"),
                     AutoSize = true,
                     Checked = !fixture.NoStrobe,
                     Font = Ui.BoldFont,
                     Margin = new Padding(10, 6, 3, 3),
                 };
                 _strobeOn.CheckedChanged += (_, _) => OnStrobeToggled();
-                var strobeZero = new Button { Text = "Strobe 0", AutoSize = true, Margin = new Padding(3, 3, 3, 3) };
+                var strobeZero = new Button { Text = Tr.T("Strobe 0"), AutoSize = true, Margin = new Padding(3, 3, 3, 3) };
                 strobeZero.Click += (_, _) => SetStrobeFixed();
-                _tips.SetToolTip(_strobeOn, "Décoché : strobe désactivé (canal fixe, la valeur est mémorisée ; rien ne peut le faire strober). " +
-                                            "Recoché : l'ancienne valeur revient. Bouger la barre dans une valeur de strobe le réactive.");
+                _tips.SetToolTip(_strobeOn, Tr.T("Décoché : strobe désactivé (canal fixe, la valeur est mémorisée ; rien ne peut le faire strober). ") +
+                                            Tr.T("Recoché : l'ancienne valeur revient. Bouger la barre dans une valeur de strobe le réactive."));
                 _tips.SetToolTip(strobeZero, channel.Type == ChannelType.Strobe
-                    ? "Met le strobe à 0 (pas de strobe)."
-                    : $"Remet l'obturateur en fixe (ouvert, {channel.NoStrobeValue}) : plus de strobe.");
+                    ? Tr.T("Met le strobe à 0 (pas de strobe).")
+                    : Tr.F("Remet l'obturateur en fixe (ouvert, {0}) : plus de strobe.", channel.NoStrobeValue));
                 table.Controls.Add(Ui.Flow(0, _strobeOn, strobeZero), 6, i);
             }
         }
@@ -530,7 +530,7 @@ internal sealed class FixturePanel : UserControl
             for (int i = 0; i < _profile.ChannelCount && i < _sliders.Length; i++)
             {
                 var channel = _profile.Channels[i];
-                _names[i].Text = $"{i + 1}. {channel.Name}   [DMX {_fixture.Address + i}]" + (channel.Verified ? "" : "  (?)");
+                _names[i].Text = Tr.F("{0}. {1}   [DMX {2}]", (i + 1), Tr.T(channel.Name), (_fixture.Address + i)) + (channel.Verified ? "" : "  (?)");
                 _names[i].ForeColor = channel.Verified ? SystemColors.ControlText : Ui.WarningColor;
                 _verified[i].Checked = channel.Verified;
 
@@ -547,9 +547,9 @@ internal sealed class FixturePanel : UserControl
 
             int unverified = _profile.UnverifiedCount;
             _warning.Text = unverified == 0
-                ? "Profil entièrement vérifié."
-                : $"Profil à vérifier : {unverified} canal(aux) non confirmé(s), marqués (?). " +
-                  "Teste-les (curseur ou onglet Debug) puis coche « OK ».";
+                ? Tr.T("Profil entièrement vérifié.")
+                : Tr.F("Profil à vérifier : {0} canal(aux) non confirmé(s), marqués (?). ", unverified) +
+                  Tr.T("Teste-les (curseur ou onglet Debug) puis coche « OK ».");
             _warning.ForeColor = unverified == 0 ? Ui.OkColor : Ui.WarningColor;
         }
         finally
@@ -658,7 +658,7 @@ internal sealed class FixturePanel : UserControl
             }
         }
         _ctx.NotifyLiveStateChanged();
-        _ctx.Status($"{_fixture.Name} : tout coupé.");
+        _ctx.Status(Tr.F("{0} : tout coupé.", _fixture.Name));
     }
 
     /// <summary>Graphique et fader des groupes recales sur les valeurs actuelles.</summary>
@@ -741,8 +741,8 @@ internal sealed class FixturePanel : UserControl
             {
                 _wings.ValueY = (255 - values[_dimmer]) * 257; // haut du pad = dimmer a fond
             }
-            _wingsInfo.Text = $"Aile 1 : {Degrees(wing1)}°   Aile 2 : {Degrees(wing2)}°" +
-                              (_dimmer >= 0 && _dimmer < values.Length ? $"   Dimmer : {values[_dimmer] * 100 / 255} %" : "");
+            _wingsInfo.Text = Tr.F("Aile 1 : {0}°   Aile 2 : {1}°", Degrees(wing1), Degrees(wing2)) +
+                              (_dimmer >= 0 && _dimmer < values.Length ? Tr.F("   Dimmer : {0} %", (values[_dimmer] * 100 / 255)) : "");
         }
 
         if (_ledLeft is not null && _ledRight is not null && _groupRight.All(i => i < values.Length))
@@ -831,7 +831,7 @@ internal sealed class FixturePanel : UserControl
         }
         _ctx.MarkDirty();
         _ctx.NotifyLiveStateChanged(); // ce panneau + l'onglet Soiree (interrupteur STROBE)
-        _ctx.Status(on ? $"{_fixture.Name} : strobe réactivé ({_fixture.StrobeMemory})." : $"{_fixture.Name} : strobe désactivé (valeur {current} mémorisée).");
+        _ctx.Status(on ? Tr.F("{0} : strobe réactivé ({1}).", _fixture.Name, _fixture.StrobeMemory) : Tr.F("{0} : strobe désactivé (valeur {1} mémorisée).", _fixture.Name, current));
     }
 
     /// <summary>Bouton « Strobe 0 » : canal en fixe (0, ou obturateur ouvert), la case reste comme elle est.</summary>
@@ -843,7 +843,7 @@ internal sealed class FixturePanel : UserControl
         }
         _ctx.Engine.SetValue(_fixture.Id, _strobeIndex, _profile.Channels[_strobeIndex].NoStrobeValue);
         _ctx.NotifyLiveStateChanged();
-        _ctx.Status($"{_fixture.Name} : strobe à 0.");
+        _ctx.Status(Tr.F("{0} : strobe à 0.", _fixture.Name));
     }
 
     /// <summary>Barre du strobe bougee dans une valeur de strobe alors qu'il est desactive : on le reactive.</summary>
@@ -859,7 +859,7 @@ internal sealed class FixturePanel : UserControl
         _strobeOn.Checked = true;
         _updating = false;
         _ctx.NotifyLiveStateChanged();
-        _ctx.Status($"{_fixture.Name} : strobe réactivé ({value}).");
+        _ctx.Status(Tr.F("{0} : strobe réactivé ({1}).", _fixture.Name, value));
     }
 
     /// <summary>Moteur du Spider : 0..255 = 0..135° (notice).</summary>
@@ -914,9 +914,9 @@ internal sealed class FixturePanel : UserControl
         _sweep.BackColor = _sweep.Checked ? Color.FromArgb(255, 210, 60) : SystemColors.Control;
         _sweep.UseVisualStyleBackColor = !_sweep.Checked;
         _ctx.Status(_sweep.Checked
-            ? $"{_fixture.Name} : effet gauche ↔ droite toutes les {_fixture.WingSweepDelaySeconds:0.#} s" +
-              (_fixture.MirrorMotors ? " (ailes en miroir)." : ".")
-            : $"{_fixture.Name} : effet gauche ↔ droite arrêté.");
+            ? Tr.F("{0} : effet gauche ↔ droite toutes les {1:0.#} s", _fixture.Name, _fixture.WingSweepDelaySeconds) +
+              (_fixture.MirrorMotors ? Tr.T(" (ailes en miroir).") : ".")
+            : Tr.F("{0} : effet gauche ↔ droite arrêté.", _fixture.Name));
     }
 
     private void OnMicListenToggled()
@@ -933,12 +933,12 @@ internal sealed class FixturePanel : UserControl
         try
         {
             _ctx.Mic.Start();
-            _ctx.Status("Micro : écoute en cours (le tempo apparaît après quelques secondes de musique).");
+            _ctx.Status(Tr.T("Micro : écoute en cours (le tempo apparaît après quelques secondes de musique)."));
         }
         catch (Exception ex)
         {
             _ctx.Mic.Stop();
-            _ctx.Status($"Impossible d'ouvrir le micro : {ex.Message}");
+            _ctx.Status(Tr.F("Impossible d'ouvrir le micro : {0}", ex.Message));
         }
     }
 
@@ -980,8 +980,8 @@ internal sealed class FixturePanel : UserControl
         _ctx.Engine.EditShow(_ => _fixture.MutedColors = muted);
         _ctx.MarkDirty();
         _ctx.Status(muted.Count == 0
-            ? $"{_fixture.Name} : toutes les couleurs actives."
-            : $"{_fixture.Name} : coupé en sortie → {string.Join(", ", _maskBoxes.Where(b => !b.Checked).Select(b => b.Text))}.");
+            ? Tr.F("{0} : toutes les couleurs actives.", _fixture.Name)
+            : Tr.F("{0} : coupé en sortie → {1}.", _fixture.Name, (string.Join(", ", _maskBoxes.Where(b => !b.Checked).Select(b => b.Text)))));
     }
 
     /// <summary>Mode actuel, d'apres l'appareil (cale ou non sur le tempo) et le micro (le BPM le suit ou non).</summary>
@@ -1070,12 +1070,12 @@ internal sealed class FixturePanel : UserControl
             _micUpdating = false;
         }
         ShowMode(CurrentMode()); // le micro a pu etre cale / decale depuis l'onglet Soiree
-        _micListen.Text = mic.IsListening ? "Micro : ON" : "Micro";
+        _micListen.Text = mic.IsListening ? Tr.T("Micro : ON") : Tr.T("Micro");
         _micListen.BackColor = mic.IsListening ? Color.FromArgb(120, 200, 120) : SystemColors.Control;
         _micListen.UseVisualStyleBackColor = !mic.IsListening;
         double bpm = mic.Bpm;
-        _micBpm.Text = !mic.IsListening ? $"BPM : {_ctx.Engine.Bpm:0.0}"
-            : bpm > 0 ? $"Tempo micro : {bpm:0.0} BPM" : "Tempo : écoute…";
+        _micBpm.Text = !mic.IsListening ? Tr.F("BPM : {0:0.0}", _ctx.Engine.Bpm)
+            : bpm > 0 ? Tr.F("Tempo micro : {0:0.0} BPM", bpm) : Tr.T("Tempo : écoute…");
         _micBpm.ForeColor = mic.IsListening && bpm > 0 ? Ui.OkColor : mic.IsListening ? Ui.WarningColor : Color.DimGray;
     }
 
@@ -1139,8 +1139,8 @@ internal sealed class FixturePanel : UserControl
     {
         byte value = (byte)_sliders[index].Value;
         var channel = _profile.Channels[index];
-        string? name = InputDialog.Ask(FindForm(), "Nouveau preset",
-            $"Nom du preset pour « {channel.Name} » = {value}\n(ex. Rouge, Bleu, Gobo étoile, Ouvert...) :");
+        string? name = InputDialog.Ask(FindForm(), Tr.T("Nouveau preset"),
+            Tr.F("Nom du preset pour « {0} » = {1}\n(ex. Rouge, Bleu, Gobo étoile, Ouvert...) :", Tr.T(channel.Name), value));
         if (name is null)
         {
             return;
@@ -1155,7 +1155,7 @@ internal sealed class FixturePanel : UserControl
         });
         _ctx.MarkDirty();
         _ctx.NotifyProfileDetailsChanged();
-        _ctx.Status($"Preset « {name} » = {value} ajouté au profil « {_profile.Name} » (valable pour tous les appareils de ce modèle).");
+        _ctx.Status(Tr.F("Preset « {0} » = {1} ajouté au profil « {2} » (valable pour tous les appareils de ce modèle).", name, value, _profile.Name));
     }
 
     private void OnVerifiedChanged(int index)

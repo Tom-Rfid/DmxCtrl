@@ -142,9 +142,9 @@ public sealed class DmxLink : IDisposable
     public static string FriendlyError(Exception ex) => ex switch
     {
         IOException io when io.Message.Contains("maphore", StringComparison.OrdinalIgnoreCase) =>
-            "le boîtier ne répond pas (éteint, hors de portée ou non appairé). " + io.Message,
-        UnauthorizedAccessException => "le port est déjà utilisé par un autre programme (appli RY-AI, autre fenêtre…).",
-        TimeoutException => "le boîtier ne répond pas (délai dépassé).",
+            Tr.T("le boîtier ne répond pas (éteint, hors de portée ou non appairé). ") + io.Message,
+        UnauthorizedAccessException => Tr.T("le port est déjà utilisé par un autre programme (appli RY-AI, autre fenêtre…)."),
+        TimeoutException => Tr.T("le boîtier ne répond pas (délai dépassé)."),
         _ => ex.Message,
     };
 

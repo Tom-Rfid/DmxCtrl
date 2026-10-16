@@ -52,14 +52,14 @@ public sealed class ChannelPreset
             int eq = raw.LastIndexOf('=');
             if (eq <= 0 || eq == raw.Length - 1)
             {
-                throw new FormatException($"Preset « {raw} » invalide : format attendu Nom=valeur (ex. Rouge=18).");
+                throw new FormatException(Tr.F("Preset « {0} » invalide : format attendu Nom=valeur (ex. Rouge=18).", raw));
             }
 
             string name = raw[..eq].Trim();
             string valueText = raw[(eq + 1)..].Trim();
             if (!int.TryParse(valueText, out int value) || value is < 0 or > 255)
             {
-                throw new FormatException($"Preset « {raw} » invalide : la valeur doit être un entier de 0 à 255.");
+                throw new FormatException(Tr.F("Preset « {0} » invalide : la valeur doit être un entier de 0 à 255.", raw));
             }
 
             list.Add(new ChannelPreset(name, (byte)value));
@@ -99,7 +99,7 @@ public sealed class ChannelRange
     /// <summary>Position (0..1) d'une valeur dans la plage.</summary>
     public double FractionOf(byte value) => To == From ? 0 : Math.Clamp((value - From) / (double)(To - From), 0, 1);
 
-    public override string ToString() => From == To ? $"{Name} ({From})" : $"{Name} ({From}-{To})";
+    public override string ToString() => From == To ? $"{Tr.T(Name)} ({From})" : $"{Tr.T(Name)} ({From}-{To})";
 }
 
 /// <summary>Un canal d'un profil.</summary>
@@ -204,11 +204,11 @@ public sealed class FixtureProfile
 
     /// <summary>"Lyre", "Spider"... : nom propose pour un nouvel appareil de ce modele.</summary>
     [JsonIgnore]
-    public string FixtureNameBase => !string.IsNullOrWhiteSpace(DefaultFixtureName) ? DefaultFixtureName
-        : CanMove ? "Lyre"
-        : IsFogMachine ? "Fumée"
-        : IsLaser ? "Laser"
-        : "Appareil";
+    public string FixtureNameBase => !string.IsNullOrWhiteSpace(DefaultFixtureName) ? Tr.T(DefaultFixtureName)
+        : CanMove ? Tr.T("Lyre")
+        : IsFogMachine ? Tr.T("Fumée")
+        : IsLaser ? Tr.T("Laser")
+        : Tr.T("Appareil");
 
     /// <summary>
     /// Canal "Mode" a plage manuelle (ex. PAR UV, canal 6 : « Manuel » 0-10) : index du canal et plage,
@@ -252,5 +252,5 @@ public sealed class FixtureProfile
 
     public static string NewId() => Guid.NewGuid().ToString("N")[..12];
 
-    public override string ToString() => Name;
+    public override string ToString() => Tr.T(Name);
 }

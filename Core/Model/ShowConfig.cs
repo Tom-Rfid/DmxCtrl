@@ -191,4 +191,7 @@ public sealed class AppSettings
     public string? LastPort { get; set; }
     public bool AutoConnect { get; set; }
     public List<string> RecentShows { get; set; } = new();
+
+    /// <summary>Interface language ("en" or "fr"). English by default for a new installation.</summary>
+    public string Language { get; set; } = Tr.English;
 }

@@ -56,7 +56,7 @@ internal sealed class ProfileEditorDialog : Form
             .GroupBy(f => f.ProfileId)
             .ToDictionary(g => g.Key, g => g.Select(f => f.Name).ToList());
 
-        Text = "Éditeur de profils (modules)";
+        Text = Tr.T("Éditeur de profils (modules)");
         Font = new Font("Segoe UI", 9f);
         Size = new Size(1200, 680);
         MinimumSize = new Size(960, 500);
@@ -69,7 +69,7 @@ internal sealed class ProfileEditorDialog : Form
         {
             if (e.ListItem is FixtureProfile p)
             {
-                e.Value = $"{p.Name} — {p.ChannelCount} canaux" + (p.IsFullyVerified ? "" : " (?)") +
+                e.Value = Tr.F("{0} — {1} canaux", Tr.T(p.Name), p.ChannelCount) + (p.IsFullyVerified ? "" : " (?)") +
                           (_usage.ContainsKey(p.Id) ? "  •" : "");
             }
         };
@@ -80,25 +80,25 @@ internal sealed class ProfileEditorDialog : Form
         _list.SelectedIndexChanged += (_, _) => OnProfileSelected();
 
         var leftButtons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
-        leftButtons.Controls.Add(SmallButton("Nouveau…", NewProfile));
-        leftButtons.Controls.Add(SmallButton("Dupliquer", DuplicateProfile));
-        leftButtons.Controls.Add(SmallButton("Supprimer", DeleteProfile));
-        leftButtons.Controls.Add(SmallButton("Importer…", ImportProfile));
-        leftButtons.Controls.Add(SmallButton("Exporter…", ExportProfile));
+        leftButtons.Controls.Add(SmallButton(Tr.T("Nouveau…"), NewProfile));
+        leftButtons.Controls.Add(SmallButton(Tr.T("Dupliquer"), DuplicateProfile));
+        leftButtons.Controls.Add(SmallButton(Tr.T("Supprimer"), DeleteProfile));
+        leftButtons.Controls.Add(SmallButton(Tr.T("Importer…"), ImportProfile));
+        leftButtons.Controls.Add(SmallButton(Tr.T("Exporter…"), ExportProfile));
 
-        var left = new GroupBox { Text = "Profils  (•  = utilisé dans le patch)", Dock = DockStyle.Left, Width = 330, Padding = new Padding(8) };
+        var left = new GroupBox { Text = Tr.T("Profils  (•  = utilisé dans le patch)"), Dock = DockStyle.Left, Width = 330, Padding = new Padding(8) };
         left.Controls.Add(_list);
         left.Controls.Add(leftButtons);
 
         // ---------------- Details du profil (droite) ----------------
         var fields = Ui.Table(2);
-        Ui.Row(fields, "Nom", _name);
-        Ui.Row(fields, "Fabricant", _manufacturer);
-        Ui.Row(fields, "Notes", _notes);
+        Ui.Row(fields, Tr.T("Nom"), _name);
+        Ui.Row(fields, Tr.T("Fabricant"), _manufacturer);
+        Ui.Row(fields, Tr.T("Notes"), _notes);
 
         var typeColumn = new DataGridViewComboBoxColumn
         {
-            HeaderText = "Rôle (type)",
+            HeaderText = Tr.T("Rôle (type)"),
             FillWeight = 150,
             DataSource = ChannelTypeInfo.All.Select(t => new TypeItem(t.ToString(), ChannelTypeInfo.DisplayName(t))).ToList(),
             ValueMember = nameof(TypeItem.Value),
@@ -108,12 +108,12 @@ internal sealed class ProfileEditorDialog : Form
         };
         _grid.Columns.AddRange(
             new DataGridViewTextBoxColumn { HeaderText = "N°", FillWeight = 30, ReadOnly = true },
-            new DataGridViewTextBoxColumn { HeaderText = "Nom du canal", FillWeight = 140 },
+            new DataGridViewTextBoxColumn { HeaderText = Tr.T("Nom du canal"), FillWeight = 140 },
             typeColumn,
-            new DataGridViewTextBoxColumn { HeaderText = "Défaut", FillWeight = 45 },
-            new DataGridViewCheckBoxColumn { HeaderText = "Vérifié", FillWeight = 45 },
-            new DataGridViewTextBoxColumn { HeaderText = "Presets (Nom=valeur; …)", FillWeight = 200 },
-            new DataGridViewTextBoxColumn { HeaderText = "Notes", FillWeight = 150 });
+            new DataGridViewTextBoxColumn { HeaderText = Tr.T("Défaut"), FillWeight = 45 },
+            new DataGridViewCheckBoxColumn { HeaderText = Tr.T("Vérifié"), FillWeight = 45 },
+            new DataGridViewTextBoxColumn { HeaderText = Tr.T("Presets (Nom=valeur; …)"), FillWeight = 200 },
+            new DataGridViewTextBoxColumn { HeaderText = Tr.T("Notes"), FillWeight = 150 });
         _grid.Columns[ColNum].DefaultCellStyle.BackColor = SystemColors.Control;
         _grid.CurrentCellDirtyStateChanged += (_, _) =>
         {
@@ -125,30 +125,30 @@ internal sealed class ProfileEditorDialog : Form
         _grid.DataError += (_, e) => e.ThrowException = false;
 
         var channelButtons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
-        channelButtons.Controls.Add(SmallButton("Ajouter un canal", () => InsertChannel(atEnd: true)));
-        channelButtons.Controls.Add(SmallButton("Insérer avant", () => InsertChannel(atEnd: false)));
-        channelButtons.Controls.Add(SmallButton("Supprimer le canal", RemoveChannel));
-        channelButtons.Controls.Add(SmallButton("Monter", () => MoveChannel(-1)));
-        channelButtons.Controls.Add(SmallButton("Descendre", () => MoveChannel(+1)));
-        channelButtons.Controls.Add(SmallButton("Tout marquer vérifié", MarkAllVerified));
+        channelButtons.Controls.Add(SmallButton(Tr.T("Ajouter un canal"), () => InsertChannel(atEnd: true)));
+        channelButtons.Controls.Add(SmallButton(Tr.T("Insérer avant"), () => InsertChannel(atEnd: false)));
+        channelButtons.Controls.Add(SmallButton(Tr.T("Supprimer le canal"), RemoveChannel));
+        channelButtons.Controls.Add(SmallButton(Tr.T("Monter"), () => MoveChannel(-1)));
+        channelButtons.Controls.Add(SmallButton(Tr.T("Descendre"), () => MoveChannel(+1)));
+        channelButtons.Controls.Add(SmallButton(Tr.T("Tout marquer vérifié"), MarkAllVerified));
         channelButtons.Controls.Add(new Label
         {
-            Text = "L'ordre des lignes = l'ordre des canaux DMX de l'appareil. Changer le nombre de canaux décale les adresses : vérifie le patch ensuite.",
+            Text = Tr.T("L'ordre des lignes = l'ordre des canaux DMX de l'appareil. Changer le nombre de canaux décale les adresses : vérifie le patch ensuite."),
             AutoSize = true,
             MaximumSize = new Size(560, 0),
             ForeColor = Color.DimGray,
             Margin = new Padding(8, 6, 3, 3),
         });
 
-        var right = new GroupBox { Text = "Profil sélectionné", Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var right = new GroupBox { Text = Tr.T("Profil sélectionné"), Dock = DockStyle.Fill, Padding = new Padding(8) };
         right.Controls.Add(_grid);
         right.Controls.Add(channelButtons);
         right.Controls.Add(fields);
 
         // ---------------- OK / Annuler ----------------
-        var ok = new Button { Text = "OK", Width = 90, Height = 30 };
+        var ok = new Button { Text = Tr.T("OK"), Width = 90, Height = 30 };
         ok.Click += (_, _) => Accept();
-        var cancel = new Button { Text = "Annuler", Width = 90, Height = 30, DialogResult = DialogResult.Cancel };
+        var cancel = new Button { Text = Tr.T("Annuler"), Width = 90, Height = 30, DialogResult = DialogResult.Cancel };
         var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, Height = 44, Padding = new Padding(8) };
         bottom.Controls.AddRange(new Control[] { cancel, ok });
         CancelButton = cancel;
@@ -286,7 +286,7 @@ internal sealed class ProfileEditorDialog : Form
             string defaultText = (Convert.ToString(row.Cells[ColDefault].Value) ?? "0").Trim();
             if (!int.TryParse(defaultText.Length == 0 ? "0" : defaultText, out int defaultValue) || defaultValue is < 0 or > 255)
             {
-                errors.Add($"Canal {number} : valeur par défaut « {defaultText} » invalide (0 à 255).");
+                errors.Add(Tr.F("Canal {0} : valeur par défaut « {1} » invalide (0 à 255).", number, defaultText));
                 defaultValue = 0;
             }
 
@@ -297,14 +297,14 @@ internal sealed class ProfileEditorDialog : Form
             }
             catch (FormatException ex)
             {
-                errors.Add($"Canal {number} : {ex.Message}");
+                errors.Add(Tr.F("Canal {0} : {1}", number, ex.Message));
                 presets = new();
             }
 
             var original = row.Tag as ChannelDef; // null pour une ligne ajoutee dans l'editeur
             channels.Add(new ChannelDef
             {
-                Name = name.Length > 0 ? name : $"Canal {number}",
+                Name = name.Length > 0 ? name : Tr.F("Canal {0}", number),
                 Type = type,
                 Default = (byte)defaultValue,
                 Verified = row.Cells[ColVerified].Value is true,
@@ -318,17 +318,17 @@ internal sealed class ProfileEditorDialog : Form
 
         if (channels.Count == 0)
         {
-            errors.Add("Un profil doit avoir au moins un canal.");
+            errors.Add(Tr.T("Un profil doit avoir au moins un canal."));
         }
 
         if (errors.Count > 0)
         {
-            MessageBox.Show(this, $"Le profil « {_name.Text} » contient des erreurs :\n\n" + string.Join("\n", errors),
-                "Profil invalide", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, Tr.F("Le profil « {0} » contient des erreurs :\n\n", _name.Text) + string.Join("\n", errors),
+                Tr.T("Profil invalide"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }
 
-        _current.Name = string.IsNullOrWhiteSpace(_name.Text) ? "Module sans nom" : _name.Text.Trim();
+        _current.Name = string.IsNullOrWhiteSpace(_name.Text) ? Tr.T("Module sans nom") : _name.Text.Trim();
         _current.Manufacturer = _manufacturer.Text.Trim();
         _current.Notes = _notes.Text.Trim();
         _current.Channels = channels;
@@ -372,23 +372,23 @@ internal sealed class ProfileEditorDialog : Form
             return;
         }
 
-        string? name = InputDialog.Ask(this, "Nouveau profil", "Nom du nouveau module (ex. « Par LED RGBW 8 canaux ») :");
+        string? name = InputDialog.Ask(this, Tr.T("Nouveau profil"), Tr.T("Nom du nouveau module (ex. « Par LED RGBW 8 canaux ») :"));
         if (name is null)
         {
             return;
         }
-        string? countText = InputDialog.Ask(this, "Nouveau profil",
-            "Nombre de canaux DMX (voir la notice de l'appareil, dans le mode DMX choisi) :", "8");
+        string? countText = InputDialog.Ask(this, Tr.T("Nouveau profil"),
+            Tr.T("Nombre de canaux DMX (voir la notice de l'appareil, dans le mode DMX choisi) :"), "8");
         if (countText is null || !int.TryParse(countText, out int count) || count is < 1 or > 512)
         {
-            MessageBox.Show(this, "Nombre de canaux invalide (1 à 512).", "Nouveau profil", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, Tr.T("Nombre de canaux invalide (1 à 512)."), Tr.T("Nouveau profil"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
         var profile = new FixtureProfile { Name = name };
         for (int i = 1; i <= count; i++)
         {
-            profile.Channels.Add(new ChannelDef { Name = $"Canal {i}" });
+            profile.Channels.Add(new ChannelDef { Name = Tr.F("Canal {0}", i) });
         }
         AddAndSelect(profile);
     }
@@ -401,7 +401,7 @@ internal sealed class ProfileEditorDialog : Form
         }
         var copy = ShowJson.Clone(_current);
         copy.Id = FixtureProfile.NewId();
-        copy.Name += " (copie)";
+        copy.Name += Tr.T(" (copie)");
         AddAndSelect(copy);
     }
 
@@ -413,12 +413,12 @@ internal sealed class ProfileEditorDialog : Form
         }
         if (_usage.TryGetValue(_current.Id, out var users))
         {
-            MessageBox.Show(this, $"Ce profil est utilisé par : {string.Join(", ", users)}.\n" +
-                                  "Change ou supprime d'abord ces appareils dans le patch.",
-                "Profil utilisé", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, Tr.F("Ce profil est utilisé par : {0}.\n", (string.Join(", ", users))) +
+                                  Tr.T("Change ou supprime d'abord ces appareils dans le patch."),
+                Tr.T("Profil utilisé"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-        if (!Ui.Confirm(this, $"Supprimer le profil « {_current.Name} » ?"))
+        if (!Ui.Confirm(this, Tr.F("Supprimer le profil « {0} » ?", _current.Name)))
         {
             return;
         }
@@ -446,8 +446,8 @@ internal sealed class ProfileEditorDialog : Form
 
         using var dialog = new OpenFileDialog
         {
-            Title = "Importer un profil",
-            Filter = $"Profil d'appareil (*{ShowStore.ProfileExtension})|*{ShowStore.ProfileExtension}|Fichiers JSON (*.json)|*.json",
+            Title = Tr.T("Importer un profil"),
+            Filter = Tr.F("Profil d'appareil (*{0})|*{1}|Fichiers JSON (*.json)|*.json", ShowStore.ProfileExtension, ShowStore.ProfileExtension),
         };
         if (dialog.ShowDialog(this) != DialogResult.OK)
         {
@@ -460,13 +460,13 @@ internal sealed class ProfileEditorDialog : Form
             if (_profiles.Any(p => p.Id == profile.Id))
             {
                 profile.Id = FixtureProfile.NewId();
-                profile.Name += " (importé)";
+                profile.Name += Tr.T(" (importé)");
             }
             AddAndSelect(profile);
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Impossible de lire ce profil :\n{ex.Message}", "Import", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, Tr.F("Impossible de lire ce profil :\n{0}", ex.Message), Tr.T("Import"), MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -479,8 +479,8 @@ internal sealed class ProfileEditorDialog : Form
 
         using var dialog = new SaveFileDialog
         {
-            Title = "Exporter le profil",
-            Filter = $"Profil d'appareil (*{ShowStore.ProfileExtension})|*{ShowStore.ProfileExtension}",
+            Title = Tr.T("Exporter le profil"),
+            Filter = Tr.F("Profil d'appareil (*{0})|*{1}", ShowStore.ProfileExtension, ShowStore.ProfileExtension),
             FileName = SafeFileName(_current.Name) + ShowStore.ProfileExtension,
         };
         if (dialog.ShowDialog(this) != DialogResult.OK)
@@ -494,7 +494,7 @@ internal sealed class ProfileEditorDialog : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Impossible d'enregistrer :\n{ex.Message}", "Export", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, Tr.F("Impossible d'enregistrer :\n{0}", ex.Message), Tr.T("Export"), MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -516,7 +516,7 @@ internal sealed class ProfileEditorDialog : Form
             return;
         }
         int? at = atEnd || _grid.CurrentRow is null ? null : _grid.CurrentRow.Index;
-        AddChannelRow(new ChannelDef { Name = $"Canal {_grid.Rows.Count + 1}" }, at);
+        AddChannelRow(new ChannelDef { Name = Tr.F("Canal {0}", (_grid.Rows.Count + 1)) }, at);
         RenumberRows();
     }
 

@@ -31,12 +31,12 @@ internal sealed class DebugPanel : UserControl
     private readonly byte[] _buffer = DmxFrame.NewUniverse();
     private readonly CheckBox _active = new()
     {
-        Text = "Mode debug prioritaire (remplace TOUTE la sortie live)",
+        Text = Tr.T("Mode debug prioritaire (remplace TOUTE la sortie live)"),
         AutoSize = true,
         Margin = new Padding(3, 8, 12, 3),
         Font = Ui.BoldFont,
     };
-    private readonly Button _blink = new() { Text = "Démarrer le test clignotement", AutoSize = true };
+    private readonly Button _blink = new() { Text = Tr.T("Démarrer le test clignotement"), AutoSize = true };
     private readonly NumericUpDown _start = new() { Minimum = 1, Maximum = DmxFrame.UniverseSize - VisibleChannels + 1, Width = 64, Margin = new Padding(3, 5, 3, 3) };
     private readonly NumericUpDown _interval = new() { Minimum = 20, Maximum = 1000, Increment = 10, Value = 100, Width = 64, Margin = new Padding(3, 5, 3, 3) };
     private readonly TrackBar[] _sliders = new TrackBar[VisibleChannels];
@@ -63,7 +63,7 @@ internal sealed class DebugPanel : UserControl
         Dock = DockStyle.Fill;
 
         // ---------------- Barre d'outils ----------------
-        var zero = new Button { Text = "Tout à 0", AutoSize = true };
+        var zero = new Button { Text = Tr.T("Tout à 0"), AutoSize = true };
         zero.Click += (_, _) =>
         {
             StopBlink();
@@ -71,7 +71,7 @@ internal sealed class DebugPanel : UserControl
             PushBuffer();
             RefreshSliders();
         };
-        var copy = new Button { Text = "Copier la sortie live actuelle", AutoSize = true };
+        var copy = new Button { Text = Tr.T("Copier la sortie live actuelle"), AutoSize = true };
         copy.Click += (_, _) =>
         {
             Array.Copy(_ctx.Engine.GetLastOutput(), _buffer, _buffer.Length);
@@ -83,8 +83,8 @@ internal sealed class DebugPanel : UserControl
         toolbar.Controls.AddRange(new Control[]
         {
             _active, _blink, zero, copy,
-            Ui.Text("Canaux affichés à partir de"), _start,
-            Ui.Text("   Envoi d'une trame toutes les"), _interval, Ui.Text("ms (100 = appli d'origine)"),
+            Ui.Text(Tr.T("Canaux affichés à partir de")), _start,
+            Ui.Text(Tr.T("   Envoi d'une trame toutes les")), _interval, Ui.Text(Tr.T("ms (100 = appli d'origine)")),
         });
 
         var help = new Label
@@ -93,8 +93,8 @@ internal sealed class DebugPanel : UserControl
             AutoSize = true,
             Padding = new Padding(10, 2, 10, 6),
             ForeColor = Color.DimGray,
-            Text = "Chaque curseur pilote un canal DMX brut. L'étiquette indique l'appareil et la fonction prévue par son profil ; " +
-                   "« (?) » = pas encore vérifié. Pense à décocher le mode debug avant la soirée.",
+            Text = Tr.T("Chaque curseur pilote un canal DMX brut. L'étiquette indique l'appareil et la fonction prévue par son profil ; ") +
+                   Tr.T("« (?) » = pas encore vérifié. Pense à décocher le mode debug avant la soirée."),
         };
 
         // ---------------- Curseurs bruts ----------------
@@ -118,7 +118,7 @@ internal sealed class DebugPanel : UserControl
             AutoSize = true,
             Padding = new Padding(8, 6, 8, 2),
             Font = Ui.BoldFont,
-            Text = "Moniteur : valeurs réellement envoyées au boîtier (ou qui le seraient si on était connecté)",
+            Text = Tr.T("Moniteur : valeurs réellement envoyées au boîtier (ou qui le seraient si on était connecté)"),
         };
 
         // Ordre d'ajout : Fill d'abord ; le dernier ajoute est docke en premier.
@@ -198,9 +198,9 @@ internal sealed class DebugPanel : UserControl
                 continue;
             }
             var def = profile.Channels[channel - fixture.Address];
-            return $"{fixture.Name} › {def.Name}" + (def.Verified ? "" : " (?)") + (fixture.Enabled ? "" : " [désactivé]");
+            return $"{fixture.Name} › {Tr.T(def.Name)}" + (def.Verified ? "" : " (?)") + (fixture.Enabled ? "" : Tr.T(" [désactivé]"));
         }
-        return "(libre)";
+        return Tr.T("(libre)");
     }
 
     private int LastPatchedChannel()
@@ -283,8 +283,8 @@ internal sealed class DebugPanel : UserControl
             RefreshSliders();
         };
         _blinkTimer.Start();
-        _blink.Text = "Arrêter le test clignotement";
-        _ctx.Status($"Test clignotement : canaux 1 à {last}, une fois par seconde.");
+        _blink.Text = Tr.T("Arrêter le test clignotement");
+        _ctx.Status(Tr.F("Test clignotement : canaux 1 à {0}, une fois par seconde.", last));
     }
 
     private void StopBlink()
@@ -296,7 +296,7 @@ internal sealed class DebugPanel : UserControl
         _blinkTimer.Stop();
         _blinkTimer.Dispose();
         _blinkTimer = null;
-        _blink.Text = "Démarrer le test clignotement";
+        _blink.Text = Tr.T("Démarrer le test clignotement");
     }
 
     protected override void Dispose(bool disposing)

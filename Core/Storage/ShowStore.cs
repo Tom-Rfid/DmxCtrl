@@ -61,11 +61,11 @@ public static class ShowStore
     {
         string json = File.ReadAllText(path);
         var show = JsonSerializer.Deserialize<ShowConfig>(json, ShowJson.Options)
-                   ?? throw new InvalidDataException("Le fichier de configuration est vide.");
+                   ?? throw new InvalidDataException(Tr.T("Le fichier de configuration est vide."));
         if (show.FormatVersion > CurrentFormatVersion)
         {
             throw new InvalidDataException(
-                $"Ce fichier a été créé par une version plus récente du logiciel (format {show.FormatVersion}).");
+                Tr.F("Ce fichier a été créé par une version plus récente du logiciel (format {0}).", show.FormatVersion));
         }
         Normalize(show);
         return show;
@@ -80,7 +80,7 @@ public static class ShowStore
     public static FixtureProfile LoadProfile(string path)
     {
         var profile = JsonSerializer.Deserialize<FixtureProfile>(File.ReadAllText(path), ShowJson.Options)
-                      ?? throw new InvalidDataException("Le fichier de profil est vide.");
+                      ?? throw new InvalidDataException(Tr.T("Le fichier de profil est vide."));
         NormalizeProfile(profile);
         return profile;
     }
@@ -94,10 +94,17 @@ public static class ShowStore
         {
             if (File.Exists(AppSettingsPath))
             {
-                var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(AppSettingsPath), ShowJson.Options);
+                string json = File.ReadAllText(AppSettingsPath);
+                var settings = JsonSerializer.Deserialize<AppSettings>(json, ShowJson.Options);
                 if (settings is not null)
                 {
                     settings.RecentShows ??= new();
+                    // Settings written before the language option existed: that version was French only,
+                    // so its user keeps French. A new installation (no file) starts in English.
+                    if (!json.Contains("\"Language\"", StringComparison.Ordinal))
+                    {
+                        settings.Language = Tr.French;
+                    }
                     return settings;
                 }
             }

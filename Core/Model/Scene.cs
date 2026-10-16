@@ -27,11 +27,11 @@ public static class MovementShapeInfo
 
     public static string DisplayName(MovementShape shape) => shape switch
     {
-        MovementShape.None => "Aucun (position fixe)",
-        MovementShape.Circle => "Cercle",
-        MovementShape.Eight => "Huit",
-        MovementShape.PanSweep => "Balayage horizontal",
-        MovementShape.TiltSweep => "Balayage vertical",
+        MovementShape.None => Tr.T("Aucun (position fixe)"),
+        MovementShape.Circle => Tr.T("Cercle"),
+        MovementShape.Eight => Tr.T("Huit"),
+        MovementShape.PanSweep => Tr.T("Balayage horizontal"),
+        MovementShape.TiltSweep => Tr.T("Balayage vertical"),
         _ => shape.ToString(),
     };
 }

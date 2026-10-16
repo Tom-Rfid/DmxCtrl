@@ -47,7 +47,7 @@ internal sealed class LivePanel : UserControl
     private readonly CheckedListBox _fixtureList = new() { CheckOnClick = true, IntegralHeight = false, Dock = DockStyle.Fill };
 
     // --- Couleurs ---
-    private readonly CheckBox _openDimmer = new() { Text = "Allumer le dimmer (s'il est à 0) en choisissant une couleur", AutoSize = true };
+    private readonly CheckBox _openDimmer = new() { Text = Tr.T("Allumer le dimmer (s'il est à 0) en choisissant une couleur"), AutoSize = true };
 
     // --- Mouvements ---
     private readonly ComboBox _shape = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200, Margin = new Padding(3, 4, 3, 3) };
@@ -57,20 +57,20 @@ internal sealed class LivePanel : UserControl
     private readonly Label _sizeValue = Ui.ValueLabel(90);
     private readonly TrackBar _spread = Ui.Slider(0, 100, 200);
     private readonly Label _spreadValue = Ui.ValueLabel(90);
-    private readonly CheckBox _mirror = new() { Text = "Miroir (une lyre sur deux inversée)", AutoSize = true };
-    private readonly CheckBox _moveSync = new() { Text = "Caler sur le BPM, 1 cycle =", AutoSize = true, Margin = new Padding(3, 6, 0, 3) };
+    private readonly CheckBox _mirror = new() { Text = Tr.T("Miroir (une lyre sur deux inversée)"), AutoSize = true };
+    private readonly CheckBox _moveSync = new() { Text = Tr.T("Caler sur le BPM, 1 cycle ="), AutoSize = true, Margin = new Padding(3, 6, 0, 3) };
     private readonly NumericUpDown _beatsPerCycle = new() { Minimum = 1, Maximum = 64, Value = 8, Width = 52, Margin = new Padding(3, 4, 3, 3) };
 
     // --- Chenillard ---
-    private readonly CheckBox _chaseOn = new() { Text = "Actif", AutoSize = true, Font = Ui.BoldFont };
-    private readonly CheckBox _chaseAlternate = new() { Text = "Une couleur différente par appareil", AutoSize = true };
+    private readonly CheckBox _chaseOn = new() { Text = Tr.T("Actif"), AutoSize = true, Font = Ui.BoldFont };
+    private readonly CheckBox _chaseAlternate = new() { Text = Tr.T("Une couleur différente par appareil"), AutoSize = true };
     private readonly NumericUpDown _chaseSeconds = new() { Minimum = 0.1m, Maximum = 60, DecimalPlaces = 1, Increment = 0.1m, Value = 1, Width = 56, Margin = new Padding(3, 4, 3, 3) };
-    private readonly CheckBox _chaseSync = new() { Text = "ou caler sur le BPM :", AutoSize = true, Margin = new Padding(12, 6, 0, 3) };
+    private readonly CheckBox _chaseSync = new() { Text = Tr.T("ou caler sur le BPM :"), AutoSize = true, Margin = new Padding(12, 6, 0, 3) };
     private readonly NumericUpDown _chaseBeats = new() { Minimum = 0.25m, Maximum = 64, DecimalPlaces = 2, Increment = 0.25m, Value = 2, Width = 60, Margin = new Padding(3, 4, 3, 3) };
     private readonly List<CheckBox> _paletteChecks = new();
 
     // --- Strobe ---
-    private readonly CheckBox _strobeOn = new() { Text = "Actif (appareils cochés)", AutoSize = true, Font = Ui.BoldFont };
+    private readonly CheckBox _strobeOn = new() { Text = Tr.T("Actif (appareils cochés)"), AutoSize = true, Font = Ui.BoldFont };
     private readonly TrackBar _strobeHz = Ui.Slider(1, 10, 200);
     private readonly Label _strobeValue = Ui.ValueLabel(90);
 
@@ -90,11 +90,11 @@ internal sealed class LivePanel : UserControl
 
     // --- Micro : tempo detecte et dimmer qui suit le volume ---
     private readonly ComboBox _micDevice = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 205, DropDownWidth = 320, Margin = new Padding(3, 4, 3, 3) };
-    private readonly CheckBox _micOn = new() { Text = "Écouter le micro", Appearance = Appearance.Button, TextAlign = ContentAlignment.MiddleCenter, Size = new Size(205, 30), Font = Ui.BoldFont };
+    private readonly CheckBox _micOn = new() { Text = Tr.T("Écouter le micro"), Appearance = Appearance.Button, TextAlign = ContentAlignment.MiddleCenter, Size = new Size(205, 30), Font = Ui.BoldFont };
     private readonly ProgressBar _micLevel = new() { Width = 205, Height = 12, Maximum = 100, Margin = new Padding(3, 4, 3, 2) };
     private readonly Label _micTempo = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 4, 3, 3) };
-    private readonly CheckBox _micFollow = new() { Text = "Caler le BPM sur le micro", AutoSize = true };
-    private readonly CheckBox _soundDimmer = new() { Text = "Dimmer suit le volume", AutoSize = true };
+    private readonly CheckBox _micFollow = new() { Text = Tr.T("Caler le BPM sur le micro"), AutoSize = true };
+    private readonly CheckBox _soundDimmer = new() { Text = Tr.T("Dimmer suit le volume"), AutoSize = true };
     private readonly NumericUpDown _soundRecovery = new() { Minimum = 0.2m, Maximum = 30, DecimalPlaces = 1, Increment = 0.5m, Value = 2, Width = 56, Margin = new Padding(3, 4, 3, 3) };
     private readonly Label _soundInfo = new() { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(3, 2, 3, 3) };
 
@@ -102,18 +102,18 @@ internal sealed class LivePanel : UserControl
     private readonly TrackBar _master = Ui.Slider(0, 255, 160);
     private readonly Label _masterValue = Ui.ValueLabel(46);
     private readonly Button _blackout = new() { Size = new Size(210, 56), Font = Ui.BigFont, Margin = new Padding(6) };
-    private readonly Button _flash = new() { Text = "FLASH  (F maintenu)", Size = new Size(210, 56), Font = Ui.BigFont, Margin = new Padding(6) };
+    private readonly Button _flash = new() { Text = Tr.T("FLASH  (F maintenu)"), Size = new Size(210, 56), Font = Ui.BigFont, Margin = new Padding(6) };
     private readonly NumericUpDown _bpm = new() { Minimum = 30, Maximum = 300, DecimalPlaces = 1, Value = 120, Width = 70, Margin = new Padding(3, 4, 3, 3) };
-    private readonly Button _tap = new() { Text = "TAP  (T)", Size = new Size(190, 40), Font = Ui.BigFont };
+    private readonly Button _tap = new() { Text = Tr.T("TAP  (T)"), Size = new Size(190, 40), Font = Ui.BigFont };
     private readonly NumericUpDown _fade = new() { Minimum = 0, Maximum = 20, DecimalPlaces = 1, Increment = 0.5m, Value = 1, Width = 60, Margin = new Padding(3, 4, 3, 3) };
     private readonly TapTempo _tapTempo = new();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
 
     // --- Scenes / mode auto ---
     private readonly FlowLayoutPanel _sceneFlow = new() { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(4) };
-    private readonly CheckBox _autoOn = new() { Text = "Mode auto : enchaîner les scènes toutes les", AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(24, 8, 0, 3) };
+    private readonly CheckBox _autoOn = new() { Text = Tr.T("Mode auto : enchaîner les scènes toutes les"), AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(24, 8, 0, 3) };
     private readonly NumericUpDown _autoSeconds = new() { Minimum = 1, Maximum = 600, Value = 8, Width = 56, Margin = new Padding(3, 5, 3, 3) };
-    private readonly CheckBox _autoSync = new() { Text = "ou sur le BPM, tous les", AutoSize = true, Margin = new Padding(8, 8, 0, 3) };
+    private readonly CheckBox _autoSync = new() { Text = Tr.T("ou sur le BPM, tous les"), AutoSize = true, Margin = new Padding(8, 8, 0, 3) };
     private readonly NumericUpDown _autoBeats = new() { Minimum = 1, Maximum = 256, Value = 16, Width = 56, Margin = new Padding(3, 5, 3, 3) };
     private readonly Label _autoStatus = new() { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(12, 8, 3, 3) };
     private readonly System.Windows.Forms.Timer _autoTimer = new() { Interval = 100 };
@@ -157,21 +157,21 @@ internal sealed class LivePanel : UserControl
 
     private Control BuildFixturePanel()
     {
-        var group = new GroupBox { Text = "Appareils pilotés", Dock = DockStyle.Left, Width = 220, Padding = new Padding(8), Font = Ui.BoldFont };
+        var group = new GroupBox { Text = Tr.T("Appareils pilotés"), Dock = DockStyle.Left, Width = 220, Padding = new Padding(8), Font = Ui.BoldFont };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Font = new Font("Segoe UI", 9f) };
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var all = new Button { Text = "Tous", Width = 58 };
+        var all = new Button { Text = Tr.T("Tous"), Width = 58 };
         all.Click += (_, _) => CheckFixtures(_ => true);
-        var none = new Button { Text = "Aucun", Width = 58 };
+        var none = new Button { Text = Tr.T("Aucun"), Width = 58 };
         none.Click += (_, _) => CheckFixtures(_ => false);
-        var movers = new Button { Text = "Lyres", Width = 58 };
+        var movers = new Button { Text = Tr.T("Lyres"), Width = 58 };
         movers.Click += (_, _) => CheckFixtures(f => _ctx.ProfileOf(f)?.CanMove == true);
-        var others = new Button { Text = "Autres", Width = 58 };
+        var others = new Button { Text = Tr.T("Autres"), Width = 58 };
         others.Click += (_, _) => CheckFixtures(f => _ctx.ProfileOf(f)?.CanMove == false);
-        var invert = new Button { Text = "Inverser", Width = 58 };
+        var invert = new Button { Text = Tr.T("Inverser"), Width = 58 };
         invert.Click += (_, _) =>
         {
             var current = _ctx.Engine.GetSelection().ToHashSet();
@@ -182,7 +182,7 @@ internal sealed class LivePanel : UserControl
         layout.Controls.Add(Ui.Flow(200, all, none, movers, others, invert), 0, 1);
         layout.Controls.Add(new Label
         {
-            Text = "Couleurs, mouvements, chenillard et strobe s'appliquent aux appareils cochés.",
+            Text = Tr.T("Couleurs, mouvements, chenillard et strobe s'appliquent aux appareils cochés."),
             AutoSize = true,
             MaximumSize = new Size(195, 0),
             ForeColor = Color.DimGray,
@@ -202,18 +202,18 @@ internal sealed class LivePanel : UserControl
             swatches.Controls.Add(button);
         }
 
-        var on = new Button { Text = "Allumer 100 %", AutoSize = true };
-        on.Click += (_, _) => ApplyToSelection(() => _ctx.Engine.SetDimmerForSelection(255), "Dimmer à 100 %");
-        var off = new Button { Text = "Éteindre", AutoSize = true };
-        off.Click += (_, _) => ApplyToSelection(() => _ctx.Engine.SetDimmerForSelection(0), "Dimmer à 0");
-        var centerButton = new Button { Text = "Centrer les lyres", AutoSize = true };
-        centerButton.Click += (_, _) => ApplyToSelection(_ctx.Engine.CenterSelection, "Lyres centrées");
+        var on = new Button { Text = Tr.T("Allumer 100 %"), AutoSize = true };
+        on.Click += (_, _) => ApplyToSelection(() => _ctx.Engine.SetDimmerForSelection(255), Tr.T("Dimmer à 100 %"));
+        var off = new Button { Text = Tr.T("Éteindre"), AutoSize = true };
+        off.Click += (_, _) => ApplyToSelection(() => _ctx.Engine.SetDimmerForSelection(0), Tr.T("Dimmer à 0"));
+        var centerButton = new Button { Text = Tr.T("Centrer les lyres"), AutoSize = true };
+        centerButton.Click += (_, _) => ApplyToSelection(_ctx.Engine.CenterSelection, Tr.T("Lyres centrées"));
 
         var table = Ui.Table(1);
         table.Controls.Add(swatches);
         table.Controls.Add(Ui.Flow(0, on, off, centerButton));
         table.Controls.Add(_openDimmer);
-        return Ui.Group("Couleurs", table);
+        return Ui.Group(Tr.T("Couleurs"), table);
     }
 
     /// <summary>
@@ -227,11 +227,11 @@ internal sealed class LivePanel : UserControl
         _flashSpeed.ValueChanged += (_, _) =>
         {
             _ctx.Engine.StrobeSpeed = _flashSpeed.Value;
-            _flashSpeedValue.Text = $"{_flashSpeed.Value * 100 / 255} %";
+            _flashSpeedValue.Text = Tr.F("{0} %", (_flashSpeed.Value * 100 / 255));
         };
-        _flashSpeedValue.Text = $"{_flashSpeed.Value * 100 / 255} %";
+        _flashSpeedValue.Text = Tr.F("{0} %", (_flashSpeed.Value * 100 / 255));
 
-        var stopAll = new Button { Text = "Couper tous les strobes", AutoSize = true };
+        var stopAll = new Button { Text = Tr.T("Couper tous les strobes"), AutoSize = true };
         stopAll.Click += (_, _) =>
         {
             foreach (var (_, toggle) in _strobeToggles)
@@ -241,10 +241,10 @@ internal sealed class LivePanel : UserControl
         };
 
         var table = Ui.Table(1);
-        table.Controls.Add(Ui.Flow(0, Ui.Text("Vitesse"), _flashSpeed, _flashSpeedValue));
+        table.Controls.Add(Ui.Flow(0, Ui.Text(Tr.T("Vitesse")), _flashSpeed, _flashSpeedValue));
         table.Controls.Add(_flashRows);
         table.Controls.Add(stopAll);
-        return Ui.Group("Flash / strobe par appareil", table);
+        return Ui.Group(Tr.T("Flash / strobe par appareil"), table);
     }
 
     private void RebuildFlashRows()
@@ -269,7 +269,7 @@ internal sealed class LivePanel : UserControl
             }
 
             string id = fixture.Id;
-            var flash = new Button { Text = "FLASH", Size = new Size(84, 32), Font = Ui.BoldFont, Margin = new Padding(3, 2, 3, 2) };
+            var flash = new Button { Text = Tr.T("FLASH"), Size = new Size(84, 32), Font = Ui.BoldFont, Margin = new Padding(3, 2, 3, 2) };
             flash.MouseDown += (_, e) =>
             {
                 if (e.Button == MouseButtons.Left)
@@ -289,7 +289,7 @@ internal sealed class LivePanel : UserControl
 
             var strobe = new CheckBox
             {
-                Text = "STROBE",
+                Text = Tr.T("STROBE"),
                 Appearance = Appearance.Button,
                 Size = new Size(96, 32),
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -305,9 +305,9 @@ internal sealed class LivePanel : UserControl
                 strobe.UseVisualStyleBackColor = !strobe.Checked;
             };
             _tips.SetToolTip(strobe, fixture.NoStrobe
-                ? "« Pas de strobe » est coché dans l'onglet de cet appareil."
-                : profile.HasHardwareStrobe ? "Interrupteur : strobe de l'appareil lui-même." : "Interrupteur : strobe logiciel (dimmer coupé en rythme).");
-            _tips.SetToolTip(flash, "Maintenir : plein feu sur cet appareil (même en blackout).");
+                ? Tr.T("« Pas de strobe » est coché dans l'onglet de cet appareil.")
+                : profile.HasHardwareStrobe ? Tr.T("Interrupteur : strobe de l'appareil lui-même.") : Tr.T("Interrupteur : strobe logiciel (dimmer coupé en rythme)."));
+            _tips.SetToolTip(flash, Tr.T("Maintenir : plein feu sur cet appareil (même en blackout)."));
             _strobeToggles.Add((id, strobe));
 
             _flashRows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -319,7 +319,7 @@ internal sealed class LivePanel : UserControl
 
         if (row == 0)
         {
-            _flashRows.Controls.Add(Ui.Text("Aucun appareil : coche « Flash / strobe » dans le patch (Ctrl+P).", color: Color.DimGray), 0, 0);
+            _flashRows.Controls.Add(Ui.Text(Tr.T("Aucun appareil : coche « Flash / strobe » dans le patch (Ctrl+P)."), color: Color.DimGray), 0, 0);
             _flashRows.SetColumnSpan(_flashRows.Controls[0], 3);
         }
         _flashRows.ResumeLayout();
@@ -333,22 +333,22 @@ internal sealed class LivePanel : UserControl
         }
 
         var table = Ui.Table(3);
-        Ui.Row(table, "Forme", _shape);
-        Ui.Row(table, "Vitesse", _speed, _speedValue);
-        Ui.Row(table, "Taille", _size, _sizeValue);
-        Ui.Row(table, "Décalage", _spread, _spreadValue);
-        Ui.Row(table, "", Ui.Flow(0, _moveSync, _beatsPerCycle, Ui.Text("temps")));
+        Ui.Row(table, Tr.T("Forme"), _shape);
+        Ui.Row(table, Tr.T("Vitesse"), _speed, _speedValue);
+        Ui.Row(table, Tr.T("Taille"), _size, _sizeValue);
+        Ui.Row(table, Tr.T("Décalage"), _spread, _spreadValue);
+        Ui.Row(table, "", Ui.Flow(0, _moveSync, _beatsPerCycle, Ui.Text(Tr.T("temps"))));
         Ui.Row(table, "", _mirror);
         table.Controls.Add(new Label
         {
-            Text = "Décalage 0 % = lyres synchronisées, 100 % = réparties (2 lyres = opposées).\n" +
-                   "Le mouvement tourne autour de la position réglée dans l'onglet de chaque lyre.",
+            Text = Tr.T("Décalage 0 % = lyres synchronisées, 100 % = réparties (2 lyres = opposées).\n") +
+                   Tr.T("Le mouvement tourne autour de la position réglée dans l'onglet de chaque lyre."),
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(3, 4, 3, 3),
         });
         table.SetColumnSpan(table.Controls[^1], 3);
-        return Ui.Group("Mouvements (lyres)", table);
+        return Ui.Group(Tr.T("Mouvements (lyres)"), table);
     }
 
     private Control BuildChaseGroup()
@@ -358,7 +358,7 @@ internal sealed class LivePanel : UserControl
         {
             var check = new CheckBox
             {
-                Text = color.Name,
+                Text = Tr.T(color.Name),
                 AutoSize = true,
                 Tag = color.Name,
                 BackColor = Color.FromArgb(60, color.R, color.G, color.B),
@@ -371,25 +371,25 @@ internal sealed class LivePanel : UserControl
 
         var table = Ui.Table(2);
         Ui.Row(table, "", Ui.Flow(0, _chaseOn, _chaseAlternate));
-        Ui.Row(table, "Pas", Ui.Flow(0, _chaseSeconds, Ui.Text("s"), _chaseSync, _chaseBeats, Ui.Text("temps")));
-        Ui.Row(table, "Couleurs", palette);
-        return Ui.Group("Chenillard de couleurs", table);
+        Ui.Row(table, Tr.T("Pas"), Ui.Flow(0, _chaseSeconds, Ui.Text(Tr.T("s")), _chaseSync, _chaseBeats, Ui.Text(Tr.T("temps"))));
+        Ui.Row(table, Tr.T("Couleurs"), palette);
+        return Ui.Group(Tr.T("Chenillard de couleurs"), table);
     }
 
     private Control BuildStrobeGroup()
     {
         var table = Ui.Table(3);
         Ui.Row(table, "", _strobeOn);
-        Ui.Row(table, "Fréquence", _strobeHz, _strobeValue);
+        Ui.Row(table, Tr.T("Fréquence"), _strobeHz, _strobeValue);
         table.Controls.Add(new Label
         {
-            Text = "Strobe « logiciel » : coupe le dimmer en rythme.\nLimité par la cadence d'envoi (10 trames/s → 5 flashs/s max).",
+            Text = Tr.T("Strobe « logiciel » : coupe le dimmer en rythme.\nLimité par la cadence d'envoi (10 trames/s → 5 flashs/s max)."),
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(3, 4, 3, 3),
         });
         table.SetColumnSpan(table.Controls[^1], 3);
-        return Ui.Group("Strobe", table);
+        return Ui.Group(Tr.T("Strobe"), table);
     }
 
     private Control BuildRightPanel()
@@ -407,22 +407,22 @@ internal sealed class LivePanel : UserControl
         var master = Ui.Table(2);
         master.Controls.Add(_master);
         master.Controls.Add(_masterValue);
-        panel.Controls.Add(Ui.Group("Master (intensité générale)", master));
+        panel.Controls.Add(Ui.Group(Tr.T("Master (intensité générale)"), master));
 
         panel.Controls.Add(_blackout);
         panel.Controls.Add(_flash);
 
         var tempo = Ui.Table(2);
-        Ui.Row(tempo, "BPM", _bpm);
+        Ui.Row(tempo, Tr.T("BPM"), _bpm);
         tempo.Controls.Add(_tap);
         tempo.SetColumnSpan(_tap, 2);
-        Ui.Row(tempo, "Fondu scènes (s)", _fade);
-        panel.Controls.Add(Ui.Group("Tempo", tempo));
+        Ui.Row(tempo, Tr.T("Fondu scènes (s)"), _fade);
+        panel.Controls.Add(Ui.Group(Tr.T("Tempo"), tempo));
         panel.Controls.Add(BuildMicGroup());
 
         panel.Controls.Add(new Label
         {
-            Text = "Raccourcis (onglet Soirée) :\nEspace = blackout\nF maintenu = flash\nT = tap tempo\n1 à 9 = scènes",
+            Text = Tr.T("Raccourcis (onglet Soirée) :\nEspace = blackout\nF maintenu = flash\nT = tap tempo\n1 à 9 = scènes"),
             AutoSize = true,
             ForeColor = Color.DimGray,
             Margin = new Padding(8, 8, 3, 3),
@@ -478,12 +478,12 @@ internal sealed class LivePanel : UserControl
         _ctx.Mic.Error += message => BeginInvoke(new Action(() =>
         {
             _ctx.Mic.Stop();
-            _ctx.Status($"Micro coupé : {message}");
+            _ctx.Status(Tr.F("Micro coupé : {0}", message));
         }));
         _ctx.Mic.Changed += UpdateMicUi;
 
-        _tips.SetToolTip(_micFollow, "Le tempo détecté remplace le BPM (mouvements, chenillard, effet gauche/droite du Spider calé sur le tempo).");
-        _tips.SetToolTip(_soundDimmer, "Quand le volume baisse (break, pont), le dimmer baisse ; il remonte progressivement quand la musique revient.");
+        _tips.SetToolTip(_micFollow, Tr.T("Le tempo détecté remplace le BPM (mouvements, chenillard, effet gauche/droite du Spider calé sur le tempo)."));
+        _tips.SetToolTip(_soundDimmer, Tr.T("Quand le volume baisse (break, pont), le dimmer baisse ; il remonte progressivement quand la musique revient."));
 
         var table = Ui.Table(1);
         table.Controls.Add(_micDevice);
@@ -492,10 +492,10 @@ internal sealed class LivePanel : UserControl
         table.Controls.Add(_micTempo);
         table.Controls.Add(_micFollow);
         table.Controls.Add(_soundDimmer);
-        table.Controls.Add(Ui.Flow(0, Ui.Text("Remontée"), _soundRecovery, Ui.Text("s")));
+        table.Controls.Add(Ui.Flow(0, Ui.Text(Tr.T("Remontée")), _soundRecovery, Ui.Text(Tr.T("s"))));
         table.Controls.Add(_soundInfo);
         UpdateMicUi();
-        return Ui.Group("Micro (tempo / volume)", table);
+        return Ui.Group(Tr.T("Micro (tempo / volume)"), table);
     }
 
     private void ToggleMic(bool on)
@@ -508,12 +508,12 @@ internal sealed class LivePanel : UserControl
         try
         {
             _ctx.Mic.Start(_micDevice.SelectedIndex);
-            _ctx.Status($"Micro « {_micDevice.SelectedItem} » : écoute en cours (le tempo apparaît après quelques secondes de musique).");
+            _ctx.Status(Tr.F("Micro « {0} » : écoute en cours (le tempo apparaît après quelques secondes de musique).", _micDevice.SelectedItem));
         }
         catch (Exception ex)
         {
             _ctx.Mic.Stop();
-            _ctx.Status($"Impossible d'ouvrir le micro : {ex.Message}");
+            _ctx.Status(Tr.F("Impossible d'ouvrir le micro : {0}", ex.Message));
         }
     }
 
@@ -543,13 +543,13 @@ internal sealed class LivePanel : UserControl
             _updating = false;
         }
 
-        _micOn.Text = mic.IsListening ? "Micro : ÉCOUTE (couper)" : "Écouter le micro";
+        _micOn.Text = mic.IsListening ? Tr.T("Micro : ÉCOUTE (couper)") : Tr.T("Écouter le micro");
         _micOn.BackColor = mic.IsListening ? Color.FromArgb(120, 200, 120) : SystemColors.Control;
         _micOn.UseVisualStyleBackColor = !mic.IsListening;
 
         if (!mic.IsListening)
         {
-            _micTempo.Text = _micDevice.Items.Count == 0 ? "Aucune entrée son trouvée" : "Micro coupé";
+            _micTempo.Text = _micDevice.Items.Count == 0 ? Tr.T("Aucune entrée son trouvée") : Tr.T("Micro coupé");
             _micTempo.ForeColor = Color.DimGray;
             _micLevel.Value = 0;
             _soundInfo.Text = "";
@@ -558,19 +558,19 @@ internal sealed class LivePanel : UserControl
 
         _micLevel.Value = (int)Math.Clamp((mic.LevelDb + 60) * 100 / 60, 0, 100);
         double bpm = mic.Bpm;
-        _micTempo.Text = bpm > 0 ? $"Tempo détecté : {bpm:0.0} BPM" : "Tempo : écoute… (musique ?)";
+        _micTempo.Text = bpm > 0 ? Tr.F("Tempo détecté : {0:0.0} BPM", bpm) : Tr.T("Tempo : écoute… (musique ?)");
         _micTempo.ForeColor = bpm > 0 ? Ui.OkColor : Ui.WarningColor;
-        _soundInfo.Text = mic.SoundDimmer ? $"Dimmer son : {mic.DimmerFactor * 100:0} %" : $"Volume : {mic.LevelDb:0} dB";
+        _soundInfo.Text = mic.SoundDimmer ? Tr.F("Dimmer son : {0:0} %", (mic.DimmerFactor * 100)) : Tr.F("Volume : {0:0} dB", mic.LevelDb);
     }
 
     private Control BuildScenePanel()
     {
-        var group = new GroupBox { Text = "Scènes", Dock = DockStyle.Bottom, Height = 196, Padding = new Padding(6), Font = Ui.BoldFont };
+        var group = new GroupBox { Text = Tr.T("Scènes"), Dock = DockStyle.Bottom, Height = 196, Padding = new Padding(6), Font = Ui.BoldFont };
 
-        var save = new Button { Text = "Enregistrer la scène actuelle…", AutoSize = true, Font = new Font("Segoe UI", 9f) };
+        var save = new Button { Text = Tr.T("Enregistrer la scène actuelle…"), AutoSize = true, Font = new Font("Segoe UI", 9f) };
         save.Click += (_, _) => SaveCurrentScene();
 
-        var top = Ui.Flow(0, save, _autoOn, _autoSeconds, Ui.Text("s"), _autoSync, _autoBeats, Ui.Text("temps"), _autoStatus);
+        var top = Ui.Flow(0, save, _autoOn, _autoSeconds, Ui.Text(Tr.T("s")), _autoSync, _autoBeats, Ui.Text(Tr.T("temps")), _autoStatus);
         top.Dock = DockStyle.Top;
         top.Font = new Font("Segoe UI", 9f);
         _sceneFlow.Font = new Font("Segoe UI", 9f);
@@ -618,7 +618,7 @@ internal sealed class LivePanel : UserControl
 
         _master.ValueChanged += (_, _) =>
         {
-            _masterValue.Text = $"{_master.Value * 100 / 255} %";
+            _masterValue.Text = Tr.F("{0} %", (_master.Value * 100 / 255));
             if (_updating)
             {
                 return;
@@ -705,7 +705,7 @@ internal sealed class LivePanel : UserControl
             var selected = _ctx.Engine.GetSelection().ToHashSet();
             foreach (var fixture in _ctx.Show.Fixtures)
             {
-                string label = fixture.Name + (fixture.Enabled ? "" : " (désactivé)");
+                string label = fixture.Name + (fixture.Enabled ? "" : Tr.T(" (désactivé)"));
                 int index = _fixtureList.Items.Add(new FixtureItem(fixture.Id, label));
                 _fixtureList.SetItemChecked(index, selected.Contains(fixture.Id));
             }
@@ -783,12 +783,12 @@ internal sealed class LivePanel : UserControl
     {
         double bpm = (double)_bpm.Value;
         _speedValue.Text = _moveSync.Checked
-            ? $"{bpm / (double)_beatsPerCycle.Value:0.#} /min (BPM)"
-            : $"{_speed.Value} cycles/min";
-        _sizeValue.Text = $"{_size.Value} %";
-        _spreadValue.Text = $"{_spread.Value} %";
-        _strobeValue.Text = $"{_strobeHz.Value} flashs/s";
-        _masterValue.Text = $"{_master.Value * 100 / 255} %";
+            ? Tr.F("{0:0.#} /min (BPM)", (bpm / (double)_beatsPerCycle.Value))
+            : Tr.F("{0} cycles/min", _speed.Value);
+        _sizeValue.Text = Tr.F("{0} %", _size.Value);
+        _spreadValue.Text = Tr.F("{0} %", _spread.Value);
+        _strobeValue.Text = Tr.F("{0} flashs/s", _strobeHz.Value);
+        _masterValue.Text = Tr.F("{0} %", (_master.Value * 100 / 255));
         _speed.Enabled = !_moveSync.Checked;
     }
 
@@ -840,26 +840,26 @@ internal sealed class LivePanel : UserControl
 
         if (result.Applied.Count == 0 && result.Unsupported.Count == 0)
         {
-            _ctx.Status("Aucun appareil coché.");
+            _ctx.Status(Tr.T("Aucun appareil coché."));
         }
         else if (result.Unsupported.Count > 0)
         {
-            _ctx.Status($"{color.Name} : appliqué à {Join(result.Applied)} ; indisponible pour {Join(result.Unsupported)} " +
-                        $"(enregistre un preset « {color.Name} » sur la roue de couleurs avec le bouton « + » de l'onglet de l'appareil).");
+            _ctx.Status(Tr.F("{0} : appliqué à {1} ; indisponible pour {2} ", Tr.T(color.Name), Join(result.Applied), Join(result.Unsupported)) +
+                        Tr.F("(enregistre un preset « {0} » sur la roue de couleurs avec le bouton « + » de l'onglet de l'appareil).", Tr.T(color.Name)));
         }
         else
         {
-            _ctx.Status($"{color.Name} : appliqué à {Join(result.Applied)}.");
+            _ctx.Status(Tr.F("{0} : appliqué à {1}.", Tr.T(color.Name), Join(result.Applied)));
         }
     }
 
-    private static string Join(IReadOnlyList<string> names) => names.Count == 0 ? "aucun" : string.Join(", ", names);
+    private static string Join(IReadOnlyList<string> names) => names.Count == 0 ? Tr.T("aucun") : string.Join(", ", names);
 
     private void ApplyToSelection(Action action, string message)
     {
         action();
         _ctx.NotifyLiveStateChanged();
-        _ctx.Status(message + " (appareils cochés).");
+        _ctx.Status(message + Tr.T(" (appareils cochés)."));
     }
 
     private void ToggleBlackout()
@@ -871,7 +871,7 @@ internal sealed class LivePanel : UserControl
     private void UpdateBlackoutButton()
     {
         bool on = _ctx.Engine.Blackout;
-        _blackout.Text = on ? "BLACKOUT ACTIF\n(Espace pour rallumer)" : "BLACKOUT  (Espace)";
+        _blackout.Text = on ? Tr.T("BLACKOUT ACTIF\n(Espace pour rallumer)") : Tr.T("BLACKOUT  (Espace)");
         _blackout.BackColor = on ? Color.DarkRed : SystemColors.Control;
         _blackout.ForeColor = on ? Color.White : SystemColors.ControlText;
         _blackout.UseVisualStyleBackColor = !on;
@@ -900,7 +900,7 @@ internal sealed class LivePanel : UserControl
         if (bpm is double value)
         {
             Ui.SetValue(_bpm, value); // declenche ValueChanged -> moteur
-            _ctx.Status($"Tempo : {value:0.#} BPM");
+            _ctx.Status(Tr.F("Tempo : {0:0.#} BPM", value));
         }
     }
 
@@ -924,7 +924,7 @@ internal sealed class LivePanel : UserControl
             var scene = scenes[i];
             var button = new Button
             {
-                Text = $"{i + 1}. {scene.Name}" + (scene.IncludeInAuto ? "" : "\n(hors auto)"),
+                Text = $"{i + 1}. {scene.Name}" + (scene.IncludeInAuto ? "" : Tr.T("\n(hors auto)")),
                 Size = new Size(150, 54),
                 Tag = scene.Id,
                 Margin = new Padding(4),
@@ -937,11 +937,11 @@ internal sealed class LivePanel : UserControl
 
         if (scenes.Count == 0)
         {
-            _sceneFlow.Controls.Add(Ui.Text("Aucune scène : règle une ambiance puis clique « Enregistrer la scène actuelle ».", color: Color.DimGray));
+            _sceneFlow.Controls.Add(Ui.Text(Tr.T("Aucune scène : règle une ambiance puis clique « Enregistrer la scène actuelle »."), color: Color.DimGray));
         }
         else
         {
-            _sceneFlow.Controls.Add(Ui.Text("Clic droit sur une scène : renommer, mettre à jour, déplacer, supprimer…", color: Color.DimGray));
+            _sceneFlow.Controls.Add(Ui.Text(Tr.T("Clic droit sur une scène : renommer, mettre à jour, déplacer, supprimer…"), color: Color.DimGray));
         }
 
         _sceneFlow.ResumeLayout();
@@ -951,19 +951,19 @@ internal sealed class LivePanel : UserControl
     private ContextMenuStrip BuildSceneMenu(Scene scene)
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Rappeler", null, (_, _) => Recall(scene, manual: true));
-        menu.Items.Add("Mettre à jour avec l'état actuel", null, (_, _) =>
+        menu.Items.Add(Tr.T("Rappeler"), null, (_, _) => Recall(scene, manual: true));
+        menu.Items.Add(Tr.T("Mettre à jour avec l'état actuel"), null, (_, _) =>
         {
             var snapshot = _ctx.Engine.CaptureScene(scene.Name);
             scene.Values = snapshot.Values;
             scene.Effects = snapshot.Effects;
             scene.Selection = snapshot.Selection;
             _ctx.MarkDirty();
-            _ctx.Status($"Scène « {scene.Name} » mise à jour.");
+            _ctx.Status(Tr.F("Scène « {0} » mise à jour.", scene.Name));
         });
-        menu.Items.Add("Renommer…", null, (_, _) =>
+        menu.Items.Add(Tr.T("Renommer…"), null, (_, _) =>
         {
-            string? name = InputDialog.Ask(FindForm(), "Renommer la scène", "Nouveau nom :", scene.Name);
+            string? name = InputDialog.Ask(FindForm(), Tr.T("Renommer la scène"), Tr.T("Nouveau nom :"), scene.Name);
             if (name is not null)
             {
                 scene.Name = name;
@@ -971,7 +971,7 @@ internal sealed class LivePanel : UserControl
                 RebuildScenes();
             }
         });
-        var inAuto = new ToolStripMenuItem("Inclure dans le mode auto") { Checked = scene.IncludeInAuto, CheckOnClick = true };
+        var inAuto = new ToolStripMenuItem(Tr.T("Inclure dans le mode auto")) { Checked = scene.IncludeInAuto, CheckOnClick = true };
         inAuto.CheckedChanged += (_, _) =>
         {
             scene.IncludeInAuto = inAuto.Checked;
@@ -980,12 +980,12 @@ internal sealed class LivePanel : UserControl
         };
         menu.Items.Add(inAuto);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Déplacer à gauche", null, (_, _) => MoveScene(scene, -1));
-        menu.Items.Add("Déplacer à droite", null, (_, _) => MoveScene(scene, +1));
+        menu.Items.Add(Tr.T("Déplacer à gauche"), null, (_, _) => MoveScene(scene, -1));
+        menu.Items.Add(Tr.T("Déplacer à droite"), null, (_, _) => MoveScene(scene, +1));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Supprimer…", null, (_, _) =>
+        menu.Items.Add(Tr.T("Supprimer…"), null, (_, _) =>
         {
-            if (Ui.Confirm(FindForm()!, $"Supprimer la scène « {scene.Name} » ?"))
+            if (Ui.Confirm(FindForm()!, Tr.F("Supprimer la scène « {0} » ?", scene.Name)))
             {
                 _ctx.Show.Scenes.Remove(scene);
                 _ctx.MarkDirty();
@@ -1012,9 +1012,9 @@ internal sealed class LivePanel : UserControl
 
     private void SaveCurrentScene()
     {
-        string? name = InputDialog.Ask(FindForm(), "Nouvelle scène",
-            "Nom de la scène (elle mémorise les valeurs de tous les appareils, les effets en cours et les appareils cochés) :",
-            $"Scène {_ctx.Show.Scenes.Count + 1}");
+        string? name = InputDialog.Ask(FindForm(), Tr.T("Nouvelle scène"),
+            Tr.T("Nom de la scène (elle mémorise les valeurs de tous les appareils, les effets en cours et les appareils cochés) :"),
+            Tr.F("Scène {0}", (_ctx.Show.Scenes.Count + 1)));
         if (name is null)
         {
             return;
@@ -1025,7 +1025,7 @@ internal sealed class LivePanel : UserControl
         _activeSceneId = scene.Id;
         _ctx.MarkDirty();
         RebuildScenes();
-        _ctx.Status($"Scène « {name} » enregistrée (pense à enregistrer la configuration : Ctrl+S).");
+        _ctx.Status(Tr.F("Scène « {0} » enregistrée (pense à enregistrer la configuration : Ctrl+S).", name));
     }
 
     private void Recall(Scene scene, bool manual)
@@ -1077,7 +1077,7 @@ internal sealed class LivePanel : UserControl
         var scenes = _ctx.Show.Scenes.Where(s => s.IncludeInAuto).ToList();
         if (scenes.Count == 0)
         {
-            _autoStatus.Text = "Aucune scène incluse dans le mode auto.";
+            _autoStatus.Text = Tr.T("Aucune scène incluse dans le mode auto.");
             return;
         }
 
@@ -1091,7 +1091,7 @@ internal sealed class LivePanel : UserControl
         }
 
         var current = scenes[Math.Clamp(_autoIndex, 0, scenes.Count - 1)];
-        _autoStatus.Text = $"En cours : « {current.Name} » — suivante dans {Math.Max(0, interval - (now - _autoLastSwitch)):0.0} s";
+        _autoStatus.Text = Tr.F("En cours : « {0} » — suivante dans {1:0.0} s", current.Name, (Math.Max(0, interval - (now - _autoLastSwitch))));
     }
 
     // =================================================================================

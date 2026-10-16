@@ -35,8 +35,8 @@ internal sealed class MainForm : Form
 
     // Onglets
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill, Padding = new Point(14, 5) };
-    private readonly TabPage _liveTab = new("Soirée") { Tag = "live" };
-    private readonly TabPage _debugTab = new("Debug") { Tag = "debug" };
+    private readonly TabPage _liveTab = new(Tr.T("Soirée")) { Tag = "live" };
+    private readonly TabPage _debugTab = new(Tr.T("Debug")) { Tag = "debug" };
     private readonly LivePanel _live;
     private readonly DebugPanel _debug;
     private readonly FogBanner _fogBanner;
@@ -46,8 +46,8 @@ internal sealed class MainForm : Form
 
     // Barre de connexion
     private readonly ComboBox _portCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 100, Margin = new Padding(3, 7, 3, 3) };
-    private readonly Button _btnConnect = new() { Text = "Connecter", AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
-    private readonly Button _btnDisconnect = new() { Text = "Déconnecter", AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
+    private readonly Button _btnConnect = new() { Text = Tr.T("Connecter"), AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
+    private readonly Button _btnDisconnect = new() { Text = Tr.T("Déconnecter"), AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
     private readonly Label _lblLink = new() { AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(6, 10, 3, 3) };
 
     // Voyant de connexion bien visible : carre vert (connecte), orange clignotant (connexion), rouge (coupe).
@@ -61,10 +61,10 @@ internal sealed class MainForm : Form
         BorderStyle = BorderStyle.FixedSingle,
         Margin = new Padding(12, 5, 3, 3),
     };
-    private readonly CheckBox _autoConnect = new() { Text = "Connexion auto au démarrage", AutoSize = true, Margin = new Padding(16, 9, 3, 3) };
+    private readonly CheckBox _autoConnect = new() { Text = Tr.T("Connexion auto au démarrage"), AutoSize = true, Margin = new Padding(16, 9, 3, 3) };
 
     // Menu et barre d'etat
-    private readonly ToolStripMenuItem _recentMenu = new("Configurations récentes");
+    private readonly ToolStripMenuItem _recentMenu = new(Tr.T("Configurations récentes"));
     private readonly ToolStripStatusLabel _stShow = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly ToolStripStatusLabel _stPatch = new() { BorderSides = ToolStripStatusLabelBorderSides.Left };
     private readonly ToolStripStatusLabel _stDebug = new() { Font = Ui.BoldFont };
@@ -83,7 +83,7 @@ internal sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "Contrôleur DMX";
+        Text = Tr.T("Contrôleur DMX");
         Font = new Font("Segoe UI", 9f);
         Size = new Size(1540, 945);
         MinimumSize = new Size(1150, 720);
@@ -142,7 +142,7 @@ internal sealed class MainForm : Form
         UpdateConnectionUi();
         UpdateTitle();
         UpdateStatusBar();
-        Log(_showPath is null ? "Configuration par défaut chargée." : $"Configuration chargée : {_showPath}");
+        Log(_showPath is null ? Tr.T("Configuration par défaut chargée.") : Tr.F("Configuration chargée : {0}", _showPath));
 
         _uiTimer.Tick += (_, _) => OnUiTick();
         _uiTimer.Start();
@@ -166,35 +166,66 @@ internal sealed class MainForm : Form
     {
         var menu = new MenuStrip();
 
-        var file = new ToolStripMenuItem("&Fichier");
-        file.DropDownItems.Add(Item("Nouvelle configuration (appareils par défaut)", null, () => NewShow(empty: false)));
-        file.DropDownItems.Add(Item("Nouvelle configuration vide (garde les profils)", null, () => NewShow(empty: true)));
+        var file = new ToolStripMenuItem(Tr.T("&Fichier"));
+        file.DropDownItems.Add(Item(Tr.T("Nouvelle configuration (appareils par défaut)"), null, () => NewShow(empty: false)));
+        file.DropDownItems.Add(Item(Tr.T("Nouvelle configuration vide (garde les profils)"), null, () => NewShow(empty: true)));
         file.DropDownItems.Add(new ToolStripSeparator());
-        file.DropDownItems.Add(Item("&Ouvrir / importer…", Keys.Control | Keys.O, () => OpenShow(null)));
-        file.DropDownItems.Add(Item("&Enregistrer", Keys.Control | Keys.S, () => SaveShow()));
-        file.DropDownItems.Add(Item("Enregistrer &sous / exporter…", Keys.Control | Keys.Shift | Keys.S, () => SaveShowAs()));
+        file.DropDownItems.Add(Item(Tr.T("&Ouvrir / importer…"), Keys.Control | Keys.O, () => OpenShow(null)));
+        file.DropDownItems.Add(Item(Tr.T("&Enregistrer"), Keys.Control | Keys.S, () => SaveShow()));
+        file.DropDownItems.Add(Item(Tr.T("Enregistrer &sous / exporter…"), Keys.Control | Keys.Shift | Keys.S, () => SaveShowAs()));
         file.DropDownItems.Add(_recentMenu);
         _recentMenu.DropDownOpening += (_, _) => BuildRecentMenu();
         BuildRecentMenu();
         file.DropDownItems.Add(new ToolStripSeparator());
-        file.DropDownItems.Add(Item("Renommer la configuration…", null, RenameShow));
-        file.DropDownItems.Add(Item("Ouvrir le dossier des configurations", null, OpenShowsFolder));
+        file.DropDownItems.Add(Item(Tr.T("Renommer la configuration…"), null, RenameShow));
+        file.DropDownItems.Add(Item(Tr.T("Ouvrir le dossier des configurations"), null, OpenShowsFolder));
         file.DropDownItems.Add(new ToolStripSeparator());
-        file.DropDownItems.Add(Item("&Quitter", null, Close));
+        file.DropDownItems.Add(Item(Tr.T("&Quitter"), null, Close));
 
-        var fixtures = new ToolStripMenuItem("&Appareils");
-        fixtures.DropDownItems.Add(Item("&Ajouter un appareil (nouvel onglet)…", Keys.Control | Keys.Shift | Keys.A, () => OpenPatch(addNew: true)));
-        fixtures.DropDownItems.Add(Item("&Patch / adressage…", Keys.Control | Keys.P, () => OpenPatch(addNew: false)));
-        fixtures.DropDownItems.Add(Item("Éditeur de &profils (modules)…", Keys.Control | Keys.M, OpenProfileEditor));
+        var fixtures = new ToolStripMenuItem(Tr.T("&Appareils"));
+        fixtures.DropDownItems.Add(Item(Tr.T("&Ajouter un appareil (nouvel onglet)…"), Keys.Control | Keys.Shift | Keys.A, () => OpenPatch(addNew: true)));
+        fixtures.DropDownItems.Add(Item(Tr.T("&Patch / adressage…"), Keys.Control | Keys.P, () => OpenPatch(addNew: false)));
+        fixtures.DropDownItems.Add(Item(Tr.T("Éditeur de &profils (modules)…"), Keys.Control | Keys.M, OpenProfileEditor));
         fixtures.DropDownItems.Add(new ToolStripSeparator());
-        fixtures.DropDownItems.Add(Item("Vérifier l'adressage", null, () => ReportPatchProblems(onlyIfAny: false)));
+        fixtures.DropDownItems.Add(Item(Tr.T("Vérifier l'adressage"), null, () => ReportPatchProblems(onlyIfAny: false)));
 
-        var help = new ToolStripMenuItem("A&ide");
-        help.DropDownItems.Add(Item("Raccourcis clavier", Keys.F1, ShowShortcuts));
-        help.DropDownItems.Add(Item("À propos", null, ShowAbout));
+        var settings = new ToolStripMenuItem(Tr.T("⚙ &Paramètres"));
+        var language = new ToolStripMenuItem(Tr.T("🌐 Langue / Language"));
+        foreach (var (code, name) in Tr.Languages)
+        {
+            var choice = new ToolStripMenuItem(name) { Checked = string.Equals(code, Tr.Language, StringComparison.OrdinalIgnoreCase) };
+            choice.Click += (_, _) => ChangeLanguage(code);
+            language.DropDownItems.Add(choice);
+        }
+        settings.DropDownItems.Add(language);
 
-        menu.Items.AddRange(new ToolStripItem[] { file, fixtures, help });
+        var help = new ToolStripMenuItem(Tr.T("A&ide"));
+        help.DropDownItems.Add(Item(Tr.T("Raccourcis clavier"), Keys.F1, ShowShortcuts));
+        help.DropDownItems.Add(Item(Tr.T("À propos"), null, ShowAbout));
+
+        menu.Items.AddRange(new ToolStripItem[] { file, fixtures, settings, help });
         return menu;
+    }
+
+    /// <summary>
+    /// Saves the chosen interface language and offers to restart: windows read their texts
+    /// when they are built, so the new language applies from the next start.
+    /// </summary>
+    private void ChangeLanguage(string code)
+    {
+        if (string.Equals(code, Tr.Language, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        _settings.Language = code;
+        SaveAppSettings();
+        string message = code == Tr.French
+            ? "La langue passera en français au prochain démarrage.\n\nRedémarrer maintenant ?"
+            : "The language will switch to English at the next start.\n\nRestart now?";
+        if (MessageBox.Show(this, message, "Langue / Language", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+        {
+            Application.Restart(); // closes this window first (asks to save the configuration if needed)
+        }
     }
 
     private static ToolStripMenuItem Item(string text, Keys? shortcut, Action action)
@@ -209,7 +240,7 @@ internal sealed class MainForm : Form
 
     private Control BuildConnectionBar()
     {
-        var refresh = new Button { Text = "Actualiser", AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
+        var refresh = new Button { Text = Tr.T("Actualiser"), AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
         refresh.Click += (_, _) => RefreshPorts();
         _btnConnect.Click += async (_, _) =>
         {
@@ -219,8 +250,8 @@ internal sealed class MainForm : Form
             }
             else
             {
-                MessageBox.Show(this, "Choisis d'abord un port COM (le port « sortant » du boîtier, ex. COM6).",
-                    "Port manquant", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, Tr.T("Choisis d'abord un port COM (le port « sortant » du boîtier, ex. COM6)."),
+                    Tr.T("Port manquant"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         };
         _btnDisconnect.Click += (_, _) => Disconnect();
@@ -230,7 +261,7 @@ internal sealed class MainForm : Form
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 40, Padding = new Padding(6, 2, 6, 2), BackColor = Color.FromArgb(240, 242, 246) };
         bar.Controls.AddRange(new Control[]
         {
-            Ui.Text("Boîtier Bluetooth (port COM) :", bold: true), _portCombo, refresh, _btnConnect, _btnDisconnect, _linkLed, _lblLink, _autoConnect,
+            Ui.Text(Tr.T("Boîtier Bluetooth (port COM) :"), bold: true), _portCombo, refresh, _btnConnect, _btnDisconnect, _linkLed, _lblLink, _autoConnect,
         });
         return bar;
     }
@@ -256,8 +287,8 @@ internal sealed class MainForm : Form
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"La dernière configuration n'a pas pu être ouverte :\n{last}\n\n{ex.Message}\n\nOuverture de la configuration par défaut.",
-                    "Contrôleur DMX", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(Tr.F("La dernière configuration n'a pas pu être ouverte :\n{0}\n\n{1}\n\nOuverture de la configuration par défaut.", last, ex.Message),
+                    Tr.T("Contrôleur DMX"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -318,8 +349,8 @@ internal sealed class MainForm : Form
             return true;
         }
 
-        var answer = MessageBox.Show(this, $"Enregistrer les modifications de « {_ctx.Show.Name} » ?",
-            "Modifications non enregistrées", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+        var answer = MessageBox.Show(this, Tr.F("Enregistrer les modifications de « {0} » ?", _ctx.Show.Name),
+            Tr.T("Modifications non enregistrées"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
         return answer switch
         {
             DialogResult.Yes => SaveShow(),
@@ -341,19 +372,19 @@ internal sealed class MainForm : Form
             // Nouvelle salle avec les memes types d'appareils : on garde la bibliotheque de profils.
             show = new ShowConfig
             {
-                Name = "Nouvelle soirée",
+                Name = Tr.T("Nouvelle soirée"),
                 Profiles = _ctx.Show.Profiles.Select(p => ShowJson.Clone(p)).ToList(),
             };
         }
         else
         {
             show = DefaultShow.Create();
-            show.Name = "Nouvelle soirée";
+            show.Name = Tr.T("Nouvelle soirée");
         }
 
         ApplyShow(show, null);
         _ctx.MarkDirty();
-        Log(empty ? "Nouvelle configuration vide (ajoute des appareils : Appareils > Ajouter un appareil)." : "Nouvelle configuration par défaut.");
+        Log(empty ? Tr.T("Nouvelle configuration vide (ajoute des appareils : Appareils > Ajouter un appareil).") : Tr.T("Nouvelle configuration par défaut."));
     }
 
     private void OpenShow(string? path)
@@ -367,7 +398,7 @@ internal sealed class MainForm : Form
         {
             using var dialog = new OpenFileDialog
             {
-                Title = "Ouvrir / importer une configuration",
+                Title = Tr.T("Ouvrir / importer une configuration"),
                 Filter = ShowFileFilter,
                 InitialDirectory = Directory.Exists(ShowStore.DefaultShowsFolder) ? ShowStore.DefaultShowsFolder : "",
             };
@@ -383,13 +414,13 @@ internal sealed class MainForm : Form
             var show = ShowStore.LoadShow(path);
             _pendingUpgradeNotes = FixtureLibrary.UpgradeProfiles(show);
             ApplyShow(show, path);
-            Log($"Configuration ouverte : {path}");
+            Log(Tr.F("Configuration ouverte : {0}", path));
             ReportUpgradeNotes();
             ReportPatchProblems(onlyIfAny: true);
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Impossible d'ouvrir ce fichier :\n{path}\n\n{ex.Message}", "Ouverture",
+            MessageBox.Show(this, Tr.F("Impossible d'ouvrir ce fichier :\n{0}\n\n{1}", path, ex.Message), Tr.T("Ouverture"),
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
@@ -404,20 +435,20 @@ internal sealed class MainForm : Form
         try
         {
             // On memorise l'etat de la console pour le retrouver a la prochaine ouverture.
-            _ctx.Show.LiveState = _engine.CaptureScene("État courant");
+            _ctx.Show.LiveState = _engine.CaptureScene(Tr.T("État courant"));
             _ctx.Show.Settings.Master = _engine.Master;
             _ctx.Show.Settings.Bpm = _engine.Bpm;
 
             ShowStore.SaveShow(_ctx.Show, _showPath);
             _ctx.ClearDirty();
             RememberShow(_showPath);
-            Log($"Configuration enregistrée : {_showPath}");
+            Log(Tr.F("Configuration enregistrée : {0}", _showPath));
             UpdateStatusBar();
             return true;
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Impossible d'enregistrer :\n{_showPath}\n\n{ex.Message}", "Enregistrement",
+            MessageBox.Show(this, Tr.F("Impossible d'enregistrer :\n{0}\n\n{1}", _showPath, ex.Message), Tr.T("Enregistrement"),
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
             return false;
         }
@@ -428,7 +459,7 @@ internal sealed class MainForm : Form
         Directory.CreateDirectory(ShowStore.DefaultShowsFolder);
         using var dialog = new SaveFileDialog
         {
-            Title = "Enregistrer sous / exporter la configuration",
+            Title = Tr.T("Enregistrer sous / exporter la configuration"),
             Filter = ShowFileFilter,
             InitialDirectory = _showPath is null ? ShowStore.DefaultShowsFolder : Path.GetDirectoryName(_showPath),
             FileName = ProfileEditorDialog.SafeFileName(_ctx.Show.Name) + ShowStore.ShowExtension,
@@ -457,7 +488,7 @@ internal sealed class MainForm : Form
 
     private void RenameShow()
     {
-        string? name = InputDialog.Ask(this, "Renommer la configuration", "Nom de la configuration :", _ctx.Show.Name);
+        string? name = InputDialog.Ask(this, Tr.T("Renommer la configuration"), Tr.T("Nom de la configuration :"), _ctx.Show.Name);
         if (name is not null)
         {
             _ctx.Show.Name = name;
@@ -497,7 +528,7 @@ internal sealed class MainForm : Form
         }
         if (_recentMenu.DropDownItems.Count == 0)
         {
-            _recentMenu.DropDownItems.Add(new ToolStripMenuItem("(aucune)") { Enabled = false });
+            _recentMenu.DropDownItems.Add(new ToolStripMenuItem(Tr.T("(aucune)")) { Enabled = false });
         }
     }
 
@@ -510,7 +541,7 @@ internal sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            Log($"Réglages non enregistrés : {ex.Message}");
+            Log(Tr.F("Réglages non enregistrés : {0}", ex.Message));
         }
     }
 
@@ -543,7 +574,7 @@ internal sealed class MainForm : Form
         _ctx.MarkDirty();
         RebuildFixtureTabs();
         _live.ReloadAll();
-        Log($"Patch mis à jour : {_ctx.Show.Fixtures.Count} appareil(s).");
+        Log(Tr.F("Patch mis à jour : {0} appareil(s).", _ctx.Show.Fixtures.Count));
         ReportPatchProblems(onlyIfAny: true);
     }
 
@@ -559,7 +590,7 @@ internal sealed class MainForm : Form
         _ctx.MarkDirty();
         RebuildFixtureTabs();
         _live.ReloadAll();
-        Log("Profils mis à jour.");
+        Log(Tr.T("Profils mis à jour."));
         ReportPatchProblems(onlyIfAny: true);
     }
 
@@ -582,7 +613,7 @@ internal sealed class MainForm : Form
             var page = new TabPage(TabTitle(fixture, profile)) { Tag = fixture.Id };
             if (profile is null)
             {
-                page.Controls.Add(Ui.Text($"Profil introuvable pour « {fixture.Name} » : corrige-le dans Appareils > Patch.", bold: true, color: Color.DarkRed));
+                page.Controls.Add(Ui.Text(Tr.F("Profil introuvable pour « {0} » : corrige-le dans Appareils > Patch.", fixture.Name), bold: true, color: Color.DarkRed));
             }
             else
             {
@@ -616,14 +647,14 @@ internal sealed class MainForm : Form
     }
 
     private static string TabTitle(FixtureInstance fixture, FixtureProfile? profile) =>
-        fixture.Name + (fixture.Enabled ? "" : " (désactivé)") + (profile is not null && !profile.IsFullyVerified ? " (?)" : "");
+        fixture.Name + (fixture.Enabled ? "" : Tr.T(" (désactivé)")) + (profile is not null && !profile.IsFullyVerified ? " (?)" : "");
 
     private Control BuildDisabledBar(FixtureInstance fixture)
     {
-        var enable = new Button { Text = "Activer ce module", AutoSize = true, Margin = new Padding(12, 4, 3, 4) };
+        var enable = new Button { Text = Tr.T("Activer ce module"), AutoSize = true, Margin = new Padding(12, 4, 3, 4) };
         enable.Click += (_, _) => SetFixtureEnabled(fixture.Id, true);
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, BackColor = Color.FromArgb(235, 235, 235), Padding = new Padding(8, 2, 8, 2) };
-        bar.Controls.Add(Ui.Text("Module DÉSACTIVÉ dans le patch : il n'envoie rien et n'est pas compté dans l'adressage.", bold: true, color: Color.DimGray));
+        bar.Controls.Add(Ui.Text(Tr.T("Module DÉSACTIVÉ dans le patch : il n'envoie rien et n'est pas compté dans l'adressage."), bold: true, color: Color.DimGray));
         bar.Controls.Add(enable);
         return bar;
     }
@@ -671,8 +702,8 @@ internal sealed class MainForm : Form
             Log(note);
         }
         _ctx.MarkDirty();
-        MessageBox.Show(this, string.Join("\n\n", notes) + "\n\nEnregistre la configuration (Ctrl+S) pour garder ces corrections.",
-            "Profils mis à jour", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        MessageBox.Show(this, string.Join("\n\n", notes) + Tr.T("\n\nEnregistre la configuration (Ctrl+S) pour garder ces corrections."),
+            Tr.T("Profils mis à jour"), MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private void UpdateTabTitles()
@@ -695,14 +726,14 @@ internal sealed class MainForm : Form
         {
             if (!onlyIfAny)
             {
-                MessageBox.Show(this, "Aucun conflit d'adressage.", "Adressage", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, Tr.T("Aucun conflit d'adressage."), Tr.T("Adressage"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             return;
         }
 
-        MessageBox.Show(this, "Problèmes d'adressage :\n\n" + string.Join("\n", problems.Select(p => "• " + p.Message)) +
-                              "\n\nCorrige-les dans Appareils > Patch / adressage (Ctrl+P).",
-            "Adressage", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        MessageBox.Show(this, Tr.T("Problèmes d'adressage :\n\n") + string.Join("\n", problems.Select(p => "• " + p.Message)) +
+                              Tr.T("\n\nCorrige-les dans Appareils > Patch / adressage (Ctrl+P)."),
+            Tr.T("Adressage"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
 
     // =================================================================================
@@ -752,16 +783,16 @@ internal sealed class MainForm : Form
             _reconnectAttempts = 0;
             _settings.LastPort = port;
             SaveAppSettings();
-            Log($"Connecté au boîtier sur {port} (une trame toutes les {_link.SendIntervalMs} ms).");
+            Log(Tr.F("Connecté au boîtier sur {0} (une trame toutes les {1} ms).", port, _link.SendIntervalMs));
         }
         else
         {
-            Log($"Échec de connexion sur {port} : {error}");
+            Log(Tr.F("Échec de connexion sur {0} : {1}", port, error));
             if (!quiet)
             {
-                MessageBox.Show(this, $"Impossible de se connecter sur {port} :\n{error}\n\n" +
-                                      "Vérifie que le boîtier est allumé, appairé, et que c'est bien le port « sortant ».",
-                    "Connexion", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(this, Tr.F("Impossible de se connecter sur {0} :\n{1}\n\n", port, error) +
+                                      Tr.T("Vérifie que le boîtier est allumé, appairé, et que c'est bien le port « sortant »."),
+                    Tr.T("Connexion"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         UpdateConnectionUi();
@@ -772,13 +803,13 @@ internal sealed class MainForm : Form
     {
         _wantConnected = false;
         _link.Disconnect();
-        Log("Déconnecté.");
+        Log(Tr.T("Déconnecté."));
         UpdateConnectionUi();
     }
 
     private void OnConnectionLost(string message)
     {
-        Log($"Liaison perdue : {message}");
+        Log(Tr.F("Liaison perdue : {0}", message));
         _link.Disconnect(); // ne leve jamais (liaison morte comprise)
         _nextReconnect = DateTime.Now.AddSeconds(2);
         UpdateConnectionUi();
@@ -797,22 +828,22 @@ internal sealed class MainForm : Form
     {
         if (_link.IsSending)
         {
-            _lblLink.Text = $"Connecté ({_link.PortName}) — {_link.FramesSent:N0} trames envoyées";
+            _lblLink.Text = Tr.F("Connecté ({0}) — {1:N0} trames envoyées", _link.PortName, _link.FramesSent);
             _lblLink.ForeColor = Ui.OkColor;
         }
         else if (_connecting)
         {
-            _lblLink.Text = _reconnectAttempts > 0 ? $"Reconnexion… (tentative {_reconnectAttempts})" : "Connexion en cours…";
+            _lblLink.Text = _reconnectAttempts > 0 ? Tr.F("Reconnexion… (tentative {0})", _reconnectAttempts) : Tr.T("Connexion en cours…");
             _lblLink.ForeColor = Ui.WarningColor;
         }
         else if (_wantConnected)
         {
-            _lblLink.Text = "Liaison perdue — nouvelle tentative dans quelques secondes";
+            _lblLink.Text = Tr.T("Liaison perdue — nouvelle tentative dans quelques secondes");
             _lblLink.ForeColor = Ui.WarningColor;
         }
         else
         {
-            _lblLink.Text = "Non connecté (aperçu seulement)";
+            _lblLink.Text = Tr.T("Non connecté (aperçu seulement)");
             _lblLink.ForeColor = Color.DarkRed;
         }
         UpdateLinkLed();
@@ -822,10 +853,10 @@ internal sealed class MainForm : Form
     private void UpdateLinkLed()
     {
         bool blinkOn = DateTime.Now.Millisecond < 500; // 1 clignotement par seconde (minuteur de 100 ms)
-        (string text, Color color) = _link.IsSending ? ("● CONNECTÉ", Color.FromArgb(0, 170, 70))
-            : _connecting ? ("● CONNEXION", blinkOn ? Color.FromArgb(240, 150, 0) : Color.FromArgb(120, 80, 20))
-            : _wantConnected ? ("● PERDUE", blinkOn ? Color.FromArgb(240, 150, 0) : Color.FromArgb(200, 40, 40))
-            : ("● OFF", Color.FromArgb(200, 40, 40));
+        (string text, Color color) = _link.IsSending ? (Tr.T("● CONNECTÉ"), Color.FromArgb(0, 170, 70))
+            : _connecting ? (Tr.T("● CONNEXION"), blinkOn ? Color.FromArgb(240, 150, 0) : Color.FromArgb(120, 80, 20))
+            : _wantConnected ? (Tr.T("● PERDUE"), blinkOn ? Color.FromArgb(240, 150, 0) : Color.FromArgb(200, 40, 40))
+            : (Tr.T("● OFF"), Color.FromArgb(200, 40, 40));
         if (_linkLed.Text != text)
         {
             _linkLed.Text = text;
@@ -871,20 +902,20 @@ internal sealed class MainForm : Form
 
     private void UpdateTitle()
     {
-        Text = $"Contrôleur DMX — {_ctx.Show.Name}{(_ctx.IsDirty ? " *" : "")}";
+        Text = Tr.F("Contrôleur DMX — {0}{1}", _ctx.Show.Name, (_ctx.IsDirty ? " *" : ""));
         UpdateStatusBar();
     }
 
     private void UpdateStatusBar()
     {
-        _stShow.Text = $"Configuration : {_ctx.Show.Name}{(_ctx.IsDirty ? " (modifiée)" : "")}  —  {_showPath ?? "pas encore enregistrée"}";
+        _stShow.Text = Tr.F("Configuration : {0}{1}  —  {2}", _ctx.Show.Name, (_ctx.IsDirty ? Tr.T(" (modifiée)") : ""), (_showPath ?? Tr.T("pas encore enregistrée")));
 
         int problems = PatchValidator.Validate(_ctx.Show).Count;
-        _stPatch.Text = problems == 0 ? "Patch : OK" : $"Patch : {problems} problème(s)";
+        _stPatch.Text = problems == 0 ? Tr.T("Patch : OK") : Tr.F("Patch : {0} problème(s)", problems);
         _stPatch.ForeColor = problems == 0 ? Ui.OkColor : Color.DarkRed;
 
         bool debug = _engine.DebugActive;
-        _stDebug.Text = debug ? "  MODE DEBUG ACTIF : la console Soirée est ignorée  " : "";
+        _stDebug.Text = debug ? Tr.T("  MODE DEBUG ACTIF : la console Soirée est ignorée  ") : "";
         _stDebug.BackColor = debug ? Color.DarkRed : SystemColors.Control;
         _stDebug.ForeColor = Color.White;
     }
@@ -896,26 +927,26 @@ internal sealed class MainForm : Form
     }
 
     private void ShowShortcuts() => MessageBox.Show(this,
-        "Onglet Soirée :\n" +
-        "   Espace : blackout (bascule)\n" +
-        "   F (maintenu) : flash plein feu\n" +
-        "   T : tap tempo\n" +
-        "   1 à 9 : rappeler la scène n°\n" +
-        "   (si un champ de saisie a le focus, clique d'abord dans une zone vide)\n\n" +
-        "Partout :\n" +
-        "   Ctrl+S : enregistrer        Ctrl+Maj+S : enregistrer sous / exporter\n" +
-        "   Ctrl+O : ouvrir / importer\n" +
-        "   Ctrl+P : patch / adressage  Ctrl+Maj+A : ajouter un appareil\n" +
-        "   Ctrl+M : éditeur de profils",
-        "Raccourcis clavier", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        Tr.T("Onglet Soirée :\n") +
+        Tr.T("   Espace : blackout (bascule)\n") +
+        Tr.T("   F (maintenu) : flash plein feu\n") +
+        Tr.T("   T : tap tempo\n") +
+        Tr.T("   1 à 9 : rappeler la scène n°\n") +
+        Tr.T("   (si un champ de saisie a le focus, clique d'abord dans une zone vide)\n\n") +
+        Tr.T("Partout :\n") +
+        Tr.T("   Ctrl+S : enregistrer        Ctrl+Maj+S : enregistrer sous / exporter\n") +
+        Tr.T("   Ctrl+O : ouvrir / importer\n") +
+        Tr.T("   Ctrl+P : patch / adressage  Ctrl+Maj+A : ajouter un appareil\n") +
+        Tr.T("   Ctrl+M : éditeur de profils"),
+        Tr.T("Raccourcis clavier"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 
     private void ShowAbout() => MessageBox.Show(this,
-        "Contrôleur DMX pour le boîtier Bluetooth « USB-RDM-DMX » (appli Android RY-AI).\n\n" +
-        "Protocole reconstitué par rétro-ingénierie de l'appli et confirmé sur le matériel :\n" +
-        "Bluetooth SPP, trames de 521 octets envoyées toutes les 100 ms, brouillage par tables.\n" +
-        "Détails : PROTOCOLE.md ; organisation du code : CLAUDE.md (dossier du projet).\n\n" +
-        $"Configurations : {ShowStore.DefaultShowsFolder}",
-        "À propos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        Tr.T("Contrôleur DMX pour le boîtier Bluetooth « USB-RDM-DMX » (appli Android RY-AI).\n\n") +
+        Tr.T("Protocole reconstitué par rétro-ingénierie de l'appli et confirmé sur le matériel :\n") +
+        Tr.T("Bluetooth SPP, trames de 521 octets envoyées toutes les 100 ms, brouillage par tables.\n") +
+        Tr.T("Détails : PROTOCOLE.md ; organisation du code : CLAUDE.md (dossier du projet).\n\n") +
+        Tr.F("Configurations : {0}", ShowStore.DefaultShowsFolder),
+        Tr.T("À propos"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 
     // =================================================================================
     //  Clavier et fermeture

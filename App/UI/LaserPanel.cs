@@ -163,11 +163,11 @@ internal sealed class LaserPanel : UserControl
         var header = Ui.Table(1);
         header.Margin = new Padding(0);
         header.Dock = DockStyle.None;
-        header.Controls.Add(new Label { Text = $"{fixture.Name}  —  {profile.Manufacturer} {profile.Name}".Trim(), AutoSize = true, Font = Ui.TitleFont });
-        header.Controls.Add(Ui.Text($"Adresse DMX {fixture.Address} : canaux {fixture.Address} à {fixture.EndAddress(profile)}", color: Color.DimGray));
+        header.Controls.Add(new Label { Text = $"{fixture.Name}  —  {profile.Manufacturer} {Tr.T(profile.Name)}".Trim(), AutoSize = true, Font = Ui.TitleFont });
+        header.Controls.Add(Ui.Text(Tr.F("Adresse DMX {0} : canaux {1} à {2}", fixture.Address, fixture.Address, fixture.EndAddress(profile)), color: Color.DimGray));
         header.Controls.Add(new Label
         {
-            Text = "⚠ Laser : ne jamais viser le public à hauteur des yeux. Le BLACKOUT (onglet Soirée, Espace) éteint aussi le laser.",
+            Text = Tr.T("⚠ Laser : ne jamais viser le public à hauteur des yeux. Le BLACKOUT (onglet Soirée, Espace) éteint aussi le laser."),
             AutoSize = true,
             MaximumSize = new Size(900, 0),
             ForeColor = Color.DarkRed,
@@ -185,7 +185,7 @@ internal sealed class LaserPanel : UserControl
             var modes = Ui.Flow(0); // une seule ligne (avec retour a la ligne, la hauteur calculee serait fausse)
             foreach (var preset in profile.Channels[_mode].Presets)
             {
-                var button = new Button { Text = preset.Name, AutoSize = true, Tag = preset.Value, Margin = new Padding(2, 0, 2, 0) };
+                var button = new Button { Text = Tr.T(preset.Name), AutoSize = true, Tag = preset.Value, Margin = new Padding(2, 0, 2, 0) };
                 _modeButtons.Add(button);
                 if (preset.Name.Contains('⚠'))
                 {
@@ -200,7 +200,7 @@ internal sealed class LaserPanel : UserControl
                 button.Click += (_, _) => SetChannel(_mode, preset.Value);
                 modes.Controls.Add(button);
             }
-            var group = Ui.Group("Mode (programmes internes ou DMX manuel)", modes);
+            var group = Ui.Group(Tr.T("Mode (programmes internes ou DMX manuel)"), modes);
             group.Padding = new Padding(6, 4, 6, 3); // boite compacte : une seule ligne de boutons
             page.Controls.Add(group);
         }
@@ -227,7 +227,7 @@ internal sealed class LaserPanel : UserControl
                 int colon = range.Name.IndexOf(" : ", StringComparison.Ordinal);
                 var legend = new Label
                 {
-                    Text = colon >= 0 ? range.Name[(colon + 3)..] : "",
+                    Text = colon >= 0 ? Tr.T(range.Name[(colon + 3)..]) : "",
                     AutoSize = true,
                     Anchor = AnchorStyles.Left,
                     Margin = new Padding(2, 0, 14, 0),
@@ -239,7 +239,7 @@ internal sealed class LaserPanel : UserControl
                 grid.Controls.Add(icon, column + 1, n % rows);
                 grid.Controls.Add(legend, column + 2, n % rows);
             }
-            middle.Controls.Add(Ui.Group("Motif (32 motifs)", grid));
+            middle.Controls.Add(Ui.Group(Tr.T("Motif (32 motifs)"), grid));
         }
 
         // ---------------- Zoom, puis couleurs | position ----------------
@@ -247,35 +247,35 @@ internal sealed class LaserPanel : UserControl
         if (_zoom >= 0)
         {
             // Copie du curseur Zoom (aussi dans « Effets ») : sous la main, en haut.
-            right.Controls.Add(Ui.Group("Zoom", BuildZoomControl(listWidth: 190)));
+            right.Controls.Add(Ui.Group(Tr.T("Zoom"), BuildZoomControl(listWidth: 190)));
         }
         var colorAndPad = Ui.Flow(0);
         right.Controls.Add(colorAndPad);
         if (_color >= 0)
         {
-            colorAndPad.Controls.Add(Ui.Group("Couleur", BuildColorSection()));
+            colorAndPad.Controls.Add(Ui.Group(Tr.T("Couleur"), BuildColorSection()));
         }
         if (_x >= 0 && _y >= 0)
         {
             _pad.ValueChanged += (_, _) => OnPad();
-            var center = new Button { Text = "Centrer", AutoSize = true };
+            var center = new Button { Text = Tr.T("Centrer"), AutoSize = true };
             center.Click += (_, _) =>
             {
                 SetChannel(_x, 64);
                 SetChannel(_y, 64);
             };
             // Laser retourne / accroche a l'envers : le moteur inverse X et / ou Y en sortie DMX.
-            var invertX = new CheckBox { Text = "Inverser X (gauche ↔ droite)", AutoSize = true, Checked = fixture.InvertPan };
-            var invertY = new CheckBox { Text = "Inverser Y (haut ↔ bas)", AutoSize = true, Checked = fixture.InvertTilt };
+            var invertX = new CheckBox { Text = Tr.T("Inverser X (gauche ↔ droite)"), AutoSize = true, Checked = fixture.InvertPan };
+            var invertY = new CheckBox { Text = Tr.T("Inverser Y (haut ↔ bas)"), AutoSize = true, Checked = fixture.InvertTilt };
             invertX.CheckedChanged += (_, _) => SetInvert(x: invertX.Checked, y: invertY.Checked);
             invertY.CheckedChanged += (_, _) => SetInvert(x: invertX.Checked, y: invertY.Checked);
 
             var padBox = Ui.Table(1);
             padBox.Controls.Add(_pad);
-            padBox.Controls.Add(Ui.Flow(0, center, Ui.Text("Position fixe du motif (X et Y)", color: Color.DimGray)));
+            padBox.Controls.Add(Ui.Flow(0, center, Ui.Text(Tr.T("Position fixe du motif (X et Y)"), color: Color.DimGray)));
             padBox.Controls.Add(Ui.Flow(0, invertX, invertY));
-            padBox.Controls.Add(Ui.Text("(laser retourné : inverse les positions et le sens des mouvements)", color: Color.DimGray));
-            colorAndPad.Controls.Add(Ui.Group("Position", padBox));
+            padBox.Controls.Add(Ui.Text(Tr.T("(laser retourné : inverse les positions et le sens des mouvements)"), color: Color.DimGray));
+            colorAndPad.Controls.Add(Ui.Group(Tr.T("Position"), padBox));
         }
         right.Dock = DockStyle.None;
         middle.Controls.Add(right);
@@ -292,34 +292,34 @@ internal sealed class LaserPanel : UserControl
             }
             if (i == _zoom)
             {
-                Ui.Row(others, $"{channel.Name}  [DMX {fixture.Address + i}]", BuildZoomControl(listWidth: 300));
+                Ui.Row(others, Tr.F("{0}  [DMX {1}]", Tr.T(channel.Name), (fixture.Address + i)), BuildZoomControl(listWidth: 300));
                 continue;
             }
             int index = i;
             var control = new RangeControl(channel);
             control.ValueChanged += value => SetChannel(index, value);
             _rangeControls.Add((i, control));
-            Ui.Row(others, $"{channel.Name}  [DMX {fixture.Address + i}]", control);
+            Ui.Row(others, Tr.F("{0}  [DMX {1}]", Tr.T(channel.Name), (fixture.Address + i)), control);
         }
-        var reset = new Button { Text = "Tout remettre par défaut (laser éteint, mode DMX)", AutoSize = true };
+        var reset = new Button { Text = Tr.T("Tout remettre par défaut (laser éteint, mode DMX)"), AutoSize = true };
         reset.Click += (_, _) =>
         {
             _ctx.Engine.ResetToDefaults(_fixture.Id);
             _ctx.NotifyLiveStateChanged();
         };
         others.Controls.Add(reset);
-        page.Controls.Add(Ui.Group("Effets (choisis la plage, puis règle dans la plage)", others));
+        page.Controls.Add(Ui.Group(Tr.T("Effets (choisis la plage, puis règle dans la plage)"), others));
 
         if (!string.IsNullOrWhiteSpace(profile.Notes))
         {
-            var notes = new Label { Text = profile.Notes, AutoSize = true, MaximumSize = new Size(900, 0), ForeColor = Color.DimGray, Margin = new Padding(6) };
+            var notes = new Label { Text = Tr.T(profile.Notes), AutoSize = true, MaximumSize = new Size(900, 0), ForeColor = Color.DimGray, Margin = new Padding(6) };
             page.Controls.Add(notes);
         }
 
         // Boutons a risque (mode test) : en bas a droite, a l'ecart.
         if (_riskyButtons.Count > 0)
         {
-            var risky = Ui.Flow(0, _riskyButtons.Cast<Control>().Prepend(Ui.Text("Coupe le DMX du laser (mode test) :", color: Ui.WarningColor)).ToArray());
+            var risky = Ui.Flow(0, _riskyButtons.Cast<Control>().Prepend(Ui.Text(Tr.T("Coupe le DMX du laser (mode test) :"), color: Ui.WarningColor)).ToArray());
             risky.Anchor = AnchorStyles.Right;
             page.Controls.Add(risky);
         }
@@ -363,8 +363,8 @@ internal sealed class LaserPanel : UserControl
         var kinds = Ui.Flow(0);
         foreach (var (kind, text) in new[]
                  {
-                     (ColorKind.Off, "Éteint"), (ColorKind.Fixed, "Fixe"),
-                     (ColorKind.Alternate, "Alternance"), (ColorKind.Continuous, "Défilement continu"),
+                     (ColorKind.Off, Tr.T("Éteint")), (ColorKind.Fixed, Tr.T("Fixe")),
+                     (ColorKind.Alternate, Tr.T("Alternance")), (ColorKind.Continuous, Tr.T("Défilement continu")),
                  })
         {
             var box = new CheckBox
@@ -388,8 +388,8 @@ internal sealed class LaserPanel : UserControl
         table.Controls.Add(Ui.Flow(0, _speedLabel, _speed, _speedValue));
         table.Controls.Add(new Label
         {
-            Text = "Fixe : le curseur règle le clignotement. Alternance / défilement : il règle la vitesse de changement " +
-                   "(à 0 l'alternance reste figée).",
+            Text = Tr.T("Fixe : le curseur règle le clignotement. Alternance / défilement : il règle la vitesse de changement ") +
+                   Tr.T("(à 0 l'alternance reste figée)."),
             AutoSize = true,
             MaximumSize = new Size(440, 0),
             ForeColor = Color.DimGray,
@@ -453,7 +453,7 @@ internal sealed class LaserPanel : UserControl
         _colorChoices.Controls.Clear();
         foreach (var range in RangesOf(kind))
         {
-            string name = range.Name.Replace("Alternance ", "");
+            string name = Tr.T(range.Name.Replace("Alternance ", ""));
             var button = new Button { Text = name, Size = new Size(140, 34), Tag = range, Margin = new Padding(3), FlatStyle = FlatStyle.Flat };
             button.BackColor = LaserColorFor(range.Name);
             button.ForeColor = button.BackColor.GetBrightness() < 0.45f ? Color.White : Color.Black;
@@ -468,9 +468,9 @@ internal sealed class LaserPanel : UserControl
         {
             _colorChoices.Controls.Add(Ui.Text(kind switch
             {
-                ColorKind.Off => "Laser éteint.",
-                ColorKind.Continuous => "Les couleurs défilent toutes seules.",
-                _ => "Couleurs d'origine du motif.",
+                ColorKind.Off => Tr.T("Laser éteint."),
+                ColorKind.Continuous => Tr.T("Les couleurs défilent toutes seules."),
+                _ => Tr.T("Couleurs d'origine du motif."),
             }, color: Color.DimGray));
         }
         _colorChoices.ResumeLayout();
@@ -504,10 +504,10 @@ internal sealed class LaserPanel : UserControl
         }
 
         // Un seul curseur pour le canal 4, nomme selon le type de couleur.
-        _speedLabel.Text = kind == ColorKind.Fixed ? "Clignotement" : "Vitesse de changement";
+        _speedLabel.Text = kind == ColorKind.Fixed ? Tr.T("Clignotement") : Tr.T("Vitesse de changement");
         _speed.Enabled = _blink >= 0 && kind != ColorKind.Off;
         _speed.Value = blink < 25 ? 0 : Math.Clamp((int)Math.Round((blink - 25) * 99.0 / 230) + 1, 1, 100);
-        _speedValue.Text = blink < 25 ? (kind == ColorKind.Fixed ? "aucun" : "arrêt") : $"{_speed.Value} %";
+        _speedValue.Text = blink < 25 ? (kind == ColorKind.Fixed ? Tr.T("aucun") : Tr.T("arrêt")) : Tr.F("{0} %", _speed.Value);
     }
 
     /// <summary>Curseur 0..100 % -> canal 4 : 0 = arret (0), 1..100 % = 25..255 (lent -> rapide).</summary>
@@ -554,7 +554,7 @@ internal sealed class LaserPanel : UserControl
             _fixture.InvertTilt = y;
         });
         _ctx.MarkDirty();
-        _ctx.Status($"{_fixture.Name} : X {(x ? "inversé" : "normal")}, Y {(y ? "inversé" : "normal")}.");
+        _ctx.Status(Tr.F("{0} : X {1}, Y {2}.", _fixture.Name, (x ? Tr.T("inversé") : Tr.T("normal")), (y ? Tr.T("inversé") : Tr.T("normal"))));
     }
 
     /// <summary>
@@ -564,16 +564,16 @@ internal sealed class LaserPanel : UserControl
     private void ConfirmRiskyMode(ChannelPreset preset)
     {
         bool ok = Ui.Confirm(FindForm()!,
-            $"« {preset.Name} » : sur ton laser, ce programme le fait passer en mode TEST (« tst » sur l'écran).\n\n" +
-            "En mode test, le laser N'ÉCOUTE PLUS LE DMX (son adressage est coupé) : plus aucun bouton de ce logiciel ne " +
-            "le pilote, et le manuel ne prévoit ni délai ni commande DMX pour en sortir.\n\n" +
-            "Pour en sortir, SUR LE LASER : bouton FUNC jusqu'à l'adresse DMX (« d… »), puis ENTER — ou l'éteindre et le rallumer.\n\n" +
-            "Envoyer quand même ?",
-            "Mode test du laser");
+            Tr.F("« {0} » : sur ton laser, ce programme le fait passer en mode TEST (« tst » sur l'écran).\n\n", Tr.T(preset.Name)) +
+            Tr.T("En mode test, le laser N'ÉCOUTE PLUS LE DMX (son adressage est coupé) : plus aucun bouton de ce logiciel ne ") +
+            Tr.T("le pilote, et le manuel ne prévoit ni délai ni commande DMX pour en sortir.\n\n") +
+            Tr.T("Pour en sortir, SUR LE LASER : bouton FUNC jusqu'à l'adresse DMX (« d… »), puis ENTER — ou l'éteindre et le rallumer.\n\n") +
+            Tr.T("Envoyer quand même ?"),
+            Tr.T("Mode test du laser"));
         if (ok)
         {
             SetChannel(_mode, preset.Value);
-            _ctx.Status($"{_fixture.Name} : « {preset.Name} » envoyé — pour sortir du mode test : FUNC → adresse DMX → ENTER sur le laser.");
+            _ctx.Status(Tr.F("{0} : « {1} » envoyé — pour sortir du mode test : FUNC → adresse DMX → ENTER sur le laser.", _fixture.Name, Tr.T(preset.Name)));
         }
     }
 
@@ -613,7 +613,7 @@ internal sealed class LaserPanel : UserControl
         {
             _lastColor = current;
             SetChannel(_color, 0);
-            _ctx.Status($"{_fixture.Name} : faisceau éteint.");
+            _ctx.Status(Tr.F("{0} : faisceau éteint.", _fixture.Name));
         }
         else
         {
@@ -623,7 +623,7 @@ internal sealed class LaserPanel : UserControl
                 _ctx.Engine.SetValue(_fixture.Id, _zoom, FixtureLibrary.ZoomDefault); // taille nette a l'allumage
             }
             SetChannel(_color, _lastColor);
-            _ctx.Status($"{_fixture.Name} : faisceau allumé (zoom {FixtureLibrary.ZoomDefault}).");
+            _ctx.Status(Tr.F("{0} : faisceau allumé (zoom {1}).", _fixture.Name, FixtureLibrary.ZoomDefault));
         }
     }
 
@@ -654,7 +654,7 @@ internal sealed class LaserPanel : UserControl
         try
         {
             bool beamOn = _color >= 0 && Value(_color) >= 25;
-            _onOff.Text = beamOn ? "LASER ALLUMÉ\n(cliquer pour éteindre)" : "Laser éteint\n(cliquer pour allumer)";
+            _onOff.Text = beamOn ? Tr.T("LASER ALLUMÉ\n(cliquer pour éteindre)") : Tr.T("Laser éteint\n(cliquer pour allumer)");
             _onOff.BackColor = beamOn ? Color.FromArgb(40, 170, 60) : SystemColors.Control;
             _onOff.ForeColor = beamOn ? Color.White : SystemColors.ControlText;
             _onOff.UseVisualStyleBackColor = !beamOn;
@@ -662,7 +662,7 @@ internal sealed class LaserPanel : UserControl
             string mode = _mode >= 0
                 ? _profile.Channels[_mode].Ranges.FirstOrDefault(r => r.Contains(Value(_mode)))?.Name ?? Value(_mode).ToString()
                 : "?";
-            _state.Text = $"Mode : {mode}";
+            _state.Text = Tr.F("Mode : {0}", Tr.T(mode));
             _state.ForeColor = TextKey.Normalize(mode).StartsWith("dmx") ? Ui.OkColor : Ui.WarningColor;
 
             Highlight(_modeButtons, b => _mode >= 0 && Equals(b.Tag, Value(_mode)));

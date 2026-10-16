@@ -103,7 +103,7 @@ internal sealed class MicController : IDisposable
         }
         if (device < 0)
         {
-            throw new InvalidOperationException("aucune entrée son trouvée");
+            throw new InvalidOperationException(Tr.T("aucune entrée son trouvée"));
         }
         _mic.Start(device);
         var names = DeviceNames();

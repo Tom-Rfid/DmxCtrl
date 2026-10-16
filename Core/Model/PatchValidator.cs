@@ -35,19 +35,19 @@ public static class PatchValidator
             var profile = profiles.FirstOrDefault(p => p.Id == f.ProfileId);
             if (profile is null)
             {
-                problems.Add(new($"« {f.Name} » : profil introuvable.", new[] { f.Id }));
+                problems.Add(new(Tr.F("« {0} » : profil introuvable.", f.Name), new[] { f.Id }));
                 continue;
             }
             if (profile.ChannelCount == 0)
             {
-                problems.Add(new($"« {f.Name} » : le profil « {profile.Name} » n'a aucun canal.", new[] { f.Id }));
+                problems.Add(new(Tr.F("« {0} » : le profil « {1} » n'a aucun canal.", f.Name, profile.Name), new[] { f.Id }));
                 continue;
             }
 
             int end = f.EndAddress(profile);
             if (f.Address < 1 || end > 512)
             {
-                problems.Add(new($"« {f.Name} » : canaux {f.Address} à {end}, hors de l'univers DMX (1 à 512).", new[] { f.Id }));
+                problems.Add(new(Tr.F("« {0} » : canaux {1} à {2}, hors de l'univers DMX (1 à 512).", f.Name, f.Address, end), new[] { f.Id }));
                 continue;
             }
 
@@ -63,7 +63,7 @@ public static class PatchValidator
                 if (a.Start <= b.End && b.Start <= a.End)
                 {
                     problems.Add(new(
-                        $"« {a.Fixture.Name} » ({a.Start}-{a.End}) chevauche « {b.Fixture.Name} » ({b.Start}-{b.End}).",
+                        Tr.F("« {0} » ({1}-{2}) chevauche « {3} » ({4}-{5}).", a.Fixture.Name, a.Start, a.End, b.Fixture.Name, b.Start, b.End),
                         new[] { a.Fixture.Id, b.Fixture.Id }));
                 }
             }

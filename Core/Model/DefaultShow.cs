@@ -24,30 +24,30 @@ public static class DefaultShow
 
         var show = new ShowConfig
         {
-            Name = "Soirée par défaut",
+            Name = Tr.T("Soirée par défaut"),
             Profiles = { spot, spider },
             Fixtures =
             {
                 // Installation reelle : lyres en 1-14 et 15-28, Spider en 29-43 (PAR UV en 44, a ajouter
                 // dans le patch). Les adresses doivent correspondre au menu de chaque appareil.
-                new FixtureInstance { Id = "lyre-1", Name = "Lyre 1", ProfileId = spot.Id, Address = 1 },
-                new FixtureInstance { Id = "lyre-2", Name = "Lyre 2", ProfileId = spot.Id, Address = 15 },
-                new FixtureInstance { Id = "spider-1", Name = "Spider", ProfileId = spider.Id, Address = 29, MirrorMotors = true },
+                new FixtureInstance { Id = "lyre-1", Name = Tr.T("Lyre 1"), ProfileId = spot.Id, Address = 1 },
+                new FixtureInstance { Id = "lyre-2", Name = Tr.T("Lyre 2"), ProfileId = spot.Id, Address = 15 },
+                new FixtureInstance { Id = "spider-1", Name = Tr.T("Spider"), ProfileId = spider.Id, Address = 29, MirrorMotors = true },
             },
         };
 
         var allIds = show.Fixtures.Select(f => f.Id).ToList();
 
         // Etat de depart : valeurs par defaut, tous les appareils selectionnes, aucun effet.
-        show.LiveState = new Scene { Name = "État courant", Selection = allIds.ToList() };
+        show.LiveState = new Scene { Name = Tr.T("État courant"), Selection = allIds.ToList() };
         foreach (var f in show.Fixtures)
         {
             show.LiveState.Values[f.Id] = ToInts(show.FindProfile(f.ProfileId)!.DefaultValues());
         }
 
-        show.Scenes.Add(BuildScene(show, "Noir", includeInAuto: false, edit: null, effects: new LiveEffects()));
+        show.Scenes.Add(BuildScene(show, Tr.T("Noir"), includeInAuto: false, edit: null, effects: new LiveEffects()));
 
-        show.Scenes.Add(BuildScene(show, "Ambiance douce", includeInAuto: true,
+        show.Scenes.Add(BuildScene(show, Tr.T("Ambiance douce"), includeInAuto: true,
             edit: (profile, values) =>
             {
                 SetType(profile, values, ChannelType.Dimmer, profile.Id == SpiderProfileId ? (byte)170 : (byte)200);
@@ -55,7 +55,7 @@ public static class DefaultShow
             },
             effects: new LiveEffects { Shape = MovementShape.Circle, SpeedCyclesPerMinute = 6, SizePercent = 30, SpreadPercent = 100 }));
 
-        show.Scenes.Add(BuildScene(show, "Fête (couleurs + huit)", includeInAuto: true,
+        show.Scenes.Add(BuildScene(show, Tr.T("Fête (couleurs + huit)"), includeInAuto: true,
             edit: (profile, values) => SetType(profile, values, ChannelType.Dimmer, 255),
             effects: new LiveEffects
             {

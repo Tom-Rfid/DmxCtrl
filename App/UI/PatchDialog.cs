@@ -30,7 +30,7 @@ internal sealed class PatchDialog : Form
     /// <summary>Element de la liste des modeles : profil de la config ou modele de la bibliotheque.</summary>
     private sealed record ModelItem(string Id, string Name, bool FromLibrary)
     {
-        public override string ToString() => FromLibrary ? $"{Name}   [bibliothèque]" : Name;
+        public override string ToString() => FromLibrary ? Tr.F("{0}   [bibliothèque]", Tr.T(Name)) : Tr.T(Name);
     }
 
     private const int ColEnabled = 0, ColName = 1, ColModel = 2, ColAddress = 3, ColCount = 4, ColEnd = 5, ColFlash = 6;
@@ -58,12 +58,12 @@ internal sealed class PatchDialog : Form
     private readonly ComboBox _model = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 290, DropDownWidth = 420 };
     private readonly NumericUpDown _address = new() { Minimum = 1, Maximum = 512, Width = 70 };
     private readonly Label _range = new() { AutoSize = true, Margin = new Padding(3, 6, 3, 3) };
-    private readonly CheckBox _enabled = new() { Text = "Actif (désactivé = n'envoie rien, aucune alerte d'adresse)", AutoSize = true };
-    private readonly CheckBox _flash = new() { Text = "Flash / strobe (interrupteurs dans l'onglet Soirée)", AutoSize = true };
-    private readonly CheckBox _invertPan = new() { Text = "Inverser pan", AutoSize = true };
-    private readonly CheckBox _invertTilt = new() { Text = "Inverser tilt", AutoSize = true };
+    private readonly CheckBox _enabled = new() { Text = Tr.T("Actif (désactivé = n'envoie rien, aucune alerte d'adresse)"), AutoSize = true };
+    private readonly CheckBox _flash = new() { Text = Tr.T("Flash / strobe (interrupteurs dans l'onglet Soirée)"), AutoSize = true };
+    private readonly CheckBox _invertPan = new() { Text = Tr.T("Inverser pan"), AutoSize = true };
+    private readonly CheckBox _invertTilt = new() { Text = Tr.T("Inverser tilt"), AutoSize = true };
     private readonly Label _freeRanges = new() { AutoSize = true, MaximumSize = new Size(330, 0), ForeColor = Color.DimGray, Margin = new Padding(3, 8, 3, 3) };
-    private readonly GroupBox _detail = new() { Text = "Appareil sélectionné", Dock = DockStyle.Top, Height = 330, Padding = new Padding(8), Font = Ui.BoldFont };
+    private readonly GroupBox _detail = new() { Text = Tr.T("Appareil sélectionné"), Dock = DockStyle.Top, Height = 330, Padding = new Padding(8), Font = Ui.BoldFont };
 
     // Ajout
     private readonly ComboBox _addModel = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 290, DropDownWidth = 420 };
@@ -80,7 +80,7 @@ internal sealed class PatchDialog : Form
         _fixtures = show.Fixtures.Select(f => ShowJson.Clone(f)).ToList();
         _profiles = show.Profiles.ToList(); // memes objets : les profils ne sont pas modifies ici
 
-        Text = "Patch — appareils et adressage DMX";
+        Text = Tr.T("Patch — appareils et adressage DMX");
         Font = new Font("Segoe UI", 9f);
         Size = new Size(1180, 640);
         MinimumSize = new Size(980, 520);
@@ -91,9 +91,9 @@ internal sealed class PatchDialog : Form
         BuildGrid();
         var side = BuildSidePanel();
 
-        var ok = new Button { Text = "OK", Width = 90, Height = 30 };
+        var ok = new Button { Text = Tr.T("OK"), Width = 90, Height = 30 };
         ok.Click += (_, _) => Accept();
-        var cancel = new Button { Text = "Annuler", Width = 90, Height = 30, DialogResult = DialogResult.Cancel };
+        var cancel = new Button { Text = Tr.T("Annuler"), Width = 90, Height = 30, DialogResult = DialogResult.Cancel };
         var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, Height = 44, Padding = new Padding(8) };
         bottom.Controls.AddRange(new Control[] { cancel, ok });
         CancelButton = cancel;
@@ -123,13 +123,13 @@ internal sealed class PatchDialog : Form
     private void BuildGrid()
     {
         _grid.Columns.AddRange(
-            new DataGridViewCheckBoxColumn { HeaderText = "Actif", FillWeight = 40 },
-            new DataGridViewTextBoxColumn { HeaderText = "Nom (titre de l'onglet)", FillWeight = 130 },
-            new DataGridViewTextBoxColumn { HeaderText = "Modèle", FillWeight = 230 },
-            new DataGridViewTextBoxColumn { HeaderText = "Adresse", FillWeight = 55 },
-            new DataGridViewTextBoxColumn { HeaderText = "Canaux", FillWeight = 50 },
-            new DataGridViewTextBoxColumn { HeaderText = "Dernier canal", FillWeight = 60 },
-            new DataGridViewCheckBoxColumn { HeaderText = "Flash / strobe", FillWeight = 55 });
+            new DataGridViewCheckBoxColumn { HeaderText = Tr.T("Actif"), FillWeight = 40 },
+            new DataGridViewTextBoxColumn { HeaderText = Tr.T("Nom (titre de l'onglet)"), FillWeight = 130 },
+            new DataGridViewTextBoxColumn { HeaderText = Tr.T("Modèle"), FillWeight = 230 },
+            new DataGridViewTextBoxColumn { HeaderText = Tr.T("Adresse"), FillWeight = 55 },
+            new DataGridViewTextBoxColumn { HeaderText = Tr.T("Canaux"), FillWeight = 50 },
+            new DataGridViewTextBoxColumn { HeaderText = Tr.T("Dernier canal"), FillWeight = 60 },
+            new DataGridViewCheckBoxColumn { HeaderText = Tr.T("Flash / strobe"), FillWeight = 55 });
 
         // Les cases se cochent d'un clic dans la liste (la liste est en lecture seule).
         _grid.CellContentClick += (_, e) =>
@@ -165,11 +165,11 @@ internal sealed class PatchDialog : Form
         // ---------------- Fiche ----------------
         var table = Ui.Table(2);
         table.Font = new Font("Segoe UI", 9f);
-        Ui.Row(table, "Nom", _name);
-        Ui.Row(table, "Modèle", _model);
-        var nextFree = new Button { Text = "Adresse libre", AutoSize = true };
+        Ui.Row(table, Tr.T("Nom"), _name);
+        Ui.Row(table, Tr.T("Modèle"), _model);
+        var nextFree = new Button { Text = Tr.T("Adresse libre"), AutoSize = true };
         nextFree.Click += (_, _) => AssignNextFreeAddress();
-        Ui.Row(table, "Adresse DMX", Ui.Flow(0, _address, nextFree));
+        Ui.Row(table, Tr.T("Adresse DMX"), Ui.Flow(0, _address, nextFree));
         Ui.Row(table, "", _range);
         Ui.Row(table, "", _enabled);
         Ui.Row(table, "", _flash);
@@ -178,7 +178,7 @@ internal sealed class PatchDialog : Form
         _detail.Controls.Add(table);
         table.Dock = DockStyle.Fill;
 
-        _name.TextChanged += (_, _) => EditSelected(f => f.Name = _name.Text.Trim().Length > 0 ? _name.Text.Trim() : "Appareil");
+        _name.TextChanged += (_, _) => EditSelected(f => f.Name = _name.Text.Trim().Length > 0 ? _name.Text.Trim() : Tr.T("Appareil"));
         _model.SelectionChangeCommitted += (_, _) => OnModelChosen();
         _address.ValueChanged += (_, _) => EditSelected(f => f.Address = (int)_address.Value);
         _enabled.CheckedChanged += (_, _) => EditSelected(f => f.Enabled = _enabled.Checked);
@@ -187,28 +187,28 @@ internal sealed class PatchDialog : Form
         _invertTilt.CheckedChanged += (_, _) => EditSelected(f => f.InvertTilt = _invertTilt.Checked);
 
         // ---------------- Ajout / liste ----------------
-        var addButton = new Button { Text = "Ajouter cet appareil", AutoSize = true, Font = Ui.BoldFont };
+        var addButton = new Button { Text = Tr.T("Ajouter cet appareil"), AutoSize = true, Font = Ui.BoldFont };
         addButton.Click += (_, _) => AddFixture();
-        var duplicate = new Button { Text = "Dupliquer", Width = 100 };
+        var duplicate = new Button { Text = Tr.T("Dupliquer"), Width = 100 };
         duplicate.Click += (_, _) => DuplicateFixture();
-        var remove = new Button { Text = "Supprimer", Width = 100 };
+        var remove = new Button { Text = Tr.T("Supprimer"), Width = 100 };
         remove.Click += (_, _) => RemoveFixture();
-        var up = new Button { Text = "Monter", Width = 100 };
+        var up = new Button { Text = Tr.T("Monter"), Width = 100 };
         up.Click += (_, _) => MoveSelected(-1);
-        var down = new Button { Text = "Descendre", Width = 100 };
+        var down = new Button { Text = Tr.T("Descendre"), Width = 100 };
         down.Click += (_, _) => MoveSelected(+1);
 
         var add = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(4) };
-        add.Controls.Add(Ui.Text("Ajouter un appareil — choisis son modèle :", bold: true));
+        add.Controls.Add(Ui.Text(Tr.T("Ajouter un appareil — choisis son modèle :"), bold: true));
         add.Controls.Add(_addModel);
         add.Controls.Add(addButton);
         add.Controls.Add(Ui.Flow(0, duplicate, remove));
         add.Controls.Add(Ui.Flow(0, up, down));
         add.Controls.Add(new Label
         {
-            Text = "L'ordre des lignes = l'ordre des onglets.\nL'adresse doit être celle réglée dans le menu de l'appareil " +
-                   "(ou ses micro-interrupteurs).\nPlusieurs appareils peuvent avoir le même modèle : chacun a son adresse et son onglet.\n" +
-                   "Un modèle absent de la liste : Appareils > Éditeur de profils.",
+            Text = Tr.T("L'ordre des lignes = l'ordre des onglets.\nL'adresse doit être celle réglée dans le menu de l'appareil ") +
+                   Tr.T("(ou ses micro-interrupteurs).\nPlusieurs appareils peuvent avoir le même modèle : chacun a son adresse et son onglet.\n") +
+                   Tr.T("Un modèle absent de la liste : Appareils > Éditeur de profils."),
             AutoSize = true,
             MaximumSize = new Size(345, 0),
             ForeColor = Color.DimGray,
@@ -282,7 +282,7 @@ internal sealed class PatchDialog : Form
         var row = _grid.Rows[index];
         row.Cells[ColEnabled].Value = fixture.Enabled;
         row.Cells[ColName].Value = fixture.Name;
-        row.Cells[ColModel].Value = profile?.Name ?? "(profil introuvable)";
+        row.Cells[ColModel].Value = profile?.Name ?? Tr.T("(profil introuvable)");
         row.Cells[ColAddress].Value = fixture.Address;
         row.Cells[ColCount].Value = profile?.ChannelCount.ToString() ?? "?";
         row.Cells[ColEnd].Value = profile is null ? "?" : fixture.EndAddress(profile).ToString();
@@ -303,7 +303,7 @@ internal sealed class PatchDialog : Form
         {
             _problems.ForeColor = Ui.OkColor;
             int disabled = _fixtures.Count(f => !f.Enabled);
-            _problems.Text = "Aucun conflit d'adressage." + (disabled > 0 ? $"  ({disabled} appareil(s) désactivé(s), ignoré(s))" : "");
+            _problems.Text = Tr.T("Aucun conflit d'adressage.") + (disabled > 0 ? Tr.F("  ({0} appareil(s) désactivé(s), ignoré(s))", disabled) : "");
         }
         else
         {
@@ -312,7 +312,7 @@ internal sealed class PatchDialog : Form
         }
 
         var free = PatchValidator.FreeRanges(_fixtures, _profiles);
-        _freeRanges.Text = "Canaux libres : " + (free.Count == 0 ? "aucun (univers plein)" : string.Join(", ", free));
+        _freeRanges.Text = Tr.T("Canaux libres : ") + (free.Count == 0 ? Tr.T("aucun (univers plein)") : string.Join(", ", free));
         return problems;
     }
 
@@ -338,7 +338,7 @@ internal sealed class PatchDialog : Form
         _loading = true;
         try
         {
-            _detail.Text = $"Appareil sélectionné : {fixture.Name}";
+            _detail.Text = Tr.F("Appareil sélectionné : {0}", fixture.Name);
             _name.Text = fixture.Name;
             _model.SelectedItem = _model.Items.Cast<ModelItem>().FirstOrDefault(m => m.Id == fixture.ProfileId);
             _address.Value = Math.Clamp(fixture.Address, 1, 512);
@@ -363,15 +363,15 @@ internal sealed class PatchDialog : Form
         var profile = ProfileOf(fixture);
         if (profile is null)
         {
-            _range.Text = "Choisis un modèle.";
+            _range.Text = Tr.T("Choisis un modèle.");
             _range.ForeColor = Color.DarkRed;
             return;
         }
 
         int end = fixture.EndAddress(profile);
         bool free = PatchValidator.IsFree(_fixtures, _profiles, fixture.Address, profile.ChannelCount, fixture.Id);
-        _range.Text = $"{profile.ChannelCount} canaux : {fixture.Address} à {end}" +
-                      (!fixture.Enabled ? "  (désactivé)" : free ? "  — libre" : "  — OCCUPÉ ou hors univers");
+        _range.Text = Tr.F("{0} canaux : {1} à {2}", profile.ChannelCount, fixture.Address, end) +
+                      (!fixture.Enabled ? Tr.T("  (désactivé)") : free ? Tr.T("  — libre") : Tr.T("  — OCCUPÉ ou hors univers"));
         _range.ForeColor = !fixture.Enabled ? Color.Gray : free ? Ui.OkColor : Color.DarkRed;
     }
 
@@ -385,7 +385,7 @@ internal sealed class PatchDialog : Form
         edit(fixture);
         RefreshRow(SelectedIndex);
         UpdateRangeLabel(fixture);
-        _detail.Text = $"Appareil sélectionné : {fixture.Name}";
+        _detail.Text = Tr.F("Appareil sélectionné : {0}", fixture.Name);
         ValidateAll();
     }
 
@@ -420,16 +420,16 @@ internal sealed class PatchDialog : Form
         string message;
         if (address < 0)
         {
-            message = $"Plus de plage libre de {profile.ChannelCount} canaux : adresse {fixture.Address} conservée (conflit).";
+            message = Tr.F("Plus de plage libre de {0} canaux : adresse {1} conservée (conflit).", profile.ChannelCount, fixture.Address);
         }
         else if (address != fixture.Address)
         {
-            message = $"Adresse {fixture.Address} occupée pour {profile.ChannelCount} canaux : {address} proposée.";
+            message = Tr.F("Adresse {0} occupée pour {1} canaux : {2} proposée.", fixture.Address, profile.ChannelCount, address);
             fixture.Address = address;
         }
         else
         {
-            message = $"Adresse {address} conservée ({profile.ChannelCount} canaux libres).";
+            message = Tr.F("Adresse {0} conservée ({1} canaux libres).", address, profile.ChannelCount);
         }
 
         int index = SelectedIndex;
@@ -444,7 +444,8 @@ internal sealed class PatchDialog : Form
     {
         string trimmed = name.TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ');
         return string.Equals(trimmed, baseName, StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(name, "Appareil", StringComparison.OrdinalIgnoreCase);
+               string.Equals(name, "Appareil", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(name, Tr.T("Appareil"), StringComparison.OrdinalIgnoreCase);
     }
 
     private string UniqueName(string baseName, string? ignoreId = null)
@@ -468,7 +469,7 @@ internal sealed class PatchDialog : Form
     {
         if (_addModel.SelectedItem is not ModelItem item || FixtureLibrary.EnsureProfile(_profiles, item.Id) is not FixtureProfile profile)
         {
-            MessageBox.Show(this, "Choisis d'abord le modèle de l'appareil dans la liste.", "Modèle", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, Tr.T("Choisis d'abord le modèle de l'appareil dans la liste."), Tr.T("Modèle"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -487,9 +488,9 @@ internal sealed class PatchDialog : Form
 
         if (address < 0)
         {
-            MessageBox.Show(this, $"Plus aucune plage libre de {profile.ChannelCount} canaux dans l'univers DMX.\n" +
-                                  "L'appareil est ajouté DÉSACTIVÉ : libère de la place ou désactive un autre appareil.",
-                "Univers plein", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, Tr.F("Plus aucune plage libre de {0} canaux dans l'univers DMX.\n", profile.ChannelCount) +
+                                  Tr.T("L'appareil est ajouté DÉSACTIVÉ : libère de la place ou désactive un autre appareil."),
+                Tr.T("Univers plein"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         _name.Focus();
         _name.SelectAll();
@@ -532,7 +533,7 @@ internal sealed class PatchDialog : Form
         int address = PatchValidator.NextFreeAddress(_fixtures, _profiles, profile?.ChannelCount ?? 1, fixture.Id);
         if (address < 0)
         {
-            MessageBox.Show(this, "Plus aucune plage libre dans l'univers DMX.", "Univers plein", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, Tr.T("Plus aucune plage libre dans l'univers DMX."), Tr.T("Univers plein"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         _address.Value = address; // -> EditSelected
@@ -554,8 +555,8 @@ internal sealed class PatchDialog : Form
     {
         var problems = ValidateAll();
         if (problems.Count > 0 &&
-            !Ui.Confirm(this, "Il reste des problèmes d'adressage :\n\n" + string.Join("\n", problems.Select(p => "• " + p.Message)) +
-                              "\n\nValider quand même ? (tu peux aussi désactiver un appareil absent ce soir)", "Conflits d'adressage"))
+            !Ui.Confirm(this, Tr.T("Il reste des problèmes d'adressage :\n\n") + string.Join("\n", problems.Select(p => "• " + p.Message)) +
+                              Tr.T("\n\nValider quand même ? (tu peux aussi désactiver un appareil absent ce soir)"), Tr.T("Conflits d'adressage")))
         {
             return;
         }
