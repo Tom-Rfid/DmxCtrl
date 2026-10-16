@@ -159,8 +159,10 @@ internal sealed class LaserPanel : UserControl
         };
         scroll.Controls.Add(page);
 
-        // ---------------- En-tete + securite ----------------
+        // ---------------- En-tete + securite : bouton marche / arret a gauche, textes a droite ----------------
         var header = Ui.Table(1);
+        header.Margin = new Padding(0);
+        header.Dock = DockStyle.None;
         header.Controls.Add(new Label { Text = $"{fixture.Name}  —  {profile.Manufacturer} {profile.Name}".Trim(), AutoSize = true, Font = Ui.TitleFont });
         header.Controls.Add(Ui.Text($"Adresse DMX {fixture.Address} : canaux {fixture.Address} à {fixture.EndAddress(profile)}", color: Color.DimGray));
         header.Controls.Add(new Label
@@ -172,9 +174,10 @@ internal sealed class LaserPanel : UserControl
             Font = Ui.BoldFont,
             Margin = new Padding(3, 4, 3, 6),
         });
+        header.Controls.Add(_state);
         _onOff.Click += (_, _) => ToggleBeam();
-        header.Controls.Add(Ui.Flow(0, _onOff, _state));
-        page.Controls.Add(header);
+        _onOff.Margin = new Padding(3, 3, 12, 3);
+        page.Controls.Add(Ui.Flow(0, _onOff, header));
 
         // ---------------- Mode ----------------
         if (_mode >= 0)
@@ -182,7 +185,7 @@ internal sealed class LaserPanel : UserControl
             var modes = Ui.Flow(0); // une seule ligne (avec retour a la ligne, la hauteur calculee serait fausse)
             foreach (var preset in profile.Channels[_mode].Presets)
             {
-                var button = new Button { Text = preset.Name, AutoSize = true, Tag = preset.Value, Margin = new Padding(3) };
+                var button = new Button { Text = preset.Name, AutoSize = true, Tag = preset.Value, Margin = new Padding(2, 0, 2, 0) };
                 _modeButtons.Add(button);
                 if (preset.Name.Contains('⚠'))
                 {
@@ -198,6 +201,7 @@ internal sealed class LaserPanel : UserControl
                 modes.Controls.Add(button);
             }
             var group = Ui.Group("Mode (programmes internes ou DMX manuel)", modes);
+            group.Padding = new Padding(6, 4, 6, 3); // boite compacte : une seule ligne de boutons
             page.Controls.Add(group);
         }
 
@@ -238,16 +242,18 @@ internal sealed class LaserPanel : UserControl
             middle.Controls.Add(Ui.Group("Motif (32 motifs)", grid));
         }
 
-        // ---------------- Couleurs + pad ----------------
+        // ---------------- Zoom, puis couleurs | position ----------------
         var right = Ui.Table(1);
-        if (_color >= 0)
-        {
-            right.Controls.Add(Ui.Group("Couleur", BuildColorSection()));
-        }
         if (_zoom >= 0)
         {
-            // Copie du curseur Zoom (aussi dans « Effets ») : sous la main, juste sous les couleurs.
+            // Copie du curseur Zoom (aussi dans « Effets ») : sous la main, en haut.
             right.Controls.Add(Ui.Group("Zoom", BuildZoomControl(listWidth: 190)));
+        }
+        var colorAndPad = Ui.Flow(0);
+        right.Controls.Add(colorAndPad);
+        if (_color >= 0)
+        {
+            colorAndPad.Controls.Add(Ui.Group("Couleur", BuildColorSection()));
         }
         if (_x >= 0 && _y >= 0)
         {
@@ -269,7 +275,7 @@ internal sealed class LaserPanel : UserControl
             padBox.Controls.Add(Ui.Flow(0, center, Ui.Text("Position fixe du motif (X et Y)", color: Color.DimGray)));
             padBox.Controls.Add(Ui.Flow(0, invertX, invertY));
             padBox.Controls.Add(Ui.Text("(laser retourné : inverse les positions et le sens des mouvements)", color: Color.DimGray));
-            right.Controls.Add(Ui.Group("Position", padBox));
+            colorAndPad.Controls.Add(Ui.Group("Position", padBox));
         }
         right.Dock = DockStyle.None;
         middle.Controls.Add(right);

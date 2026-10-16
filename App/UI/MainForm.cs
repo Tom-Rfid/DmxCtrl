@@ -85,7 +85,7 @@ internal sealed class MainForm : Form
     {
         Text = "Contrôleur DMX";
         Font = new Font("Segoe UI", 9f);
-        Size = new Size(1400, 900);
+        Size = new Size(1540, 945);
         MinimumSize = new Size(1150, 720);
         StartPosition = FormStartPosition.CenterScreen;
         KeyPreview = true; // la fenetre voit les touches avant les controles (raccourcis de l'onglet Soiree)
