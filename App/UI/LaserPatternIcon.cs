@@ -98,7 +98,7 @@ internal sealed class LaserPatternIcon : Control
                 g.DrawPolygon(pen, star);
                 break;
             }
-            case 9: g.DrawLines(pen, new[] { P(0.8f, -0.8f), P(-0.8f, -0.8f), P(-0.8f, 0.8f) }); break;
+            case 9: g.DrawPolygon(pen, new[] { P(0.8f, -0.8f), P(-0.8f, -0.8f), P(-0.8f, 0.8f), P(-0.45f, 0.8f), P(-0.45f, -0.45f), P(0.8f, -0.45f) }); break; // L epais
             case 10: g.DrawPolygon(pen, new[] { P(-0.9f, -0.75f), P(0.9f, 0.75f), P(0.9f, -0.75f), P(-0.9f, 0.75f) }); break;
             case 11:
             {

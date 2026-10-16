@@ -134,14 +134,14 @@ public static class FixtureLibrary
     /// <summary>Description des 32 motifs du Galactic RGY-140, relevee a l'oeil sur l'appareil.</summary>
     public static readonly string[] LaserPatternNames =
     {
-        "cercle", "cercle pointillé", "triangle (base en bas)", "carré",
-        "carré pointillé", "double carré", "grosse croix (creuse)", "étoile",
-        "L (coin en haut à gauche)", "sablier renversé", "tourbillon", "2 C inversés",
+        "cercle", "cercle pointillé", "triangle", "carré",
+        "carré pointillé", "double carré", "grosse croix", "étoile",
+        "L", "sablier renversé", "tourbillon", "2 C inversés",
         "courbe bizarre", "2 quarts de cercle", "double vague", "grande vague",
         "montagne", "W", "E", "ligne",
-        "ligne pointillée", "ligne (2)", "double ligne horizontale", "croix en ligne",
-        "2 traits : bas gauche, puis haut droite", "cercle allumé en diagonale", "petit carré bas gauche + haut droite", "4 carrés dans les coins",
-        "rond en haut à droite", "pointillé rapide", "petite courbe pointillée rapide", "croix × creuse pointillée rapide",
+        "ligne pointillée", "ligne", "double ligne horizontale", "croix en ligne",
+        "2 traits", "cercle coupé", "2 petits carrés", "4 carrés dans les coins",
+        "rond en haut à droite", "pointillé rapide", "petite courbe pointillée rapide", "X pointillé",
     };
 
     /// <summary>Valeurs par defaut corrigees dans un modele (type de canal -> valeur), appliquees aux configurations.</summary>

@@ -44,11 +44,11 @@ canvas { width: 64px; height: 52px; background: var(--screen); border-radius: 4p
 </main>
 
 <script>
-const names = ["cercle","cercle pointillé","triangle (base en bas)","carré","carré pointillé","double carré","grosse croix (creuse)","étoile",
-"L (coin en haut à gauche)","sablier renversé","tourbillon","2 C inversés","courbe bizarre","2 quarts de cercle","double vague","grande vague",
-"montagne","W","E","ligne","ligne pointillée","ligne (2)","double ligne horizontale","croix en ligne",
-"2 traits : bas gauche, puis haut droite","cercle allumé en diagonale","petit carré bas gauche + haut droite","4 carrés dans les coins",
-"rond en haut à droite","pointillé rapide","petite courbe pointillée rapide","croix × creuse pointillée rapide"];
+const names = ["cercle","cercle pointillé","triangle","carré","carré pointillé","double carré","grosse croix","étoile",
+"L","sablier renversé","tourbillon","2 C inversés","courbe bizarre","2 quarts de cercle","double vague","grande vague",
+"montagne","W","E","ligne","ligne pointillée","ligne","double ligne horizontale","croix en ligne",
+"2 traits","cercle coupé","2 petits carrés","4 carrés dans les coins",
+"rond en haut à droite","pointillé rapide","petite courbe pointillée rapide","X pointillé"];
 
 const beam = getComputedStyle(document.documentElement).getPropertyValue("--beam").trim();
 
@@ -86,7 +86,7 @@ function draw(c, n) {
     case 6: rect(-.85, -.85, 1.7, 1.7); rect(-.45, -.45, .9, .9); break;
     case 7: cross(0); break;
     case 8: line(Array.from({ length: 10 }, (_, i) => { const r = i % 2 ? .4 : .95, a = -Math.PI / 2 + i * Math.PI / 5; return [r * Math.cos(a), r * Math.sin(a)]; }), true); break;
-    case 9: line([[.8, -.8], [-.8, -.8], [-.8, .8]]); break;
+    case 9: line([[.8, -.8], [-.8, -.8], [-.8, .8], [-.45, .8], [-.45, -.45], [.8, -.45]], true); break;
     case 10: line([[-.9, -.75], [.9, .75], [.9, -.75], [-.9, .75]], true); break;
     case 11: line(Array.from({ length: 80 }, (_, i) => { const t = i / 79, a = -t * 6 * Math.PI; return [.9 * t * Math.cos(a), .9 * t * Math.sin(a)]; })); break;
     case 12: ell(-.95, -.2, .7, 1, -90, 90); ell(.25, -.2, .7, 1, 90, 270); break;
