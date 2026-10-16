@@ -349,7 +349,7 @@ internal sealed class PatchDialog : Form
         _loading = true;
         try
         {
-            _detail.Text = Tr.F("Appareil sélectionné : {0}", fixture.Name);
+            _detail.Text = Tr.F("Appareil sélectionné : {0}", Tr.T(fixture.Name));
             _name.Text = fixture.Name;
             _model.SelectedItem = _model.Items.Cast<ModelItem>().FirstOrDefault(m => m.Id == fixture.ProfileId);
             _address.Value = Math.Clamp(fixture.Address, 1, 512);
@@ -397,7 +397,7 @@ internal sealed class PatchDialog : Form
         edit(fixture);
         RefreshRow(SelectedIndex);
         UpdateRangeLabel(fixture);
-        _detail.Text = Tr.F("Appareil sélectionné : {0}", fixture.Name);
+        _detail.Text = Tr.F("Appareil sélectionné : {0}", Tr.T(fixture.Name));
         ValidateAll();
     }
 

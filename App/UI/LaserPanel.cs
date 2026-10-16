@@ -167,7 +167,7 @@ internal sealed class LaserPanel : UserControl
         var header = Ui.Table(1);
         header.Margin = new Padding(0);
         header.Dock = DockStyle.None;
-        header.Controls.Add(new Label { Text = $"{fixture.Name}  —  {profile.Manufacturer} {Tr.T(profile.Name)}".Trim(), AutoSize = true, Font = Ui.TitleFont });
+        header.Controls.Add(new Label { Text = $"{Tr.T(fixture.Name)}  —  {profile.Manufacturer} {Tr.T(profile.Name)}".Trim(), AutoSize = true, Font = Ui.TitleFont });
         header.Controls.Add(Ui.Text(Tr.F("Adresse DMX {0} : canaux {1} à {2}", fixture.Address, fixture.Address, fixture.EndAddress(profile)), color: Color.DimGray));
         header.Controls.Add(new Label
         {
@@ -561,7 +561,7 @@ internal sealed class LaserPanel : UserControl
             _fixture.InvertTilt = y;
         });
         _ctx.MarkDirty();
-        _ctx.Status(Tr.F("{0} : X {1}, Y {2}.", _fixture.Name, (x ? Tr.T("inversé") : Tr.T("normal")), (y ? Tr.T("inversé") : Tr.T("normal"))));
+        _ctx.Status(Tr.F("{0} : X {1}, Y {2}.", Tr.T(_fixture.Name), (x ? Tr.T("inversé") : Tr.T("normal")), (y ? Tr.T("inversé") : Tr.T("normal"))));
     }
 
     /// <summary>
@@ -580,7 +580,7 @@ internal sealed class LaserPanel : UserControl
         if (ok)
         {
             SetChannel(_mode, preset.Value);
-            _ctx.Status(Tr.F("{0} : « {1} » envoyé — pour sortir du mode test : FUNC → adresse DMX → ENTER sur le laser.", _fixture.Name, Tr.T(preset.Name)));
+            _ctx.Status(Tr.F("{0} : « {1} » envoyé — pour sortir du mode test : FUNC → adresse DMX → ENTER sur le laser.", Tr.T(_fixture.Name), Tr.T(preset.Name)));
         }
     }
 
@@ -622,7 +622,7 @@ internal sealed class LaserPanel : UserControl
         {
             _lastColor = current;
             SetChannel(_color, 0);
-            _ctx.Status(Tr.F("{0} : faisceau éteint.", _fixture.Name));
+            _ctx.Status(Tr.F("{0} : faisceau éteint.", Tr.T(_fixture.Name)));
         }
         else
         {
@@ -632,7 +632,7 @@ internal sealed class LaserPanel : UserControl
                 _ctx.Engine.SetValue(_fixture.Id, _zoom, FixtureLibrary.ZoomDefault); // sharp size when switching on
             }
             SetChannel(_color, _lastColor);
-            _ctx.Status(Tr.F("{0} : faisceau allumé (zoom {1}).", _fixture.Name, FixtureLibrary.ZoomDefault));
+            _ctx.Status(Tr.F("{0} : faisceau allumé (zoom {1}).", Tr.T(_fixture.Name), FixtureLibrary.ZoomDefault));
         }
     }
 

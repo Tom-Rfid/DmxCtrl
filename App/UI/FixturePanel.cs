@@ -131,7 +131,7 @@ internal sealed class FixturePanel : UserControl
         };
         header.Controls.Add(new Label
         {
-            Text = $"{fixture.Name}  —  {profile.Manufacturer} {Tr.T(profile.Name)}".Trim(),
+            Text = $"{Tr.T(fixture.Name)}  —  {profile.Manufacturer} {Tr.T(profile.Name)}".Trim(),
             AutoSize = true,
             Font = Ui.TitleFont,
         });
@@ -663,7 +663,7 @@ internal sealed class FixturePanel : UserControl
             }
         }
         _ctx.NotifyLiveStateChanged();
-        _ctx.Status(Tr.F("{0} : tout coupé.", _fixture.Name));
+        _ctx.Status(Tr.F("{0} : tout coupé.", Tr.T(_fixture.Name)));
     }
 
     /// <summary>Group chart and fader realigned on the current values.</summary>
@@ -839,7 +839,7 @@ internal sealed class FixturePanel : UserControl
         }
         _ctx.MarkDirty();
         _ctx.NotifyLiveStateChanged(); // this panel + the Show tab (STROBE switch)
-        _ctx.Status(on ? Tr.F("{0} : strobe réactivé ({1}).", _fixture.Name, _fixture.StrobeMemory) : Tr.F("{0} : strobe désactivé (valeur {1} mémorisée).", _fixture.Name, current));
+        _ctx.Status(on ? Tr.F("{0} : strobe réactivé ({1}).", Tr.T(_fixture.Name), _fixture.StrobeMemory) : Tr.F("{0} : strobe désactivé (valeur {1} mémorisée).", Tr.T(_fixture.Name), current));
     }
 
     /// <summary>"Strobe 0" button: channel set to fixed (0, or open shutter); the box stays as it is.</summary>
@@ -851,7 +851,7 @@ internal sealed class FixturePanel : UserControl
         }
         _ctx.Engine.SetValue(_fixture.Id, _strobeIndex, _profile.Channels[_strobeIndex].NoStrobeValue);
         _ctx.NotifyLiveStateChanged();
-        _ctx.Status(Tr.F("{0} : strobe à 0.", _fixture.Name));
+        _ctx.Status(Tr.F("{0} : strobe à 0.", Tr.T(_fixture.Name)));
     }
 
     /// <summary>Strobe slider moved into a strobe value while the strobe is disabled: it is enabled again.</summary>
@@ -867,7 +867,7 @@ internal sealed class FixturePanel : UserControl
         _strobeOn.Checked = true;
         _updating = false;
         _ctx.NotifyLiveStateChanged();
-        _ctx.Status(Tr.F("{0} : strobe réactivé ({1}).", _fixture.Name, value));
+        _ctx.Status(Tr.F("{0} : strobe réactivé ({1}).", Tr.T(_fixture.Name), value));
     }
 
     /// <summary>Spider motor: 0..255 = 0..135° (manual).</summary>
@@ -924,9 +924,9 @@ internal sealed class FixturePanel : UserControl
         _sweep.BackColor = _sweep.Checked ? Color.FromArgb(255, 210, 60) : SystemColors.Control;
         _sweep.UseVisualStyleBackColor = !_sweep.Checked;
         _ctx.Status(_sweep.Checked
-            ? Tr.F("{0} : effet gauche ↔ droite toutes les {1:0.#} s", _fixture.Name, _fixture.WingSweepDelaySeconds) +
+            ? Tr.F("{0} : effet gauche ↔ droite toutes les {1:0.#} s", Tr.T(_fixture.Name), _fixture.WingSweepDelaySeconds) +
               (_fixture.MirrorMotors ? Tr.T(" (ailes en miroir).") : ".")
-            : Tr.F("{0} : effet gauche ↔ droite arrêté.", _fixture.Name));
+            : Tr.F("{0} : effet gauche ↔ droite arrêté.", Tr.T(_fixture.Name)));
     }
 
     /// <summary>"Mic" button: starts or stops the shared microphone.</summary>
@@ -992,8 +992,8 @@ internal sealed class FixturePanel : UserControl
         _ctx.Engine.EditShow(_ => _fixture.MutedColors = muted);
         _ctx.MarkDirty();
         _ctx.Status(muted.Count == 0
-            ? Tr.F("{0} : toutes les couleurs actives.", _fixture.Name)
-            : Tr.F("{0} : coupé en sortie → {1}.", _fixture.Name, (string.Join(", ", _maskBoxes.Where(b => !b.Checked).Select(b => b.Text)))));
+            ? Tr.F("{0} : toutes les couleurs actives.", Tr.T(_fixture.Name))
+            : Tr.F("{0} : coupé en sortie → {1}.", Tr.T(_fixture.Name), (string.Join(", ", _maskBoxes.Where(b => !b.Checked).Select(b => b.Text)))));
     }
 
     /// <summary>Current mode, from the fixture (locked to the tempo or not) and the microphone (the BPM follows it or not).</summary>

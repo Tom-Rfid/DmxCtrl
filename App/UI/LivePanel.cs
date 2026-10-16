@@ -321,7 +321,7 @@ internal sealed class LivePanel : UserControl
             _strobeToggles.Add((id, strobe));
 
             _flashRows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            _flashRows.Controls.Add(new Label { Text = fixture.Name, AutoSize = true, MinimumSize = new Size(110, 0), Margin = new Padding(3, 9, 3, 3) }, 0, row);
+            _flashRows.Controls.Add(new Label { Text = Tr.T(fixture.Name), AutoSize = true, MinimumSize = new Size(110, 0), Margin = new Padding(3, 9, 3, 3) }, 0, row);
             _flashRows.Controls.Add(flash, 1, row);
             _flashRows.Controls.Add(strobe, 2, row);
             row++;
@@ -723,7 +723,7 @@ internal sealed class LivePanel : UserControl
             var selected = _ctx.Engine.GetSelection().ToHashSet();
             foreach (var fixture in _ctx.Show.Fixtures)
             {
-                string label = fixture.Name + (fixture.Enabled ? "" : Tr.T(" (désactivé)"));
+                string label = Tr.T(fixture.Name) + (fixture.Enabled ? "" : Tr.T(" (désactivé)"));
                 int index = _fixtureList.Items.Add(new FixtureItem(fixture.Id, label));
                 _fixtureList.SetItemChecked(index, selected.Contains(fixture.Id));
             }
@@ -953,7 +953,7 @@ internal sealed class LivePanel : UserControl
             var scene = scenes[i];
             var button = new Button
             {
-                Text = $"{i + 1}. {scene.Name}" + (scene.IncludeInAuto ? "" : Tr.T("\n(hors auto)")),
+                Text = $"{i + 1}. {Tr.T(scene.Name)}" + (scene.IncludeInAuto ? "" : Tr.T("\n(hors auto)")),
                 Size = new Size(150, 54),
                 Tag = scene.Id,
                 Margin = new Padding(4),
@@ -989,7 +989,7 @@ internal sealed class LivePanel : UserControl
             scene.Effects = snapshot.Effects;
             scene.Selection = snapshot.Selection;
             _ctx.MarkDirty();
-            _ctx.Status(Tr.F("Scène « {0} » mise à jour.", scene.Name));
+            _ctx.Status(Tr.F("Scène « {0} » mise à jour.", Tr.T(scene.Name)));
         });
         menu.Items.Add(Tr.T("Renommer…"), null, (_, _) =>
         {
@@ -1015,7 +1015,7 @@ internal sealed class LivePanel : UserControl
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(Tr.T("Supprimer…"), null, (_, _) =>
         {
-            if (Ui.Confirm(FindForm()!, Tr.F("Supprimer la scène « {0} » ?", scene.Name)))
+            if (Ui.Confirm(FindForm()!, Tr.F("Supprimer la scène « {0} » ?", Tr.T(scene.Name))))
             {
                 _ctx.Show.Scenes.Remove(scene);
                 _ctx.MarkDirty();
@@ -1127,7 +1127,7 @@ internal sealed class LivePanel : UserControl
         }
 
         var current = scenes[Math.Clamp(_autoIndex, 0, scenes.Count - 1)];
-        _autoStatus.Text = Tr.F("En cours : « {0} » — suivante dans {1:0.0} s", current.Name, (Math.Max(0, interval - (now - _autoLastSwitch))));
+        _autoStatus.Text = Tr.F("En cours : « {0} » — suivante dans {1:0.0} s", Tr.T(current.Name), (Math.Max(0, interval - (now - _autoLastSwitch))));
     }
 
     // =================================================================================

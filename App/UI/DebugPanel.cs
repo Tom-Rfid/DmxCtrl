@@ -203,7 +203,7 @@ internal sealed class DebugPanel : UserControl
                 continue;
             }
             var def = profile.Channels[channel - fixture.Address];
-            return $"{fixture.Name} › {Tr.T(def.Name)}" + (def.Verified ? "" : " (?)") + (fixture.Enabled ? "" : Tr.T(" [désactivé]"));
+            return $"{Tr.T(fixture.Name)} › {Tr.T(def.Name)}" + (def.Verified ? "" : " (?)") + (fixture.Enabled ? "" : Tr.T(" [désactivé]"));
         }
         return Tr.T("(libre)");
     }

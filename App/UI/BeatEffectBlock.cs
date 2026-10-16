@@ -127,7 +127,7 @@ internal sealed class BeatEffectBlock : TableLayoutPanel
     {
         _ctx.Engine.SetBeatEffect(_fixture.Id, _run.Checked);
         UpdateRunButton();
-        _ctx.Status(_run.Checked ? Tr.F("{0} : effet au tempo lancé.", _fixture.Name) : Tr.F("{0} : effet au tempo arrêté.", _fixture.Name));
+        _ctx.Status(_run.Checked ? Tr.F("{0} : effet au tempo lancé.", Tr.T(_fixture.Name)) : Tr.F("{0} : effet au tempo arrêté.", Tr.T(_fixture.Name)));
     }
 
     /// <summary>Stops the effect (ALL OFF button of the tab).</summary>

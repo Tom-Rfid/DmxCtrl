@@ -632,7 +632,7 @@ internal sealed class MainForm : Form
             var page = new TabPage(TabTitle(fixture, profile)) { Tag = fixture.Id };
             if (profile is null)
             {
-                page.Controls.Add(Ui.Text(Tr.F("Profil introuvable pour « {0} » : corrige-le dans Appareils > Patch.", fixture.Name), bold: true, color: Color.DarkRed));
+                page.Controls.Add(Ui.Text(Tr.F("Profil introuvable pour « {0} » : corrige-le dans Appareils > Patch.", Tr.T(fixture.Name)), bold: true, color: Color.DarkRed));
             }
             else
             {
@@ -667,7 +667,7 @@ internal sealed class MainForm : Form
 
     /// <summary>Tab title: fixture name, "(disabled)" and "(?)" for an unchecked profile.</summary>
     private static string TabTitle(FixtureInstance fixture, FixtureProfile? profile) =>
-        fixture.Name + (fixture.Enabled ? "" : Tr.T(" (désactivé)")) + (profile is not null && !profile.IsFullyVerified ? " (?)" : "");
+        Tr.T(fixture.Name) + (fixture.Enabled ? "" : Tr.T(" (désactivé)")) + (profile is not null && !profile.IsFullyVerified ? " (?)" : "");
 
     /// <summary>Banner shown on the tab of a disabled fixture, with a button to enable it.</summary>
     private Control BuildDisabledBar(FixtureInstance fixture)

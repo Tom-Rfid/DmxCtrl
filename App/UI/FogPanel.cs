@@ -53,7 +53,7 @@ internal sealed class FogStrip : FlowLayoutPanel
 
         if (showName)
         {
-            Controls.Add(Ui.Text(fixture.Name + " :", bold: true));
+            Controls.Add(Ui.Text(Tr.T(fixture.Name) + " :", bold: true));
         }
         var every = new Label { Text = Tr.T("un jet toutes les"), AutoSize = true, Margin = new Padding(3, 9, 2, 3) };
         var minutes = new Label { Text = Tr.T("min"), AutoSize = true, Margin = new Padding(2, 9, 3, 3) };
@@ -70,7 +70,7 @@ internal sealed class FogStrip : FlowLayoutPanel
             int n = (int)_interval.Value;
             _ctx.Engine.EditShow(_ => _fixture.Fog.SetIntervalMinutes(n));
             _ctx.MarkDirty();
-            _ctx.Status(Tr.F("{0} : mode auto, un jet de {1:0.#} s toutes les {2} min.", _fixture.Name, _fixture.Fog.DurationSeconds, n));
+            _ctx.Status(Tr.F("{0} : mode auto, un jet de {1:0.#} s toutes les {2} min.", Tr.T(_fixture.Name), _fixture.Fog.DurationSeconds, n));
             UpdateStatus();
         };
         _shotLength.Margin = new Padding(0, 3, 6, 0);
@@ -105,7 +105,7 @@ internal sealed class FogStrip : FlowLayoutPanel
         _shot.Click += (_, _) =>
         {
             _ctx.Engine.FogShot(_fixture.Id);
-            _ctx.Status(Tr.F("{0} : coup de fumée de {1:0.#} s.", _fixture.Name, _fixture.Fog.ShotSeconds));
+            _ctx.Status(Tr.F("{0} : coup de fumée de {1:0.#} s.", Tr.T(_fixture.Name), _fixture.Fog.ShotSeconds));
             UpdateStatus();
         };
         _auto.CheckedChanged += (_, _) =>
@@ -116,8 +116,8 @@ internal sealed class FogStrip : FlowLayoutPanel
             }
             _ctx.Engine.SetFogAuto(_fixture.Id, _auto.Checked);
             _ctx.Status(_auto.Checked
-                ? Tr.F("{0} : mode AUTO ({1:0.#} s de fumée toutes les {2:0.#} s).", _fixture.Name, _fixture.Fog.DurationSeconds, (_fixture.Fog.DurationSeconds + _fixture.Fog.DelaySeconds))
-                : Tr.F("{0} : mode manuel.", _fixture.Name));
+                ? Tr.F("{0} : mode AUTO ({1:0.#} s de fumée toutes les {2:0.#} s).", Tr.T(_fixture.Name), _fixture.Fog.DurationSeconds, (_fixture.Fog.DurationSeconds + _fixture.Fog.DelaySeconds))
+                : Tr.F("{0} : mode manuel.", Tr.T(_fixture.Name)));
             UpdateStatus();
         };
         _stop.Click += (_, _) =>
@@ -280,7 +280,7 @@ internal sealed class FogBanner : FlowLayoutPanel
                 _ctx.Engine.FogShot(m.Id);
             }
             _ctx.Status(Tr.T("Coup de fumée sur toutes les machines : ") +
-                        string.Join(", ", machines.Select(m => Tr.F("{0} {1:0.#} s", m.Name, m.Fog.ShotSeconds))) + ".");
+                        string.Join(", ", machines.Select(m => Tr.F("{0} {1:0.#} s", Tr.T(m.Name), m.Fog.ShotSeconds))) + ".");
         };
         return Ui.Flow(0, Ui.Text(Tr.F("Toutes les machines ({0}) :", machines.Count), bold: true), hold, shot);
     }
@@ -318,7 +318,7 @@ internal sealed class FogPanel : UserControl
         string model = profile.Name.StartsWith(profile.Manufacturer, StringComparison.OrdinalIgnoreCase)
             ? Tr.T(profile.Name)
             : $"{profile.Manufacturer} {Tr.T(profile.Name)}".Trim();
-        page.Controls.Add(new Label { Text = $"{fixture.Name}  —  {model}", AutoSize = true, Font = Ui.TitleFont });
+        page.Controls.Add(new Label { Text = $"{Tr.T(fixture.Name)}  —  {model}", AutoSize = true, Font = Ui.TitleFont });
         page.Controls.Add(Ui.Text(Tr.F("Adresse DMX {0} : canaux {1} à {2}", fixture.Address, fixture.Address, fixture.EndAddress(profile)), color: Color.DimGray));
 
         // ---------------- Status and controls ----------------
@@ -328,7 +328,7 @@ internal sealed class FogPanel : UserControl
         {
             _ctx.Engine.MarkFogPoweredOn(_fixture.Id);
             strip.UpdateStatus();
-            _ctx.Status(Tr.F("{0} : chauffe estimée à {1:0.#} min à partir de maintenant.", _fixture.Name, _fixture.Fog.WarmupMinutes));
+            _ctx.Status(Tr.F("{0} : chauffe estimée à {1:0.#} min à partir de maintenant.", Tr.T(_fixture.Name), _fixture.Fog.WarmupMinutes));
         };
         var commands = Ui.Table(1);
         commands.Controls.Add(strip);
