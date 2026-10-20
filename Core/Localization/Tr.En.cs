@@ -854,5 +854,6 @@ public static partial class Tr
         ["Aucune lyre ni Spider actif dans le patch."] = "No enabled head or Spider in the patch.",
         ["Balayage auto lancé."] = "Auto sweep started.",
         ["Balayage auto arrêté."] = "Auto sweep stopped.",
+        ["Liaison perdue — nouvelle tentative dans {0:0} s"] = "Link lost — retrying in {0:0} s",
     };
 }

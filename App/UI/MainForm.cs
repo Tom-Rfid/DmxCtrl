@@ -80,6 +80,7 @@ internal sealed class MainForm : Form
     private bool _wantConnected;     // the user wants to be connected (reconnect if the link drops)
     private string? _wantedPort;
     private DateTime _nextReconnect;
+    private const double ReconnectSeconds = 3; // pause between two automatic reconnection attempts
     private int _reconnectAttempts;
     private bool _closing;
 
@@ -825,6 +826,7 @@ internal sealed class MainForm : Form
         else
         {
             Log(Tr.F("Échec de connexion sur {0} : {1}", port, error));
+            _nextReconnect = DateTime.Now.AddSeconds(ReconnectSeconds); // counted from the end of the failed attempt
             if (!quiet)
             {
                 MessageBox.Show(this, Tr.F("Impossible de se connecter sur {0} :\n{1}\n\n", port, error) +
@@ -850,7 +852,7 @@ internal sealed class MainForm : Form
     {
         Log(Tr.F("Liaison perdue : {0}", message));
         _link.Disconnect(); // never throws (dead link included)
-        _nextReconnect = DateTime.Now.AddSeconds(2);
+        _nextReconnect = DateTime.Now.AddSeconds(ReconnectSeconds);
         UpdateConnectionUi();
     }
 
@@ -879,7 +881,8 @@ internal sealed class MainForm : Form
         }
         else if (_wantConnected)
         {
-            _lblLink.Text = Tr.T("Liaison perdue — nouvelle tentative dans quelques secondes");
+            double wait = Math.Max(0, (_nextReconnect - DateTime.Now).TotalSeconds);
+            _lblLink.Text = Tr.F("Liaison perdue — nouvelle tentative dans {0:0} s", Math.Ceiling(wait));
             _lblLink.ForeColor = Ui.WarningColor;
         }
         else
@@ -931,7 +934,7 @@ internal sealed class MainForm : Form
         if (_wantConnected && !_link.IsConnected && !_connecting && _wantedPort is not null && DateTime.Now >= _nextReconnect)
         {
             _reconnectAttempts++;
-            _nextReconnect = DateTime.Now.AddSeconds(4);
+            _nextReconnect = DateTime.MaxValue; // set again when the attempt fails
             _ = ConnectAsync(_wantedPort, quiet: true);
         }
 
