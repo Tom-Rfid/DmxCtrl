@@ -1,0 +1,2042 @@
+{
+  "FormatVersion": 1,
+  "Name": "Soirée par défaut",
+  "Profiles": [
+    {
+      "Id": "chauvet-spot-260x-14ch",
+      "Name": "Intimidator Spot 260X (14 canaux)",
+      "Manufacturer": "Chauvet DJ",
+      "Notes": "Table DMX officielle (guide rapide Chauvet Rev. 1). Mode à régler dans le menu de la lyre : Run Mode > DMX > 14CH ou 8CH. Les couleurs de l'onglet Soirée utilisent les presets de la roue (Rouge, Vert…). Adresse de départ max : 499.",
+      "DefaultFixtureName": "Lyre",
+      "Revision": 2,
+      "Channels": [
+        {
+          "Name": "Pan",
+          "Type": "Pan",
+          "Default": 128,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "0-255 = 0-540°.",
+          "Presets": []
+        },
+        {
+          "Name": "Pan fin",
+          "Type": "PanFine",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Tilt",
+          "Type": "Tilt",
+          "Default": 128,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "0-255 = 0-234°.",
+          "Presets": []
+        },
+        {
+          "Name": "Tilt fin",
+          "Type": "TiltFine",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Vitesse pan/tilt",
+          "Type": "PanTiltSpeed",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "0 = le plus rapide, 255 = le plus lent.",
+          "Presets": []
+        },
+        {
+          "Name": "Roue de couleurs",
+          "Type": "ColorWheel",
+          "Default": 3,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Blanc",
+              "From": 0,
+              "To": 6
+            },
+            {
+              "Name": "Rouge",
+              "From": 7,
+              "To": 13
+            },
+            {
+              "Name": "Orange",
+              "From": 14,
+              "To": 20
+            },
+            {
+              "Name": "Jaune",
+              "From": 21,
+              "To": 27
+            },
+            {
+              "Name": "Vert",
+              "From": 28,
+              "To": 34
+            },
+            {
+              "Name": "Bleu",
+              "From": 35,
+              "To": 41
+            },
+            {
+              "Name": "CTO",
+              "From": 42,
+              "To": 48
+            },
+            {
+              "Name": "Cyan",
+              "From": 49,
+              "To": 55
+            },
+            {
+              "Name": "Magenta",
+              "From": 56,
+              "To": 62
+            },
+            {
+              "Name": "Blanc",
+              "From": 63,
+              "To": 64
+            },
+            {
+              "Name": "Position libre de la roue",
+              "From": 65,
+              "To": 189
+            },
+            {
+              "Name": "Arc-en-ciel (rapide → lent)",
+              "From": 190,
+              "To": 221
+            },
+            {
+              "Name": "Arrêt",
+              "From": 222,
+              "To": 223
+            },
+            {
+              "Name": "Arc-en-ciel inversé (lent → rapide)",
+              "From": 224,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": [
+            {
+              "Name": "Blanc",
+              "Value": 3
+            },
+            {
+              "Name": "Rouge",
+              "Value": 10
+            },
+            {
+              "Name": "Orange",
+              "Value": 17
+            },
+            {
+              "Name": "Jaune",
+              "Value": 24
+            },
+            {
+              "Name": "Vert",
+              "Value": 31
+            },
+            {
+              "Name": "Bleu",
+              "Value": 38
+            },
+            {
+              "Name": "CTO (blanc chaud)",
+              "Value": 45
+            },
+            {
+              "Name": "Cyan",
+              "Value": 52
+            },
+            {
+              "Name": "Magenta",
+              "Value": 59
+            },
+            {
+              "Name": "Arc-en-ciel lent",
+              "Value": 220
+            },
+            {
+              "Name": "Arc-en-ciel rapide",
+              "Value": 191
+            }
+          ]
+        },
+        {
+          "Name": "Gobo",
+          "Type": "Gobo",
+          "Default": 3,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Ouvert",
+              "From": 0,
+              "To": 7
+            },
+            {
+              "Name": "Gobo 1",
+              "From": 8,
+              "To": 15
+            },
+            {
+              "Name": "Gobo 2",
+              "From": 16,
+              "To": 23
+            },
+            {
+              "Name": "Gobo 3",
+              "From": 24,
+              "To": 31
+            },
+            {
+              "Name": "Gobo 4",
+              "From": 32,
+              "To": 39
+            },
+            {
+              "Name": "Gobo 5",
+              "From": 40,
+              "To": 47
+            },
+            {
+              "Name": "Gobo 6",
+              "From": 48,
+              "To": 55
+            },
+            {
+              "Name": "Gobo 7",
+              "From": 56,
+              "To": 63
+            },
+            {
+              "Name": "Gobo 7 qui tremble",
+              "From": 64,
+              "To": 71
+            },
+            {
+              "Name": "Gobo 6 qui tremble",
+              "From": 72,
+              "To": 79
+            },
+            {
+              "Name": "Gobo 5 qui tremble",
+              "From": 80,
+              "To": 87
+            },
+            {
+              "Name": "Gobo 4 qui tremble",
+              "From": 88,
+              "To": 95
+            },
+            {
+              "Name": "Gobo 3 qui tremble",
+              "From": 96,
+              "To": 103
+            },
+            {
+              "Name": "Gobo 2 qui tremble",
+              "From": 104,
+              "To": 111
+            },
+            {
+              "Name": "Gobo 1 qui tremble",
+              "From": 112,
+              "To": 119
+            },
+            {
+              "Name": "Ouvert",
+              "From": 120,
+              "To": 127
+            },
+            {
+              "Name": "Défilement (lent → rapide)",
+              "From": 128,
+              "To": 189
+            },
+            {
+              "Name": "Arrêt",
+              "From": 190,
+              "To": 193
+            },
+            {
+              "Name": "Défilement inverse (lent → rapide)",
+              "From": 194,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": [
+            {
+              "Name": "Ouvert (sans gobo)",
+              "Value": 3
+            },
+            {
+              "Name": "Gobo 1",
+              "Value": 11
+            },
+            {
+              "Name": "Gobo 2",
+              "Value": 19
+            },
+            {
+              "Name": "Gobo 3",
+              "Value": 27
+            },
+            {
+              "Name": "Gobo 4",
+              "Value": 35
+            },
+            {
+              "Name": "Gobo 5",
+              "Value": 43
+            },
+            {
+              "Name": "Gobo 6",
+              "Value": 51
+            },
+            {
+              "Name": "Gobo 7",
+              "Value": 59
+            },
+            {
+              "Name": "Défilement des gobos",
+              "Value": 160
+            }
+          ]
+        },
+        {
+          "Name": "Rotation gobo",
+          "Type": "GoboRotation",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Pas de rotation",
+              "From": 0,
+              "To": 7
+            },
+            {
+              "Name": "Sens horaire (lent → rapide)",
+              "From": 8,
+              "To": 119
+            },
+            {
+              "Name": "Anti-horaire (lent → rapide)",
+              "From": 120,
+              "To": 231
+            },
+            {
+              "Name": "Va-et-vient (lent → rapide)",
+              "From": 232,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": [
+            {
+              "Name": "Arrêt",
+              "Value": 0
+            },
+            {
+              "Name": "Horaire lent",
+              "Value": 20
+            },
+            {
+              "Name": "Horaire rapide",
+              "Value": 115
+            },
+            {
+              "Name": "Anti-horaire lent",
+              "Value": 132
+            },
+            {
+              "Name": "Anti-horaire rapide",
+              "Value": 228
+            },
+            {
+              "Name": "Va-et-vient",
+              "Value": 244
+            }
+          ]
+        },
+        {
+          "Name": "Prisme",
+          "Type": "Prism",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Sans prisme",
+              "From": 0,
+              "To": 15
+            },
+            {
+              "Name": "Prisme 3 facettes",
+              "From": 16,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": [
+            {
+              "Name": "Sans prisme",
+              "Value": 0
+            },
+            {
+              "Name": "Prisme 3 facettes",
+              "Value": 255
+            }
+          ]
+        },
+        {
+          "Name": "Focus",
+          "Type": "Focus",
+          "Default": 128,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Dimmer",
+          "Type": "Dimmer",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Obturateur / strobe",
+          "Type": "Shutter",
+          "Default": 255,
+          "StrobeSlow": 8,
+          "StrobeFast": 76,
+          "Ranges": [
+            {
+              "Name": "Fermé",
+              "From": 0,
+              "To": 3
+            },
+            {
+              "Name": "Ouvert",
+              "From": 4,
+              "To": 7
+            },
+            {
+              "Name": "Strobe (lent → rapide)",
+              "From": 8,
+              "To": 76
+            },
+            {
+              "Name": "Strobe pulsé (lent → rapide)",
+              "From": 77,
+              "To": 145
+            },
+            {
+              "Name": "Strobe aléatoire (lent → rapide)",
+              "From": 146,
+              "To": 215
+            },
+            {
+              "Name": "Ouvert",
+              "From": 216,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "0-3 = fermé (pas de lumière), 216-255 = ouvert. Strobe 8-76, pulsé 77-145, aléatoire 146-215.",
+          "Presets": [
+            {
+              "Name": "Fermé",
+              "Value": 0
+            },
+            {
+              "Name": "Strobe lent",
+              "Value": 8
+            },
+            {
+              "Name": "Strobe rapide",
+              "Value": 76
+            },
+            {
+              "Name": "Pulsé lent",
+              "Value": 77
+            },
+            {
+              "Name": "Pulsé rapide",
+              "Value": 145
+            },
+            {
+              "Name": "Aléatoire lent",
+              "Value": 146
+            },
+            {
+              "Name": "Aléatoire rapide",
+              "Value": 215
+            },
+            {
+              "Name": "Ouvert",
+              "Value": 255
+            }
+          ]
+        },
+        {
+          "Name": "Fonctions (blackout en mouvement, resets)",
+          "Type": "Control",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "Laisser à 0. 8-55 : blackout pendant les mouvements ; 96-159 : resets (pan, tilt, roues, prisme, focus, tout).",
+          "Presets": [
+            {
+              "Name": "Rien",
+              "Value": 0
+            },
+            {
+              "Name": "Blackout pendant pan/tilt",
+              "Value": 11
+            },
+            {
+              "Name": "Blackout pendant roue couleurs",
+              "Value": 19
+            },
+            {
+              "Name": "Blackout pendant roue gobos",
+              "Value": 27
+            },
+            {
+              "Name": "Blackout pendant tout mouvement",
+              "Value": 51
+            },
+            {
+              "Name": "Reset pan",
+              "Value": 99
+            },
+            {
+              "Name": "Reset tilt",
+              "Value": 107
+            },
+            {
+              "Name": "Reset couleurs",
+              "Value": 115
+            },
+            {
+              "Name": "Reset gobos",
+              "Value": 123
+            },
+            {
+              "Name": "Reset prisme",
+              "Value": 139
+            },
+            {
+              "Name": "Reset focus",
+              "Value": 147
+            },
+            {
+              "Name": "Reset complet",
+              "Value": 155
+            }
+          ]
+        },
+        {
+          "Name": "Macros de mouvement",
+          "Type": "Macro",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "0-7 = aucune. Macros 1-8 : 8-135 (pas de 16) ; au son 1-8 : 136-255.",
+          "Presets": [
+            {
+              "Name": "Aucune",
+              "Value": 0
+            },
+            {
+              "Name": "Macro 1",
+              "Value": 15
+            },
+            {
+              "Name": "Macro 2",
+              "Value": 31
+            },
+            {
+              "Name": "Macro 3",
+              "Value": 47
+            },
+            {
+              "Name": "Macro 4",
+              "Value": 63
+            },
+            {
+              "Name": "Macro 5",
+              "Value": 79
+            },
+            {
+              "Name": "Macro 6",
+              "Value": 95
+            },
+            {
+              "Name": "Macro 7",
+              "Value": 111
+            },
+            {
+              "Name": "Macro 8",
+              "Value": 127
+            },
+            {
+              "Name": "Macro au son 1",
+              "Value": 143
+            },
+            {
+              "Name": "Macro au son 2",
+              "Value": 159
+            },
+            {
+              "Name": "Macro au son 3",
+              "Value": 175
+            },
+            {
+              "Name": "Macro au son 4",
+              "Value": 191
+            },
+            {
+              "Name": "Macro au son 5",
+              "Value": 207
+            },
+            {
+              "Name": "Macro au son 6",
+              "Value": 223
+            },
+            {
+              "Name": "Macro au son 7",
+              "Value": 239
+            },
+            {
+              "Name": "Macro au son 8",
+              "Value": 251
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Id": "mindi-mini-spider-15ch",
+      "Name": "Mini Spider 8x3W RGBW (15 canaux + 1 vide = 16)",
+      "Manufacturer": "Mindi",
+      "Notes": "Le Spider ignore le canal de son adresse et commence au suivant (constaté sur l'appareil) : le canal 1 du profil est donc vide. Saisis dans le patch l'adresse affichée sur le Spider. Table des canaux 2 à 16 relevée sur la notice ; la couleur de chaque LED (canaux 6 à 13) est SUPPOSÉE (rouge, vert, bleu, blanc, puis pareil) : à vérifier et corriger si besoin.",
+      "DefaultFixtureName": "Spider",
+      "Revision": 1,
+      "Channels": [
+        {
+          "Name": "(vide : décalage du Spider)",
+          "Type": "Generic",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "Le Spider n'écoute pas ce canal : il démarre au canal suivant. Laisser à 0.",
+          "Presets": []
+        },
+        {
+          "Name": "Moteur 1 (0-135°)",
+          "Type": "Motor",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Moteur 2 (0-135°)",
+          "Type": "Motor",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Dimmer général",
+          "Type": "Dimmer",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Strobe (0 = arrêt)",
+          "Type": "Strobe",
+          "Default": 0,
+          "StrobeSlow": 10,
+          "StrobeFast": 255,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "LED 1",
+          "Type": "Red",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "Intensité confirmée, couleur supposée.",
+          "Presets": []
+        },
+        {
+          "Name": "LED 2",
+          "Type": "Green",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "Intensité confirmée, couleur supposée.",
+          "Presets": []
+        },
+        {
+          "Name": "LED 3",
+          "Type": "Blue",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "Intensité confirmée, couleur supposée.",
+          "Presets": []
+        },
+        {
+          "Name": "LED 4",
+          "Type": "White",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "Intensité confirmée, couleur supposée.",
+          "Presets": []
+        },
+        {
+          "Name": "LED 5",
+          "Type": "Red",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "Intensité confirmée, couleur supposée.",
+          "Presets": []
+        },
+        {
+          "Name": "LED 6",
+          "Type": "Green",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "Intensité confirmée, couleur supposée.",
+          "Presets": []
+        },
+        {
+          "Name": "LED 7",
+          "Type": "Blue",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "Intensité confirmée, couleur supposée.",
+          "Presets": []
+        },
+        {
+          "Name": "LED 8",
+          "Type": "White",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "Intensité confirmée, couleur supposée.",
+          "Presets": []
+        },
+        {
+          "Name": "Macros d'effets",
+          "Type": "Macro",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Vitesse des effets",
+          "Type": "EffectSpeed",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Reset",
+          "Type": "Control",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "Laisser à 0.",
+          "Presets": []
+        }
+      ]
+    },
+    {
+      "Id": "showtec-galactic-rgy140-mkii",
+      "Name": "Galactic RGY-140 MKII Value Line (laser, 10 canaux)",
+      "Manufacturer": "Showtec",
+      "Notes": "Table DMX du manuel Highlite (code 51335). Le canal 1 doit être en « DMX » (240-255) pour piloter motifs, couleurs et mouvements ; sinon le laser joue ses programmes internes. Couleur 0-24 = laser éteint. SÉCURITÉ : connecteur d'interlock obligatoire ; ne jamais viser le public à hauteur des yeux.",
+      "DefaultFixtureName": "Laser",
+      "Revision": 1,
+      "Channels": [
+        {
+          "Name": "Mode / programmes",
+          "Type": "LaserMode",
+          "Default": 250,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Programme auto rouge/vert/jaune",
+              "From": 0,
+              "To": 29
+            },
+            {
+              "Name": "Programme auto vert",
+              "From": 30,
+              "To": 59
+            },
+            {
+              "Name": "Programme auto rouge",
+              "From": 60,
+              "To": 89
+            },
+            {
+              "Name": "Programme auto jaune",
+              "From": 90,
+              "To": 119
+            },
+            {
+              "Name": "Programme au son rouge/vert/jaune",
+              "From": 120,
+              "To": 149
+            },
+            {
+              "Name": "Programme au son vert",
+              "From": 150,
+              "To": 179
+            },
+            {
+              "Name": "Programme au son rouge",
+              "From": 180,
+              "To": 209
+            },
+            {
+              "Name": "Programme au son jaune",
+              "From": 210,
+              "To": 239
+            },
+            {
+              "Name": "DMX (manuel)",
+              "From": 240,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": [
+            {
+              "Name": "Auto rouge/vert/jaune",
+              "Value": 15
+            },
+            {
+              "Name": "Auto vert",
+              "Value": 45
+            },
+            {
+              "Name": "Auto rouge",
+              "Value": 75
+            },
+            {
+              "Name": "Auto jaune",
+              "Value": 105
+            },
+            {
+              "Name": "Son rouge/vert/jaune",
+              "Value": 135
+            },
+            {
+              "Name": "Son vert",
+              "Value": 165
+            },
+            {
+              "Name": "Son rouge",
+              "Value": 195
+            },
+            {
+              "Name": "Son jaune",
+              "Value": 225
+            },
+            {
+              "Name": "DMX (manuel)",
+              "Value": 250
+            }
+          ]
+        },
+        {
+          "Name": "Motif",
+          "Type": "LaserPattern",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Motif 1",
+              "From": 0,
+              "To": 7
+            },
+            {
+              "Name": "Motif 2",
+              "From": 8,
+              "To": 15
+            },
+            {
+              "Name": "Motif 3",
+              "From": 16,
+              "To": 23
+            },
+            {
+              "Name": "Motif 4",
+              "From": 24,
+              "To": 31
+            },
+            {
+              "Name": "Motif 5",
+              "From": 32,
+              "To": 39
+            },
+            {
+              "Name": "Motif 6",
+              "From": 40,
+              "To": 47
+            },
+            {
+              "Name": "Motif 7",
+              "From": 48,
+              "To": 55
+            },
+            {
+              "Name": "Motif 8",
+              "From": 56,
+              "To": 63
+            },
+            {
+              "Name": "Motif 9",
+              "From": 64,
+              "To": 71
+            },
+            {
+              "Name": "Motif 10",
+              "From": 72,
+              "To": 79
+            },
+            {
+              "Name": "Motif 11",
+              "From": 80,
+              "To": 87
+            },
+            {
+              "Name": "Motif 12",
+              "From": 88,
+              "To": 95
+            },
+            {
+              "Name": "Motif 13",
+              "From": 96,
+              "To": 103
+            },
+            {
+              "Name": "Motif 14",
+              "From": 104,
+              "To": 111
+            },
+            {
+              "Name": "Motif 15",
+              "From": 112,
+              "To": 119
+            },
+            {
+              "Name": "Motif 16",
+              "From": 120,
+              "To": 127
+            },
+            {
+              "Name": "Motif 17",
+              "From": 128,
+              "To": 135
+            },
+            {
+              "Name": "Motif 18",
+              "From": 136,
+              "To": 143
+            },
+            {
+              "Name": "Motif 19",
+              "From": 144,
+              "To": 151
+            },
+            {
+              "Name": "Motif 20",
+              "From": 152,
+              "To": 159
+            },
+            {
+              "Name": "Motif 21",
+              "From": 160,
+              "To": 167
+            },
+            {
+              "Name": "Motif 22",
+              "From": 168,
+              "To": 175
+            },
+            {
+              "Name": "Motif 23",
+              "From": 176,
+              "To": 183
+            },
+            {
+              "Name": "Motif 24",
+              "From": 184,
+              "To": 191
+            },
+            {
+              "Name": "Motif 25",
+              "From": 192,
+              "To": 199
+            },
+            {
+              "Name": "Motif 26",
+              "From": 200,
+              "To": 207
+            },
+            {
+              "Name": "Motif 27",
+              "From": 208,
+              "To": 215
+            },
+            {
+              "Name": "Motif 28",
+              "From": 216,
+              "To": 223
+            },
+            {
+              "Name": "Motif 29",
+              "From": 224,
+              "To": 231
+            },
+            {
+              "Name": "Motif 30",
+              "From": 232,
+              "To": 239
+            },
+            {
+              "Name": "Motif 31",
+              "From": 240,
+              "To": 247
+            },
+            {
+              "Name": "Motif 32",
+              "From": 248,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "32 motifs de 8 valeurs chacun (motif 1 = 0-7, motif 2 = 8-15…).",
+          "Presets": []
+        },
+        {
+          "Name": "Couleur",
+          "Type": "LaserColor",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Éteint (blackout)",
+              "From": 0,
+              "To": 24
+            },
+            {
+              "Name": "Couleurs d'origine",
+              "From": 25,
+              "To": 49
+            },
+            {
+              "Name": "Rouge",
+              "From": 50,
+              "To": 74
+            },
+            {
+              "Name": "Vert",
+              "From": 75,
+              "To": 99
+            },
+            {
+              "Name": "Jaune",
+              "From": 100,
+              "To": 124
+            },
+            {
+              "Name": "Alternance rouge ↔ vert",
+              "From": 125,
+              "To": 149
+            },
+            {
+              "Name": "Alternance vert ↔ jaune",
+              "From": 150,
+              "To": 174
+            },
+            {
+              "Name": "Alternance rouge ↔ jaune",
+              "From": 175,
+              "To": 199
+            },
+            {
+              "Name": "Alternance rouge / vert / jaune",
+              "From": 200,
+              "To": 224
+            },
+            {
+              "Name": "Changement continu",
+              "From": 225,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "0-24 = laser éteint (blackout).",
+          "Presets": [
+            {
+              "Name": "Éteint",
+              "Value": 0
+            },
+            {
+              "Name": "Couleurs d'origine",
+              "Value": 37
+            },
+            {
+              "Name": "Rouge",
+              "Value": 62
+            },
+            {
+              "Name": "Vert",
+              "Value": 87
+            },
+            {
+              "Name": "Jaune",
+              "Value": 112
+            },
+            {
+              "Name": "Rouge ↔ vert",
+              "Value": 137
+            },
+            {
+              "Name": "Vert ↔ jaune",
+              "Value": 162
+            },
+            {
+              "Name": "Rouge ↔ jaune",
+              "Value": 187
+            },
+            {
+              "Name": "Rouge / vert / jaune",
+              "Value": 212
+            },
+            {
+              "Name": "Changement continu",
+              "Value": 240
+            }
+          ]
+        },
+        {
+          "Name": "Strobe / vitesse de changement",
+          "Type": "Strobe",
+          "Default": 0,
+          "StrobeSlow": 25,
+          "StrobeFast": 255,
+          "Ranges": [
+            {
+              "Name": "Arrêt",
+              "From": 0,
+              "To": 24
+            },
+            {
+              "Name": "Lent → rapide",
+              "From": 25,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "Couleur fixe (25-124) : vitesse du strobe. Couleur alternée (125-255) : vitesse du changement. 0-24 = arrêt.",
+          "Presets": []
+        },
+        {
+          "Name": "Zoom",
+          "Type": "LaserZoom",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Taille fixe (100 % → 5 %)",
+              "From": 0,
+              "To": 127
+            },
+            {
+              "Name": "Zoom avant animé (lent → rapide)",
+              "From": 128,
+              "To": 169
+            },
+            {
+              "Name": "Zoom arrière animé (lent → rapide)",
+              "From": 170,
+              "To": 209
+            },
+            {
+              "Name": "Zoom avant + arrière (lent → rapide)",
+              "From": 210,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Mouvement X",
+          "Type": "LaserX",
+          "Default": 64,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Position fixe",
+              "From": 0,
+              "To": 127
+            },
+            {
+              "Name": "Mouvement horaire (lent → rapide)",
+              "From": 128,
+              "To": 191
+            },
+            {
+              "Name": "Mouvement anti-horaire (lent → rapide)",
+              "From": 192,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Mouvement Y",
+          "Type": "LaserY",
+          "Default": 64,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Position fixe",
+              "From": 0,
+              "To": 127
+            },
+            {
+              "Name": "Mouvement horaire (lent → rapide)",
+              "From": 128,
+              "To": 191
+            },
+            {
+              "Name": "Mouvement anti-horaire (lent → rapide)",
+              "From": 192,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Rotation axe Y",
+          "Type": "LaserRoll",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Angle fixe (0-359°)",
+              "From": 0,
+              "To": 127
+            },
+            {
+              "Name": "Rotation horaire (lent → rapide)",
+              "From": 128,
+              "To": 191
+            },
+            {
+              "Name": "Rotation anti-horaire (lent → rapide)",
+              "From": 192,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Rotation axe X",
+          "Type": "LaserRoll",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Angle fixe (0-359°)",
+              "From": 0,
+              "To": 127
+            },
+            {
+              "Name": "Rotation horaire (lent → rapide)",
+              "From": 128,
+              "To": 191
+            },
+            {
+              "Name": "Rotation anti-horaire (lent → rapide)",
+              "From": 192,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Rotation axe Z",
+          "Type": "LaserRoll",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [
+            {
+              "Name": "Angle fixe (0-359°)",
+              "From": 0,
+              "To": 127
+            },
+            {
+              "Name": "Rotation horaire (lent → rapide)",
+              "From": 128,
+              "To": 191
+            },
+            {
+              "Name": "Rotation anti-horaire (lent → rapide)",
+              "From": 192,
+              "To": 255
+            }
+          ],
+          "Verified": true,
+          "Notes": "Le manuel indique « horaire » pour 128-191 et 192-255 (probable coquille : 192-255 = anti-horaire).",
+          "Presets": []
+        }
+      ]
+    },
+    {
+      "Id": "par-led-36-rgb-uv-generic",
+      "Name": "PAR LED 36 RGB+UV (générique 8 canaux — à vérifier)",
+      "Manufacturer": "Générique",
+      "Notes": "Modèle GÉNÉRIQUE : la marque du PAR n'est pas connue, l'ordre des canaux est le plus courant pour ces PAR 36 LED RGB+UV (souvent mode « 8CH » ou « d008 » dans le menu). Vérifie chaque canal (curseurs ou onglet Debug) et corrige dans Appareils > Éditeur de profils si besoin.",
+      "DefaultFixtureName": "PAR UV",
+      "Revision": 1,
+      "Channels": [
+        {
+          "Name": "Dimmer",
+          "Type": "Dimmer",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Rouge",
+          "Type": "Red",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Vert",
+          "Type": "Green",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Bleu",
+          "Type": "Blue",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "UV",
+          "Type": "UV",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Strobe (0 = arrêt)",
+          "Type": "Strobe",
+          "Default": 0,
+          "StrobeSlow": 10,
+          "StrobeFast": 255,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "",
+          "Presets": []
+        },
+        {
+          "Name": "Mode / programmes",
+          "Type": "Macro",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "Laisser à 0 pour piloter les couleurs en direct.",
+          "Presets": []
+        },
+        {
+          "Name": "Vitesse des programmes",
+          "Type": "EffectSpeed",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": false,
+          "Notes": "",
+          "Presets": []
+        }
+      ]
+    },
+    {
+      "Id": "ayra-wsm02-mkiii",
+      "Name": "Ayra WSM02 MKIII (fumée, 1 canal)",
+      "Manufacturer": "Ayra",
+      "Notes": "Machine à fumée 1200 W, 1 canal DMX : débit de fumée 0-100 %. Adresse réglée avec les micro-interrupteurs (valeurs additionnées, ex. 17 = interrupteurs 1 + 5). Chauffe : environ 6 minutes après l'allumage. Le DMX ne va que dans un sens : la machine ne renvoie ni son état « prête » ni sa température (voyant « prête » à l'intérieur du réservoir).",
+      "DefaultFixtureName": "Fumée",
+      "Revision": 1,
+      "Channels": [
+        {
+          "Name": "Fumée (débit 0-100 %)",
+          "Type": "Fog",
+          "Default": 0,
+          "StrobeSlow": null,
+          "StrobeFast": null,
+          "Ranges": [],
+          "Verified": true,
+          "Notes": "Piloté par l'onglet de la machine (manuel / coup / auto) et le bandeau Fumée.",
+          "Presets": []
+        }
+      ]
+    }
+  ],
+  "Fixtures": [
+    {
+      "Id": "lyre-1",
+      "Name": "Lyre 1",
+      "ProfileId": "chauvet-spot-260x-14ch",
+      "Address": 1,
+      "Enabled": true,
+      "InvertPan": false,
+      "InvertTilt": false,
+      "MirrorMotors": false,
+      "NoStrobe": false,
+      "Flash": true,
+      "Fog": {
+        "LevelPercent": 100,
+        "DurationSeconds": 5,
+        "DelaySeconds": 60,
+        "WarmupMinutes": 6
+      }
+    },
+    {
+      "Id": "lyre-2",
+      "Name": "Lyre 2",
+      "ProfileId": "chauvet-spot-260x-14ch",
+      "Address": 15,
+      "Enabled": true,
+      "InvertPan": false,
+      "InvertTilt": false,
+      "MirrorMotors": false,
+      "NoStrobe": false,
+      "Flash": true,
+      "Fog": {
+        "LevelPercent": 100,
+        "DurationSeconds": 5,
+        "DelaySeconds": 60,
+        "WarmupMinutes": 6
+      }
+    },
+    {
+      "Id": "spider-1",
+      "Name": "Spider",
+      "ProfileId": "mindi-mini-spider-15ch",
+      "Address": 29,
+      "Enabled": true,
+      "InvertPan": false,
+      "InvertTilt": false,
+      "MirrorMotors": false,
+      "NoStrobe": false,
+      "Flash": true,
+      "Fog": {
+        "LevelPercent": 100,
+        "DurationSeconds": 5,
+        "DelaySeconds": 60,
+        "WarmupMinutes": 6
+      }
+    },
+    {
+      "Id": "4e310af4401a",
+      "Name": "Laser 1",
+      "ProfileId": "showtec-galactic-rgy140-mkii",
+      "Address": 45,
+      "Enabled": true,
+      "InvertPan": false,
+      "InvertTilt": false,
+      "MirrorMotors": false,
+      "NoStrobe": false,
+      "Flash": true,
+      "Fog": {
+        "LevelPercent": 100,
+        "DurationSeconds": 5,
+        "DelaySeconds": 60,
+        "WarmupMinutes": 6
+      }
+    },
+    {
+      "Id": "72e6565cffc9",
+      "Name": "PAR UV 1",
+      "ProfileId": "par-led-36-rgb-uv-generic",
+      "Address": 55,
+      "Enabled": true,
+      "InvertPan": false,
+      "InvertTilt": false,
+      "MirrorMotors": false,
+      "NoStrobe": false,
+      "Flash": true,
+      "Fog": {
+        "LevelPercent": 100,
+        "DurationSeconds": 5,
+        "DelaySeconds": 60,
+        "WarmupMinutes": 6
+      }
+    },
+    {
+      "Id": "358f86cd2ba5",
+      "Name": "Fumée 1",
+      "ProfileId": "ayra-wsm02-mkiii",
+      "Address": 63,
+      "Enabled": true,
+      "InvertPan": false,
+      "InvertTilt": false,
+      "MirrorMotors": false,
+      "NoStrobe": false,
+      "Flash": false,
+      "Fog": {
+        "LevelPercent": 100,
+        "DurationSeconds": 5,
+        "DelaySeconds": 60,
+        "WarmupMinutes": 6
+      }
+    }
+  ],
+  "Scenes": [
+    {
+      "Id": "0e52a589bd10",
+      "Name": "Noir",
+      "IncludeInAuto": false,
+      "Values": {
+        "lyre-1": [
+          128,
+          0,
+          128,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128,
+          0,
+          255,
+          0,
+          0
+        ],
+        "lyre-2": [
+          128,
+          0,
+          128,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128,
+          0,
+          255,
+          0,
+          0
+        ],
+        "spider-1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "Effects": {
+        "Shape": "None",
+        "SpeedCyclesPerMinute": 20,
+        "MovementSyncToBpm": false,
+        "BeatsPerCycle": 8,
+        "SizePercent": 40,
+        "SpreadPercent": 50,
+        "Mirror": false,
+        "ColorChase": false,
+        "ColorChaseStepSeconds": 1,
+        "ColorChaseSyncToBpm": false,
+        "ColorChaseBeatsPerStep": 2,
+        "ColorChaseAlternate": true,
+        "ColorChasePalette": [
+          "Rouge",
+          "Orange",
+          "Jaune",
+          "Vert",
+          "Cyan",
+          "Bleu",
+          "Violet",
+          "Magenta"
+        ],
+        "Strobe": false,
+        "StrobeHz": 4
+      },
+      "Selection": [
+        "lyre-1",
+        "lyre-2",
+        "spider-1"
+      ]
+    },
+    {
+      "Id": "ba52312473b3",
+      "Name": "Ambiance douce",
+      "IncludeInAuto": true,
+      "Values": {
+        "lyre-1": [
+          128,
+          0,
+          128,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128,
+          200,
+          255,
+          0,
+          0
+        ],
+        "lyre-2": [
+          128,
+          0,
+          128,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128,
+          200,
+          255,
+          0,
+          0
+        ],
+        "spider-1": [
+          0,
+          0,
+          0,
+          170,
+          0,
+          0,
+          0,
+          255,
+          0,
+          0,
+          0,
+          255,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "Effects": {
+        "Shape": "Circle",
+        "SpeedCyclesPerMinute": 6,
+        "MovementSyncToBpm": false,
+        "BeatsPerCycle": 8,
+        "SizePercent": 30,
+        "SpreadPercent": 100,
+        "Mirror": false,
+        "ColorChase": false,
+        "ColorChaseStepSeconds": 1,
+        "ColorChaseSyncToBpm": false,
+        "ColorChaseBeatsPerStep": 2,
+        "ColorChaseAlternate": true,
+        "ColorChasePalette": [
+          "Rouge",
+          "Orange",
+          "Jaune",
+          "Vert",
+          "Cyan",
+          "Bleu",
+          "Violet",
+          "Magenta"
+        ],
+        "Strobe": false,
+        "StrobeHz": 4
+      },
+      "Selection": [
+        "lyre-1",
+        "lyre-2",
+        "spider-1"
+      ]
+    },
+    {
+      "Id": "a6e2a0da6714",
+      "Name": "Fête (couleurs + huit)",
+      "IncludeInAuto": true,
+      "Values": {
+        "lyre-1": [
+          128,
+          0,
+          128,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128,
+          255,
+          255,
+          0,
+          0
+        ],
+        "lyre-2": [
+          128,
+          0,
+          128,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128,
+          255,
+          255,
+          0,
+          0
+        ],
+        "spider-1": [
+          0,
+          0,
+          0,
+          255,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "Effects": {
+        "Shape": "Eight",
+        "SpeedCyclesPerMinute": 20,
+        "MovementSyncToBpm": true,
+        "BeatsPerCycle": 8,
+        "SizePercent": 45,
+        "SpreadPercent": 100,
+        "Mirror": true,
+        "ColorChase": true,
+        "ColorChaseStepSeconds": 1,
+        "ColorChaseSyncToBpm": true,
+        "ColorChaseBeatsPerStep": 2,
+        "ColorChaseAlternate": true,
+        "ColorChasePalette": [
+          "Rouge",
+          "Orange",
+          "Jaune",
+          "Vert",
+          "Cyan",
+          "Bleu",
+          "Violet",
+          "Magenta"
+        ],
+        "Strobe": false,
+        "StrobeHz": 4
+      },
+      "Selection": [
+        "lyre-1",
+        "lyre-2",
+        "spider-1"
+      ]
+    }
+  ],
+  "LiveState": {
+    "Id": "f0062aa08c4f",
+    "Name": "État courant",
+    "IncludeInAuto": true,
+    "Values": {
+      "lyre-1": [
+        112,
+        225,
+        238,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        128,
+        0,
+        255,
+        0,
+        0
+      ],
+      "lyre-2": [
+        128,
+        0,
+        128,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        128,
+        0,
+        255,
+        0,
+        0
+      ],
+      "spider-1": [
+        0,
+        0,
+        0,
+        0,
+        197,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        140,
+        137,
+        136,
+        0,
+        0
+      ],
+      "4e310af4401a": [
+        250,
+        0,
+        0,
+        0,
+        0,
+        64,
+        64,
+        0,
+        0,
+        0
+      ],
+      "72e6565cffc9": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "358f86cd2ba5": [
+        0
+      ]
+    },
+    "Effects": {
+      "Shape": "None",
+      "SpeedCyclesPerMinute": 20,
+      "MovementSyncToBpm": false,
+      "BeatsPerCycle": 8,
+      "SizePercent": 40,
+      "SpreadPercent": 50,
+      "Mirror": false,
+      "ColorChase": false,
+      "ColorChaseStepSeconds": 1,
+      "ColorChaseSyncToBpm": false,
+      "ColorChaseBeatsPerStep": 2,
+      "ColorChaseAlternate": true,
+      "ColorChasePalette": [
+        "Rouge",
+        "Orange",
+        "Jaune",
+        "Vert",
+        "Cyan",
+        "Bleu",
+        "Violet",
+        "Magenta"
+      ],
+      "Strobe": false,
+      "StrobeHz": 4
+    },
+    "Selection": [
+      "lyre-1",
+      "lyre-2",
+      "spider-1",
+      "4e310af4401a",
+      "72e6565cffc9",
+      "358f86cd2ba5"
+    ]
+  },
+  "Settings": {
+    "Bpm": 120,
+    "Master": 255,
+    "FadeSeconds": 1,
+    "AutoIntervalSeconds": 8,
+    "AutoSyncToBpm": false,
+    "AutoIntervalBeats": 16,
+    "SendIntervalMs": 100,
+    "OpenDimmerOnColor": true
+  }
+}
