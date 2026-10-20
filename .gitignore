@@ -13,3 +13,6 @@ __pycache__/
 
 # Fichiers temporaires d'ecriture atomique (ShowStore)
 *.tmp
+
+# Executable portable (dotnet publish)
+publish/
