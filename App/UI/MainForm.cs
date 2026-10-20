@@ -103,6 +103,8 @@ internal sealed class MainForm : Form
         _engine.LoadShow(show);
         _link.Source = _engine;
         _link.SendIntervalMs = show.Settings.SendIntervalMs;
+        _link.SendOnChangeOnly = show.Settings.SendOnChangeOnly;
+        _link.KeepAliveMs = show.Settings.KeepAliveMs;
         _link.ConnectionLost += (_, message) =>
         {
             // Called from the send thread: switch back to the UI thread.
@@ -335,6 +337,8 @@ internal sealed class MainForm : Form
         _ctx.Show = show;
         _showPath = path;
         _link.SendIntervalMs = show.Settings.SendIntervalMs;
+        _link.SendOnChangeOnly = show.Settings.SendOnChangeOnly;
+        _link.KeepAliveMs = show.Settings.KeepAliveMs;
 
         RebuildFixtureTabs();
         _live.ReloadAll();
@@ -871,7 +875,9 @@ internal sealed class MainForm : Form
     {
         if (_link.IsSending)
         {
-            _lblLink.Text = Tr.F("Connecté ({0}) — {1:N0} trames envoyées", _link.PortName, _link.FramesSent);
+            _lblLink.Text = _link.SendOnChangeOnly
+                ? Tr.F("Connecté ({0}) — {1:N0} trames envoyées, {2:N0} évitées (rien n'avait changé)", _link.PortName, _link.FramesSent, _link.FramesSkipped)
+                : Tr.F("Connecté ({0}) — {1:N0} trames envoyées", _link.PortName, _link.FramesSent);
             _lblLink.ForeColor = Ui.OkColor;
         }
         else if (_connecting)

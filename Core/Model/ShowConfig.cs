@@ -170,6 +170,12 @@ public sealed class ShowSettings
     /// <summary>Interval between two frames sent to the box (100 ms = original app).</summary>
     public int SendIntervalMs { get; set; } = 100;
 
+    /// <summary>Send a frame only when something changed, plus a keep-alive frame (see DmxLink.SendOnChangeOnly).</summary>
+    public bool SendOnChangeOnly { get; set; }
+
+    /// <summary>With SendOnChangeOnly: longest time without a frame, in milliseconds.</summary>
+    public int KeepAliveMs { get; set; } = 1000;
+
     /// <summary>Colour buttons open a dimmer that is at 0.</summary>
     public bool OpenDimmerOnColor { get; set; } = true;
 

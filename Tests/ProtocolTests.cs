@@ -63,4 +63,13 @@ public class ProtocolTests
         Assert.Equal(new byte[] { 0xBB, 0x99, 0x77, 0x01, 0x77, 0x99 }, DmxFrame.HandshakeConnect());
         Assert.Equal(new byte[] { 0xBB, 0x77, 0x99, 0x10, 0x99, 0x77, 0x00, 0x55 }, DmxFrame.HandshakeDisconnect());
     }
+
+    [Fact]
+    public void Send_on_change_only_skips_identical_frames_but_keeps_the_signal_alive()
+    {
+        Assert.True(DmxLink.ShouldSend(onChangeOnly: false, changed: false, msSinceLastFrame: 10, keepAliveMs: 1000));  // continuous mode
+        Assert.True(DmxLink.ShouldSend(onChangeOnly: true, changed: true, msSinceLastFrame: 10, keepAliveMs: 1000));    // something changed
+        Assert.False(DmxLink.ShouldSend(onChangeOnly: true, changed: false, msSinceLastFrame: 500, keepAliveMs: 1000)); // nothing new yet
+        Assert.True(DmxLink.ShouldSend(onChangeOnly: true, changed: false, msSinceLastFrame: 1000, keepAliveMs: 1000)); // keep-alive frame
+    }
 }

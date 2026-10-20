@@ -195,6 +195,7 @@ public static class ShowStore
 
         var s = show.Settings;
         s.SendIntervalMs = Math.Clamp(s.SendIntervalMs, 20, 1000);
+        s.KeepAliveMs = Math.Clamp(s.KeepAliveMs, 100, 5000);
         s.Bpm = Math.Clamp(s.Bpm, 30, 300);
         s.Master = Math.Clamp(s.Master, 0, 255);
         s.FadeSeconds = Math.Clamp(s.FadeSeconds, 0, 20);

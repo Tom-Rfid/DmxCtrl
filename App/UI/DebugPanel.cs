@@ -39,6 +39,8 @@ internal sealed class DebugPanel : UserControl
     };
     private readonly Button _blink = new() { Text = Tr.T("Démarrer le test clignotement"), AutoSize = true };
     private readonly NumericUpDown _start = new() { Minimum = 1, Maximum = DmxFrame.UniverseSize - VisibleChannels + 1, Width = 64, Margin = new Padding(3, 5, 3, 3) };
+    private readonly CheckBox _onChange = new() { Text = Tr.T("   Seulement si changement, maintien toutes les"), AutoSize = true, Margin = new Padding(3, 7, 0, 3) };
+    private readonly NumericUpDown _keepAlive = new() { Minimum = 100, Maximum = 5000, Increment = 100, Value = 1000, Width = 64, Margin = new Padding(3, 5, 3, 3) };
     private readonly NumericUpDown _interval = new() { Minimum = 20, Maximum = 1000, Increment = 10, Value = 100, Width = 64, Margin = new Padding(3, 5, 3, 3) };
     private readonly TrackBar[] _sliders = new TrackBar[VisibleChannels];
     private readonly Label[] _labels = new Label[VisibleChannels];
@@ -87,7 +89,11 @@ internal sealed class DebugPanel : UserControl
             _active, _blink, zero, copy,
             Ui.Text(Tr.T("Canaux affichés à partir de")), _start,
             Ui.Text(Tr.T("   Envoi d'une trame toutes les")), _interval, Ui.Text(Tr.T("ms (100 = appli d'origine)")),
+            _onChange, _keepAlive, Ui.Text(Tr.T("ms")),
         });
+        var tips = new ToolTip();
+        tips.SetToolTip(_onChange, Tr.T("Coché : une trame seulement quand une valeur change, plus une trame de maintien toutes les N ms pour que le boîtier et les appareils ne perdent pas le signal. À tester sur ton matériel avant une soirée."));
+        Disposed += (_, _) => tips.Dispose();
 
         var help = new Label
         {
@@ -153,6 +159,8 @@ internal sealed class DebugPanel : UserControl
             _ctx.Show.Settings.SendIntervalMs = (int)_interval.Value;
             _ctx.MarkDirty();
         };
+        _onChange.CheckedChanged += (_, _) => SaveSendMode();
+        _keepAlive.ValueChanged += (_, _) => SaveSendMode();
 
         ReloadSettings();
         RebuildLabels();
@@ -163,7 +171,28 @@ internal sealed class DebugPanel : UserControl
     {
         _updating = true;
         Ui.SetValue(_interval, _ctx.Show.Settings.SendIntervalMs);
+        _onChange.Checked = _ctx.Show.Settings.SendOnChangeOnly;
+        Ui.SetValue(_keepAlive, _ctx.Show.Settings.KeepAliveMs);
+        _keepAlive.Enabled = _onChange.Checked;
         _updating = false;
+    }
+
+    /// <summary>"Only when something changes" box and keep-alive time: applied to the link and saved with the configuration.</summary>
+    private void SaveSendMode()
+    {
+        _keepAlive.Enabled = _onChange.Checked;
+        if (_updating)
+        {
+            return;
+        }
+        _ctx.Link.SendOnChangeOnly = _onChange.Checked;
+        _ctx.Link.KeepAliveMs = (int)_keepAlive.Value;
+        _ctx.Show.Settings.SendOnChangeOnly = _onChange.Checked;
+        _ctx.Show.Settings.KeepAliveMs = (int)_keepAlive.Value;
+        _ctx.MarkDirty();
+        _ctx.Status(_onChange.Checked
+            ? Tr.F("Envoi seulement si changement (maintien toutes les {0} ms).", (int)_keepAlive.Value)
+            : Tr.T("Envoi continu d'une trame à chaque intervalle."));
     }
 
     /// <summary>Relabels the sliders from the patch (after the patch or a profile changed).</summary>

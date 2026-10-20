@@ -855,5 +855,11 @@ public static partial class Tr
         ["Balayage auto lancé."] = "Auto sweep started.",
         ["Balayage auto arrêté."] = "Auto sweep stopped.",
         ["Liaison perdue — nouvelle tentative dans {0:0} s"] = "Link lost — retrying in {0:0} s",
+        ["   Seulement si changement, maintien toutes les"] = "   Only when something changes, keep-alive every",
+        ["ms"] = "ms",
+        ["Coché : une trame seulement quand une valeur change, plus une trame de maintien toutes les N ms pour que le boîtier et les appareils ne perdent pas le signal. À tester sur ton matériel avant une soirée."] = "Ticked: a frame only when a value changes, plus a keep-alive frame every N ms so that the box and the fixtures never lose the signal. Test it on your hardware before a show.",
+        ["Envoi seulement si changement (maintien toutes les {0} ms)."] = "Sending only on change (keep-alive every {0} ms).",
+        ["Envoi continu d'une trame à chaque intervalle."] = "Continuous sending: one frame every interval.",
+        ["Connecté ({0}) — {1:N0} trames envoyées, {2:N0} évitées (rien n'avait changé)"] = "Connected ({0}) — {1:N0} frames sent, {2:N0} skipped (nothing had changed)",
     };
 }

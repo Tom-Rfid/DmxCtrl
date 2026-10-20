@@ -63,6 +63,32 @@ public sealed class DmxLink : IDisposable
         set => _sendIntervalMs = Math.Clamp(value, 20, 1000);
     }
 
+    /// <summary>
+    /// Send only when the universe changed, plus one "keep-alive" frame every <see cref="KeepAliveMs"/>
+    /// (so that the box and the fixtures never see the signal disappear). Off = a frame every interval.
+    /// </summary>
+    public bool SendOnChangeOnly { get; set; }
+
+    /// <summary>With SendOnChangeOnly: longest time without a frame, in milliseconds (100 to 5000).</summary>
+    public int KeepAliveMs
+    {
+        get => _keepAliveMs;
+        set => _keepAliveMs = Math.Clamp(value, 100, 5000);
+    }
+
+    private volatile int _keepAliveMs = 1000;
+    private long _framesSkipped;
+
+    /// <summary>Frames not sent because nothing changed (SendOnChangeOnly), since the connection.</summary>
+    public long FramesSkipped => Interlocked.Read(ref _framesSkipped);
+
+    /// <summary>
+    /// Decides whether a computed frame is sent: always in continuous mode; otherwise when the universe
+    /// changed or when the last frame is older than the keep-alive time.
+    /// </summary>
+    public static bool ShouldSend(bool onChangeOnly, bool changed, long msSinceLastFrame, int keepAliveMs) =>
+        !onChangeOnly || changed || msSinceLastFrame >= keepAliveMs;
+
     /// <summary>true while the COM port is open.</summary>
     public bool IsConnected => _port is { IsOpen: true };
     /// <summary>true while the send loop runs.</summary>
@@ -119,6 +145,7 @@ public sealed class DmxLink : IDisposable
             _port = port;
             LastError = null;
             Interlocked.Exchange(ref _framesSent, 0);
+            Interlocked.Exchange(ref _framesSkipped, 0);
         }
     }
 
@@ -255,6 +282,8 @@ public sealed class DmxLink : IDisposable
     private void SendLoop()
     {
         var universe = DmxFrame.NewUniverse();
+        var lastSent = DmxFrame.NewUniverse();
+        long lastSentAt = long.MinValue / 2; // the first frame always goes out
         var clock = Stopwatch.StartNew();
 
         while (_sending)
@@ -264,6 +293,16 @@ public sealed class DmxLink : IDisposable
             {
                 Array.Clear(universe);
                 Source?.Render(universe);
+
+                bool changed = !universe.AsSpan().SequenceEqual(lastSent);
+                if (!ShouldSend(SendOnChangeOnly, changed, started - lastSentAt, _keepAliveMs))
+                {
+                    Interlocked.Increment(ref _framesSkipped);
+                    Thread.Sleep((int)Math.Max(1, _sendIntervalMs - (clock.ElapsedMilliseconds - started)));
+                    continue;
+                }
+                Array.Copy(universe, lastSent, universe.Length);
+                lastSentAt = started;
 
                 byte[] frame = DmxFrame.Build(universe, NextCodeNum());
                 var port = _port;
