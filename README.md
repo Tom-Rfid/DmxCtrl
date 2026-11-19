@@ -8,6 +8,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue)
 ![.NET](https://img.shields.io/badge/.NET-10%20WinForms-purple)
 ![Portable](https://img.shields.io/badge/exe-portable%2C%20single%20file-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-green)
 ![Contributions](https://img.shields.io/badge/fixture%20profiles-contributions%20welcome-orange)
 
 <!--
@@ -156,6 +157,12 @@ Code comments are in English.
 
 [**JL_SPP-ProtocolLib-DMX**](https://github.com/Tom-Rfid/JL_SPP-ProtocolLib-DMX) — the
 protocol specification and libraries (Python, C, C#, Android) behind DmxCtrl.
+
+## License
+
+[MIT](LICENSE): free to use, modify and redistribute, including in commercial
+products, as long as the copyright notice and the licence text are kept. Provided
+without any warranty.
 
 ## Disclaimer
 

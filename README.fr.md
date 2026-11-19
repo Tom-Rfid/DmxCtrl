@@ -9,6 +9,7 @@ installer.**
 ![Plateforme](https://img.shields.io/badge/plateforme-Windows%2010%20%7C%2011-blue)
 ![.NET](https://img.shields.io/badge/.NET-10%20WinForms-purple)
 ![Portable](https://img.shields.io/badge/exe-portable%2C%20un%20seul%20fichier-brightgreen)
+![Licence](https://img.shields.io/badge/licence-MIT-green)
 ![Contributions](https://img.shields.io/badge/profils%20d'appareils-contributions%20bienvenues-orange)
 
 <!--
@@ -163,6 +164,12 @@ Les commentaires du code sont en anglais.
 [**JL_SPP-ProtocolLib-DMX**](https://github.com/Tom-Rfid/JL_SPP-ProtocolLib-DMX) — la
 spécification du protocole et les librairies (Python, C, C#, Android) sur lesquelles
 repose DmxCtrl.
+
+## Licence
+
+[MIT](LICENSE) : utilisation, modification et redistribution libres, y compris dans
+des produits commerciaux, à condition de conserver la mention de copyright et le texte
+de la licence. Fourni sans aucune garantie.
 
 ## Avertissement
 
